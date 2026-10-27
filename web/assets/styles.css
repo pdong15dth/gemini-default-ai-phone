@@ -646,10 +646,11 @@ h1, h2, h3, p, figure, blockquote { margin: 0; }
   margin-top: 8px;
 }
 .step {
-  padding: 22px 26px 4px 0;
+  padding: 22px 26px 4px;
   border-right: 1px solid var(--line-soft);
 }
-.step:last-child { border-right: 0; }
+.step:first-child { padding-left: 0; }
+.step:last-child { border-right: 0; padding-right: 0; }
 .step__num {
   display: block;
   font-family: var(--mono);
@@ -1324,6 +1325,8 @@ h1, h2, h3, p, figure, blockquote { margin: 0; }
   .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .step { padding-block: 20px; }
   .step:nth-child(2) { border-right: 0; }
+  .step:nth-child(odd) { padding-left: 0; }
+  .step:nth-child(even) { padding-right: 0; }
   .step:nth-child(3),
   .step:nth-child(4) { border-top: 1px solid var(--line-soft); }
   .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1400,7 +1403,7 @@ h1, h2, h3, p, figure, blockquote { margin: 0; }
   .hero__trust { gap: 10px 18px; }
   .hero__cta .btn { flex: 1 1 auto; }
   .steps { grid-template-columns: 1fr; }
-  .step { border-right: 0; border-top: 1px solid var(--line-soft); padding-block: 18px; }
+  .step { border-right: 0; border-top: 1px solid var(--line-soft); padding-block: 18px; padding-inline: 0; }
   .step:first-child { border-top: 0; }
   .step__desc { max-width: none; }
   .features { grid-template-columns: 1fr; }
