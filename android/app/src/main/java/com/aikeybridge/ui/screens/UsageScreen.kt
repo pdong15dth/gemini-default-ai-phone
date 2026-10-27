@@ -49,16 +49,27 @@ import com.aikeybridge.ui.theme.TextFaint
 import com.aikeybridge.ui.theme.TextLabel
 import com.aikeybridge.ui.theme.TextMain
 
-/** Bước 2 onboarding: chọn chạy đầy đủ (Trợ năng) hay chỉ cấu hình một lần. */
+/** Bước 2 onboarding: chọn script nền, chạy đầy đủ (Trợ năng) hay chỉ cấu hình một lần. */
 @Composable
 fun UsageScreen(
     config: ActiveConfig,
     current: UsageMode,
+    chosen: Boolean,
     onBack: () -> Unit,
     onConfirm: (UsageMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var selected by rememberSaveable { mutableStateOf(current) }
+    val scriptAvailable = config.profile.shellWatch != null && config.target.shellKeyevent != null
+    // Chưa chọn lần nào thì gợi ý Script nền; máy không chạy được script thì về Đầy đủ.
+    var selected by rememberSaveable {
+        mutableStateOf(
+            when {
+                !chosen && scriptAvailable -> UsageMode.SCRIPT
+                current == UsageMode.SCRIPT && !scriptAvailable -> UsageMode.FULL
+                else -> current
+            },
+        )
+    }
     val assistant = config.profile.assistantName
     val target = config.target.displayName
     val wake = config.profile.wakePhrase?.let { "“$it”" } ?: assistant
@@ -82,23 +93,10 @@ fun UsageScreen(
                 lineHeight = 20.sp,
             )
             Gap(22.dp)
-            ModeCard(
-                title = "Đầy đủ",
-                tag = "khuyên dùng",
-                selected = selected == UsageMode.FULL,
-                points = listOf(
-                    "$wake → $target, $assistant không còn trả lời",
-                    "Phím tắt / nút AI → $target",
-                    "Tự bấm Micro sau khi $target mở",
-                ),
-                cost = "Cần Trợ năng · app chạy nền nhẹ",
-                onClick = { selected = UsageMode.FULL },
-            )
-            if (config.profile.shellWatch != null && config.target.shellKeyevent != null) {
-                Gap(12.dp)
+            if (scriptAvailable) {
                 ModeCard(
                     title = "Script nền",
-                    tag = "như README",
+                    tag = "khuyên dùng",
                     selected = selected == UsageMode.SCRIPT,
                     points = listOf(
                         "$wake → $target, Micro bật sẵn",
@@ -108,7 +106,20 @@ fun UsageScreen(
                     cost = "Cần Shizuku (hoặc ADB) sau mỗi lần khởi động máy",
                     onClick = { selected = UsageMode.SCRIPT },
                 )
+                Gap(12.dp)
             }
+            ModeCard(
+                title = "Đầy đủ",
+                tag = if (scriptAvailable) null else "khuyên dùng",
+                selected = selected == UsageMode.FULL,
+                points = listOf(
+                    "$wake → $target, $assistant không còn trả lời",
+                    "Phím tắt / nút AI → $target",
+                    "Tự bấm Micro sau khi $target mở",
+                ),
+                cost = "Cần Trợ năng · app chạy nền nhẹ",
+                onClick = { selected = UsageMode.FULL },
+            )
             Gap(12.dp)
             ModeCard(
                 title = "Cấu hình một lần",

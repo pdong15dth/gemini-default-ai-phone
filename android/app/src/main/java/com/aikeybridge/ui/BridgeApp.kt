@@ -168,6 +168,7 @@ fun BridgeApp(viewModel: AppViewModel) {
                     "onboarding:2" -> UsageScreen(
                         config = config,
                         current = settings.usageMode,
+                        chosen = settings.usageModeChosen,
                         onBack = { onboardingStep = 1 },
                         onConfirm = { mode ->
                             viewModel.setUsageMode(mode, announce = false)

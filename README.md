@@ -2,7 +2,7 @@
 
 **Hô "Hi Jovi". Gemini trả lời.**
 
-App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi trên Vivo OriginOS và các hãng khác) bằng **Google Gemini** — cả câu lệnh giọng nói lẫn nút cứng, tự bật Micro. Không root, không cần máy tính sau khi cài.
+App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi trên Vivo OriginOS và các hãng khác) bằng **Google Gemini** — cả câu lệnh giọng nói lẫn nút cứng, tự bật Micro. Không root, không bắt buộc Trợ năng, không cần máy tính sau khi cài.
 
 <p align="center">
   <img src="docs/images/01-welcome.webp" width="240" alt="Màn chào">
@@ -41,7 +41,7 @@ App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi tr�
 
 | | Chức năng | Mô tả |
 | --- | --- | --- |
-| 🎙️ | **Thay "Hi Jovi"** | Bắt cửa sổ trợ lý gốc vừa hiện, đóng nó và mở Gemini thay thế. Tiểu V không còn trả lời. |
+| 🎙️ | **Thay "Hi Jovi"** | Bắt trợ lý gốc vừa hiện, đóng nó và mở Gemini thay thế — bằng script nền (không cần Trợ năng) hoặc Trợ năng. |
 | 🔘 | **Nút cứng → AI** | Nút lối tắt / nút AI bên hông mở Gemini. Chế độ A bắt cửa sổ Tiểu V; chế độ B đọc event log nên Tiểu V không nháy lên. |
 | 🎤 | **Tự bật Micro** | Tự chạm nút Micro sau khi Gemini mở, bạn nói luôn không cần chạm tay. |
 | 🔒 | **Màn hình khóa** | Hô "Hi Jovi" khi máy đang khóa vẫn lên Gemini. |
@@ -59,16 +59,21 @@ App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi tr�
 ## Cơ chế hoạt động
 
 ```
-"Hi Jovi" / nút AI ──► cửa sổ Tiểu V hiện ──► Trợ năng bắt được (≈50 ms)
+"Hi Jovi" / nút AI ──► cửa sổ Tiểu V hiện ──► app biết (≈50 ms)
                                                    │
                                                    ▼
                                      Back: đóng panel, nhả audio (500 ms)
                                                    │
                                                    ▼
-                                     Mở Gemini (400 ms) ──► tự bật Micro (250 ms)
+                                     Mở Gemini, Micro bật sẵn
 ```
 
-App dùng **AccessibilityService** chỉ để đọc *tên gói* và *tên lớp cửa sổ* đang hiện — không đọc nội dung màn hình, không ghi âm.
+App biết trợ lý gốc vừa mở bằng một trong hai cách, tuỳ chế độ:
+
+- **Script nền** (khuyên dùng, không cần Trợ năng): script shell chạy bằng quyền shell của Shizuku, đọc kênh `events` của logcat và lọc đúng sự kiện `CopilotPanelWindow` / nút lối tắt. Gặp sự kiện thì bấm Back, đánh thức màn hình rồi gửi `keyevent 231` — Gemini mở thẳng chế độ nghe. Giống hệt cách trong [hướng dẫn script ADB](HUONG-DAN-SCRIPT-ADB.md), nhưng không cần máy tính.
+- **Đầy đủ**: **AccessibilityService** đọc *tên gói* và *tên lớp cửa sổ* vừa hiện. Khi Gemini mở, service đọc thêm tên và mô tả của các nút để tìm nút Micro rồi chạm.
+
+Cả hai đều không đọc văn bản trên màn hình, không chụp màn hình, không ghi âm. App không có quyền Internet.
 
 <a name="hang-duoc-ho-tro"></a>
 
@@ -110,8 +115,8 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
 
 | Chế độ | Thay "Hi Jovi" | Nút / phím tắt | Tự bật Micro | Cần |
 | --- | --- | --- | --- | --- |
-| **Đầy đủ** (khuyên dùng) | ✅ | ✅ | ✅ | Trợ năng, app chạy nền nhẹ |
-| **Script nền** | ✅ | ✅ | ✅ | Shizuku (bật lại sau mỗi lần khởi động máy) |
+| **Script nền** (khuyên dùng) | ✅ | ✅ | ✅ | Shizuku (bật lại sau mỗi lần khởi động máy) |
+| **Đầy đủ** | ✅ | ✅ | ✅ | Trợ năng, app chạy nền nhẹ |
 | **Cấu hình một lần** | ❌ (vẫn là Tiểu V) | ✅ | ❌ | Shizuku hoặc ADB một lần, không chạy nền |
 
 Đổi chế độ bất cứ lúc nào trong tab **Chế độ**.
@@ -125,7 +130,7 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
     <td width="33%"><img src="docs/images/10-overview.webp" alt="Tổng quan: Sẵn sàng"></td>
   </tr>
   <tr>
-    <td><b>Bước 3 — Cấp quyền.</b> Chạm từng dòng để mở đúng màn hình cài đặt: <b>Trợ năng</b>, <b>Tự khởi chạy</b>, <b>Pin không hạn chế</b>.</td>
+    <td><b>Bước 3 — Cấp quyền.</b> Chạm từng dòng để mở đúng màn hình cài đặt. Script nền cần <b>Shizuku</b>; chế độ Đầy đủ cần thêm <b>Trợ năng</b>, <b>Tự khởi chạy</b>, <b>Pin không hạn chế</b>.</td>
     <td><b>Bước 4 — Kích hoạt & vá lỗi.</b> Có Shizuku thì bấm <b>Chạy 7 lệnh</b>; không có thì bấm nút copy và dán lệnh ADB vào máy tính một lần.</td>
     <td>Trạng thái chuyển sang <b>Sẵn sàng</b>. Hô <b>"Hi Jovi"</b> để thử.</td>
   </tr>
@@ -185,9 +190,17 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
 
 ## Lưu ý trên OriginOS
 
+**Script nền** (khuyên dùng)
+
+- Script chạy dưới quyền `shell` của Shizuku, tách khỏi app. **Vuốt app khỏi đa nhiệm hay kill app đều không ảnh hưởng** — "Hi Jovi" vẫn gọi Gemini.
+- Script và Shizuku không root **mất khi khởi động lại máy**. Sau mỗi lần khởi động: bật lại Shizuku, mở app, bấm **Bật script**.
+- Không cần Trợ năng, không cần Tự khởi chạy.
+
+**Đầy đủ** (Trợ năng)
+
 - **Khóa AI Key Bridge trong đa nhiệm.** Vuốt app khỏi màn đa nhiệm trên OriginOS là *force-stop*, và Android tự **tắt Trợ năng** của app bị force-stop — "Hi Jovi" sẽ ngừng hoạt động cho tới khi bạn bật lại Trợ năng. Mở đa nhiệm, kéo thẻ AI Key Bridge xuống (hoặc chạm biểu tượng khóa) để OriginOS không dọn nó.
-- Bật **Tự khởi chạy**: *i Quản lý → Quản lý ứng dụng → Tự khởi chạy → bật AI Key Bridge*.
-- Shizuku không root mất sau khi khởi động lại máy — chỉ ảnh hưởng chế độ **Script nền** và việc chạy lại lệnh kích hoạt. Chế độ **Đầy đủ** vẫn chạy nhờ Trợ năng.
+- Bật **Tự khởi chạy**: *i Quản lý → Quản lý ứng dụng → Tự khởi chạy → bật AI Key Bridge*, để dịch vụ chạy lại sau khi khởi động máy.
+- Không cần Shizuku lúc chạy — chỉ cần một lần để chạy lệnh kích hoạt (hoặc dán lệnh ADB).
 
 <a name="bao-loi"></a>
 

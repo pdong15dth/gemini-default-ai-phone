@@ -386,8 +386,8 @@ private fun UsageModeDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 listOfNotNull(
+                    Triple(UsageMode.SCRIPT, "Script nền", "Khuyên dùng · Shizuku · không Trợ năng").takeIf { scriptAvailable },
                     Triple(UsageMode.FULL, "Đầy đủ", "Cần Trợ năng · thay khẩu lệnh, tự bật Micro"),
-                    Triple(UsageMode.SCRIPT, "Script nền", "Shizuku · như README · không Trợ năng").takeIf { scriptAvailable },
                     Triple(UsageMode.ONE_TIME, "Cấu hình một lần", "Không Trợ năng · gán phím vào lối tắt Gọi AI"),
                 ).forEach { (mode, title, sub) ->
                     Row(

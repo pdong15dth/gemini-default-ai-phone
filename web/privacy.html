@@ -28,18 +28,19 @@
   <div class="wrap"><div class="doc__inner">
     <a class="doc__back" href="index.html">← Trang chủ</a>
     <h1 class="doc__title">Chính sách riêng tư</h1>
-    <p class="doc__meta">Cập nhật 27/10/2025 · áp dụng cho AI Key Bridge 0.9.x</p>
+    <p class="doc__meta">Cập nhật 28/10/2026 · áp dụng cho AI Key Bridge 1.0.x</p>
 
     <div class="prose">
       <p class="callout"><strong>Không có server.</strong> AI Key Bridge chạy hoàn toàn trên máy bạn. Không có tài khoản, không có telemetry, không có SDK quảng cáo hay phân tích của bên thứ ba.</p>
 
       <h2>App đọc gì</h2>
-      <p>Để biết trợ lý gốc vừa trượt lên, app dùng quyền Trợ năng (AccessibilityService) và chỉ đọc hai trường của sự kiện cửa sổ:</p>
+      <p>Cách app biết trợ lý gốc vừa mở tuỳ vào cách dùng bạn chọn:</p>
       <ul>
-        <li>Tên gói của app vừa mở cửa sổ (ví dụ <code>com.vivo.ai.copilot</code>).</li>
-        <li>Tên lớp cửa sổ (ví dụ <code>CopilotPanelWindow</code>).</li>
+        <li><strong>Script nền</strong> (khuyên dùng, không cần Trợ năng): một script shell chạy qua Shizuku, chỉ đọc kênh <code>events</code> của logcat và lọc đúng tên sự kiện của trợ lý gốc (ví dụ <code>CopilotPanelWindow</code>). Thấy sự kiện thì bấm Back, đánh thức màn hình và gọi trợ lý bằng phím <code>231</code>. Script không đọc nội dung màn hình và không lưu dòng log nào.</li>
+        <li><strong>Đầy đủ</strong>: dùng quyền Trợ năng (AccessibilityService) và chỉ đọc hai trường của sự kiện cửa sổ — tên gói (ví dụ <code>com.vivo.ai.copilot</code>) và tên lớp cửa sổ (ví dụ <code>CopilotPanelWindow</code>).</li>
+        <li><strong>Cấu hình một lần</strong>: không theo dõi gì; bạn gán phím vào lối tắt “Gọi AI”.</li>
       </ul>
-      <p>Khi Gemini đã mở, app duyệt cây nút để tìm nút Micro. Bước này chỉ đọc <code>viewIdResourceName</code> và <code>contentDescription</code> (mô tả của nút), không đọc <code>text</code>, không đọc mật khẩu, không chụp màn hình và không lưu nội dung cửa sổ.</p>
+      <p>Riêng chế độ Đầy đủ, khi Gemini đã mở, app duyệt cây nút để tìm nút Micro. Bước này chỉ đọc <code>viewIdResourceName</code> và <code>contentDescription</code> (mô tả của nút), không đọc <code>text</code>, không đọc mật khẩu, không chụp màn hình và không lưu nội dung cửa sổ.</p>
 
       <h2>Micro và âm thanh</h2>
       <p>App không xin quyền <code>RECORD_AUDIO</code> và không có khả năng ghi âm. Khi Gemini mở, app chỉ mô phỏng một cú chạm vào nút Micro của Gemini. Âm thanh do Gemini xử lý theo chính sách của Google.</p>
@@ -47,23 +48,31 @@
       <h2>Dữ liệu lưu trên máy</h2>
       <ul>
         <li>Cấu hình: đích đến, độ trễ, các công tắc. Lưu trong bộ nhớ riêng của app.</li>
-        <li>Nhật ký sự kiện: thời điểm, tên sự kiện, thời lượng. Vòng lặp tối đa 200 mục, tự ghi đè.</li>
+        <li>Nhật ký sự kiện: thời điểm, tên sự kiện, thời lượng. Lưu trong file tối đa khoảng 1 MB, tự xoay vòng.</li>
+        <li>Lịch sử lượt chạy: tối đa 500 lượt gần nhất, dùng cho biểu đồ 7 ngày.</li>
         <li>Profile ROM: file JSON đi kèm app.</li>
       </ul>
       <p>Bạn có thể xoá toàn bộ bằng <strong>Nhật ký → Xoá</strong>, hoặc xoá dữ liệu app trong hệ thống.</p>
 
       <h2>Xuất log chẩn đoán</h2>
-      <p>Log chỉ được tạo khi bạn bấm <strong>Xuất log chẩn đoán</strong>. Log không chứa văn bản màn hình, tên riêng hay số điện thoại — chỉ gồm tên gói, tên lớp cửa sổ, kết quả lệnh và thời lượng. File zip nằm trong bộ nhớ máy cho tới khi bạn tự chia sẻ.</p>
+      <p>File zip chỉ được tạo khi bạn bấm <strong>Xuất log chẩn đoán</strong> và nằm trong bộ nhớ máy cho tới khi bạn tự chia sẻ. Nội dung gồm:</p>
+      <ul>
+        <li>Nhật ký của app: tên gói, tên lớp cửa sổ, kết quả lệnh và thời lượng — không có văn bản màn hình.</li>
+        <li>Lý do các lần app bị tắt (vuốt khỏi đa nhiệm, ROM dọn RAM, crash…), do Android ghi lại.</li>
+        <li>Nếu có Shizuku: logcat toàn máy và trạng thái hệ thống (Trợ năng, trợ lý mặc định, quyền của app). Phần này <strong>không được che</strong> và có thể chứa tên app khác, tên Wi-Fi hay tài khoản.</li>
+      </ul>
+      <p>Vì vậy chỉ gửi file zip riêng cho người phát triển, không đăng công khai.</p>
 
       <h2>Shizuku và ADB</h2>
-      <p>Shizuku là app bên thứ ba, chạy lệnh shell với quyền của chính nó. AI Key Bridge chỉ gửi đúng các lệnh cấu hình hiển thị trong màn hình Kích hoạt, không gửi gì ra mạng. Nếu bạn không cài Shizuku, app in lệnh ADB để bạn tự dán.</p>
+      <p>Shizuku là app bên thứ ba, chạy lệnh shell với quyền của chính nó. AI Key Bridge chỉ gửi đúng các lệnh hiển thị trong app: lệnh cấu hình ở màn hình Kích hoạt, script nền ở màn hình Script nền, và các lệnh đọc trạng thái khi bạn xuất log. Không gửi gì ra mạng. Nếu bạn không cài Shizuku, app in lệnh ADB để bạn tự dán.</p>
 
       <h2>Quyền hệ thống được dùng</h2>
       <ul>
-        <li><strong>Trợ năng</strong> — bắt sự kiện cửa sổ trợ lý gốc, tìm nút Micro và thực hiện thao tác chạm.</li>
+        <li><strong>Shizuku</strong> — chạy script nền (chế độ khuyên dùng) và lệnh cấu hình. Không bắt buộc nếu bạn dùng chế độ Đầy đủ và dán lệnh ADB.</li>
+        <li><strong>Trợ năng</strong> (chỉ chế độ Đầy đủ) — bắt sự kiện cửa sổ trợ lý gốc, tìm nút Micro và thực hiện thao tác chạm.</li>
+        <li><strong>READ_LOGS</strong> (tuỳ chọn, cấp qua Shizuku/ADB) — chế độ nút cứng B đọc event log để biết bạn vừa bấm nút.</li>
         <li><strong>Bỏ giới hạn pin</strong> (khuyến nghị) — giữ service sống sau khi reboot.</li>
         <li><strong>Truy vấn gói</strong> — kiểm tra Gemini và trợ lý gốc đã cài hay chưa.</li>
-        <li><strong>Shizuku</strong> (tuỳ chọn) — chạy lệnh cấu hình và dự phòng keyevent 231; không bắt buộc lúc chạy.</li>
       </ul>
       <p>App không xin quyền vị trí, danh bạ, tin nhắn, camera, bộ nhớ ngoài hay quyền INTERNET.</p>
 
@@ -74,7 +83,7 @@
       <p>Mọi thay đổi sẽ được ghi trong <a href="https://github.com/pdong15dth/gemini-default-ai-phone">mã nguồn</a> và có hiệu lực từ commit tương ứng. Vì app không có server, không có bản cập nhật chính sách nào âm thầm chạy trên máy bạn.</p>
 
       <h2>Liên hệ</h2>
-      <p>Mở issue tại <a href="https://github.com/pdong15dth/gemini-default-ai-phone/issues">github.com/pdong15dth/gemini-default-ai-phone/issues</a>. Vui lòng không dán log chưa che nội dung.</p>
+      <p>Mở issue tại <a href="https://github.com/pdong15dth/gemini-default-ai-phone/issues">github.com/pdong15dth/gemini-default-ai-phone/issues</a>. Vui lòng không đính kèm file log chẩn đoán vào issue công khai — gửi riêng cho người phát triển.</p>
     </div>
   </div></div>
 </main>
