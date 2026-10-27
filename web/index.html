@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Key Bridge — Hô “Hi Jovi”, Gemini trả lời</title>
-<meta name="description" content="Biến nút AI của ROM nội địa thành cửa mở Gemini. Cấu hình một lần, chạy độc lập, không cần PC, không root. Mã nguồn mở MIT, Android 11–15.">
+<meta name="description" content="Biến khẩu lệnh và nút AI của ROM nội địa thành cửa mở Gemini. Script nền qua Shizuku hoặc Trợ năng, không cần PC, không root. Mã nguồn mở MIT, Android 11+.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0A0B0D">
 <link rel="canonical" href="https://pdong15dth.github.io/gemini-default-ai-phone/">
@@ -76,7 +76,7 @@
     </nav>
 
     <div class="nav__right">
-      <span class="version"><span class="dot" aria-hidden="true"></span>v0.9 · beta</span>
+      <span class="version"><span class="dot" aria-hidden="true"></span>v1.0.1</span>
       <a class="btn btn--light btn--sm" href="https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk">
         Tải APK <svg class="i" aria-hidden="true"><use href="#i-arrow-down-to-line"/></svg>
       </a>
@@ -94,12 +94,12 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap hero__grid">
       <div class="hero__copy">
-        <p class="eyebrow" data-reveal><span class="pulse" aria-hidden="true"></span>Android 11–15 · OriginOS 3/4/5 · Không root</p>
+        <p class="eyebrow" data-reveal><span class="pulse" aria-hidden="true"></span>Android 11+ · OriginOS · Không root</p>
         <h1 class="hero__title" id="hero-title" data-reveal data-delay="1">
           Hô “Hi Jovi”.<br><span class="accent">Gemini</span> trả lời.
         </h1>
         <p class="hero__sub" data-reveal data-delay="2">
-          Biến khẩu lệnh và nút AI của ROM nội địa thành cửa mở Gemini: bắt cửa sổ trợ lý gốc, đóng nó, mở Gemini, tự bật Micro. Cấu hình một lần — chạy độc lập, không cần máy tính.
+          Biến khẩu lệnh và nút AI của ROM nội địa thành cửa mở Gemini: bắt trợ lý gốc vừa mở, đóng nó, mở Gemini với Micro bật sẵn. Chạy bằng script nền qua Shizuku — không cần Trợ năng, không cần máy tính.
         </p>
         <div class="hero__cta" data-reveal data-delay="3">
           <a class="btn btn--accent" href="https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk">
@@ -122,8 +122,8 @@
         <div class="hero__glow" aria-hidden="true"></div>
         <figure class="phone phone--hero">
           <div class="phone__frame">
-            <img class="phone__shot" src="assets/shots/overview.webp" width="824" height="1830"
-                 alt="Màn hình Tổng quan của AI Key Bridge: trạng thái Sẵn sàng, 96% thành công, các công tắc Tự bật Micro và Màn hình khóa đang bật."
+            <img class="phone__shot" src="assets/shots/overview.webp" width="540" height="1200"
+                 alt="Màn hình Tổng quan của AI Key Bridge trên vivo: trạng thái Sẵn sàng, 100% thành công, thời gian trung bình 0,9 giây, script nền đang chạy."
                  fetchpriority="high" decoding="async">
           </div>
           <figcaption class="visually-hidden">Ảnh màn hình ứng dụng AI Key Bridge</figcaption>
@@ -132,7 +132,7 @@
           <span class="chip__icon"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg></span>
           <span>
             <b>Chuyển hướng xong</b>
-            <small>Hi Jovi → Gemini · 1.2s</small>
+            <small>Hi Jovi → Gemini · 0,9s</small>
           </span>
         </div>
         <div class="chip chip--mic" aria-hidden="true">
@@ -150,7 +150,7 @@
         <p class="eyebrow eyebrow--dark">Trước &amp; sau</p>
         <h2 class="h2 h2--dark" id="compare-title">Một cái nút. Không còn chuỗi lệnh.</h2>
         <p class="lede">
-          Cách cũ cần PC, cáp và lòng kiên nhẫn. AI Key Bridge gói toàn bộ quy trình đó vào ba màn hình onboarding — rồi biến mất khỏi đường đi của bạn.
+          Cách cũ cần PC, cáp và lòng kiên nhẫn. AI Key Bridge gói toàn bộ quy trình đó vào vài màn hình onboarding — rồi biến mất khỏi đường đi của bạn.
         </p>
       </header>
 
@@ -177,11 +177,11 @@
             <span class="compare__time compare__time--accent">≈ 3 phút</span>
           </div>
           <ul class="list-check">
-            <li>Bật Trợ năng — chỉ một lần</li>
-            <li>Chạm “Kích hoạt &amp; vá lỗi”</li>
+            <li>Chọn cách dùng: Script nền, Đầy đủ hoặc Cấu hình một lần</li>
+            <li>Chạm “Kích hoạt &amp; vá lỗi” — Shizuku chạy lệnh thay PC</li>
             <li>Hô “Hi Jovi” → Gemini mở, Micro bật</li>
-            <li>Reboot vẫn sống, không cần cáp</li>
-            <li>Đổi đích đến: Gemini, ChatGPT Voice hoặc app khác</li>
+            <li>Reboot: bật lại script bằng một chạm, không cần cáp</li>
+            <li>Đổi đích đến: Gemini, ChatGPT Voice, Claude hoặc app khác</li>
           </ul>
           <p class="compare__note">Không root · Không Xposed · Không gửi dữ liệu ra ngoài</p>
         </div>
@@ -195,18 +195,18 @@
       <header class="head head--split" data-reveal>
         <div>
           <p class="eyebrow">Luồng chạy thật</p>
-          <h2 class="h2" id="how-title">Từ tiếng gọi đến Micro:<br>1,2 giây.</h2>
+          <h2 class="h2" id="how-title">Từ tiếng gọi đến Micro:<br>dưới 1 giây.</h2>
         </div>
         <p class="head__aside">
-          Không đọc nội dung màn hình, không ghi âm. Chỉ quan sát sự kiện cửa sổ, bấm Back, rồi chạm đúng một nút.
+          Không đọc nội dung màn hình, không ghi âm. Script nền đọc sự kiện hệ thống qua Shizuku; chế độ Đầy đủ dùng Trợ năng để quan sát cửa sổ. Cả hai đều chỉ bấm Back rồi gọi Gemini.
         </p>
       </header>
 
       <ol class="steps">
         <li class="step" data-reveal>
           <span class="step__num">01 <span>/ ≈ 50 ms</span></span>
-          <h3 class="step__title">Bắt cửa sổ trợ lý gốc</h3>
-          <p class="step__desc">Accessibility thấy CopilotPanelWindow vừa trượt lên.</p>
+          <h3 class="step__title">Bắt trợ lý gốc</h3>
+          <p class="step__desc">Script thấy CopilotPanelWindow trong event log (Đầy đủ: Trợ năng thấy cửa sổ).</p>
         </li>
         <li class="step" data-reveal data-delay="1">
           <span class="step__num">02 <span>/ ≈ 500 ms</span></span>
@@ -216,12 +216,12 @@
         <li class="step" data-reveal data-delay="2">
           <span class="step__num">03 <span>/ ≈ 400 ms</span></span>
           <h3 class="step__title">Mở Gemini</h3>
-          <p class="step__desc">Intent ACTION_ASSIST, fallback keyevent 231.</p>
+          <p class="step__desc">Script: keyevent 231 (phím trợ lý giọng nói). Đầy đủ: intent tường minh tới Gemini.</p>
         </li>
         <li class="step" data-reveal data-delay="3">
           <span class="step__num">04 <span>/ ≈ 250 ms</span></span>
-          <h3 class="step__title">Tự bật Micro</h3>
-          <p class="step__desc">Tìm node mic, click hoặc chạm theo bounds cửa sổ.</p>
+          <h3 class="step__title">Micro bật sẵn</h3>
+          <p class="step__desc">Keyevent 231 mở thẳng chế độ nghe. Đầy đủ: tìm nút Micro rồi chạm.</p>
         </li>
       </ol>
 
@@ -247,7 +247,7 @@
         <div class="provision__copy" data-reveal data-delay="1">
           <h3 class="h3">Cấu hình 7 lệnh, hoặc dán tay nếu chưa có Shizuku.</h3>
           <p>Provisioner chạy qua Shizuku hoặc in lệnh ADB cho bạn dán. Mỗi bước đều đọc lại giá trị để xác nhận — không tin exit code. Lệnh nào fail thì báo đúng lệnh đó, kèm gợi ý theo ROM.</p>
-          <p class="note"><svg class="i" aria-hidden="true"><use href="#i-triangle-alert"/></svg>Shizuku không root phải bật lại sau reboot. App không phụ thuộc Shizuku lúc chạy — chỉ dùng làm dự phòng keyevent nếu đang bật.</p>
+          <p class="note"><svg class="i" aria-hidden="true"><use href="#i-triangle-alert"/></svg>Shizuku không root phải bật lại sau reboot, rồi bấm “Bật script” trong app. Chế độ Đầy đủ chạy bằng Trợ năng nên không cần Shizuku lúc chạy.</p>
         </div>
       </div>
     </div>
@@ -257,45 +257,45 @@
   <section class="section dark section--flush" id="screens" aria-labelledby="screens-title">
     <div class="wrap">
       <header class="head head--center" data-reveal>
-        <p class="eyebrow">Onboarding · 3 màn hình</p>
-        <h2 class="h2" id="screens-title">Ba màn hình, rồi không cần mở app nữa.</h2>
-        <p class="lede lede--center">Cài đặt xong là xong. App nằm im, chỉ thức dậy đúng khoảnh khắc Tiểu V trượt lên.</p>
+        <p class="eyebrow">Onboarding · chụp trên vivo X300 Pro</p>
+        <h2 class="h2" id="screens-title">Vài màn hình, rồi không cần mở app nữa.</h2>
+        <p class="lede lede--center">Cài đặt xong là xong. Chỉ cần mở lại app để bật script sau mỗi lần khởi động máy.</p>
       </header>
 
       <div class="screens">
         <figure class="screen-card" data-reveal>
           <div class="phone phone--strip">
             <div class="phone__frame">
-              <img class="phone__shot" src="assets/shots/welcome.webp" width="824" height="1830" loading="lazy" decoding="async"
-                   alt="Màn hình chào của AI Key Bridge: nhận diện thiết bị iQOO 12, OriginOS 4, Android 14 và luồng chạy dự kiến.">
+              <img class="phone__shot" src="assets/shots/welcome.webp" width="540" height="1200" loading="lazy" decoding="async"
+                   alt="Màn hình chào của AI Key Bridge: nhận diện vivo X300 Pro, OriginOS 7, Android 17, profile vivo có sẵn và luồng chạy.">
             </div>
           </div>
           <figcaption>
             <span class="screen-card__num">01</span>
             <h3>Kiểm tra thiết bị</h3>
-            <p>Nhận diện hãng, ROM, phiên bản Gemini và profile đang dùng.</p>
+            <p>Nhận diện hãng, ROM, phiên bản Android và profile đang dùng.</p>
           </figcaption>
         </figure>
 
         <figure class="screen-card" data-reveal data-delay="1">
           <div class="phone phone--strip">
             <div class="phone__frame">
-              <img class="phone__shot" src="assets/shots/permissions.webp" width="824" height="1830" loading="lazy" decoding="async"
-                   alt="Màn hình cấp quyền: Trợ năng và Tự khởi chạy ở trạng thái đã bật, kèm các quyền khuyến nghị.">
+              <img class="phone__shot" src="assets/shots/usage.webp" width="540" height="1200" loading="lazy" decoding="async"
+                   alt="Màn hình chọn cách dùng: Script nền được chọn sẵn và gắn nhãn khuyên dùng, bên dưới là Đầy đủ và Cấu hình một lần.">
             </div>
           </div>
           <figcaption>
             <span class="screen-card__num">02</span>
-            <h3>Cấp quyền</h3>
-            <p>Bốn dòng, mỗi dòng mở đúng màn hình cài đặt tương ứng.</p>
+            <h3>Chọn cách dùng</h3>
+            <p>Script nền (khuyên dùng, không cần Trợ năng), Đầy đủ (Trợ năng) hoặc Cấu hình một lần.</p>
           </figcaption>
         </figure>
 
         <figure class="screen-card" data-reveal data-delay="2">
           <div class="phone phone--strip">
             <div class="phone__frame">
-              <img class="phone__shot" src="assets/shots/setup.webp" width="824" height="1830" loading="lazy" decoding="async"
-                   alt="Màn hình kích hoạt và vá lỗi: 6 trên 7 lệnh thành công, một lệnh locale bị từ chối kèm cách xử lý.">
+              <img class="phone__shot" src="assets/shots/setup.webp" width="540" height="1200" loading="lazy" decoding="async"
+                   alt="Màn hình kích hoạt và vá lỗi: Shizuku đã kết nối, danh sách 7 lệnh cấu hình và nút Chạy 7 lệnh.">
             </div>
           </div>
           <figcaption>
@@ -323,12 +323,12 @@
         <li class="feature" data-reveal>
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-monitor-smartphone"/></svg>
           <h3>Không cần PC</h3>
-          <p>Service chạy trong máy. Rút cáp, tắt laptop, đóng terminal — chuyển hướng vẫn hoạt động.</p>
+          <p>Shizuku chạy script ngay trên máy. Rút cáp, tắt laptop, đóng terminal — chuyển hướng vẫn hoạt động.</p>
         </li>
         <li class="feature" data-reveal data-delay="1">
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg>
-          <h3>Sống sau reboot</h3>
-          <p>Kèm hướng dẫn tự khởi chạy và pin không hạn chế cho OriginOS; app kiểm tra lại quyền mỗi lần mở.</p>
+          <h3>Ba cách dùng</h3>
+          <p>Script nền không cần Trợ năng; Đầy đủ dùng Trợ năng và tự chạy lại sau reboot; Cấu hình một lần chỉ gán phím, không chạy nền.</p>
         </li>
         <li class="feature" data-reveal data-delay="2">
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-languages"/></svg>
@@ -338,17 +338,17 @@
         <li class="feature" data-reveal>
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-mic"/></svg>
           <h3>Tự bật Micro</h3>
-          <p>Tìm node micro trong cửa sổ Gemini; không click được thì chạm theo bounds cửa sổ, không hard-code độ phân giải.</p>
+          <p>Script gọi keyevent 231 nên Gemini mở thẳng chế độ nghe. Chế độ Đầy đủ tìm nút Micro trong cửa sổ Gemini rồi chạm, không hard-code độ phân giải.</p>
         </li>
         <li class="feature" data-reveal data-delay="1">
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-power"/></svg>
           <h3>Nút cứng → AI</h3>
-          <p>Nhấn giữ nút lối tắt mở trợ lý gốc rồi chuyển hướng ngay — không cần logcat hay Shizuku lúc chạy.</p>
+          <p>Nhấn giữ nút lối tắt là mở Gemini. Chế độ A bắt cửa sổ Tiểu V; chế độ B đọc event log nên Tiểu V không nháy lên.</p>
         </li>
         <li class="feature" data-reveal data-delay="2">
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-layers"/></svg>
           <h3>Đa hãng bằng JSON</h3>
-          <p>Khung profile JSON đã có sẵn; bản V1 bổ sung Xiaomi, OPPO, Honor và Nubia.</p>
+          <p>Vivo đã kiểm chứng; Xiaomi, OPPO, Honor và Nubia có profile beta. Hãng khác dùng “Dò trợ lý” để tự lưu cửa sổ.</p>
         </li>
       </ul>
     </div>
@@ -370,7 +370,7 @@
           <span class="license__label">Giấy phép</span>
           <strong class="license__name">MIT</strong>
           <p>Fork, sửa, dùng trong dịch vụ cài đặt máy — miễn giữ phần ghi công. Không paywall, không telemetry, không SDK trả phí.</p>
-          <span class="license__meta">kotlin · agp 8.7 · minSdk 30 · apk ~2 MB</span>
+          <span class="license__meta">kotlin 2.0 · agp 8.7 · minSdk 30 · apk ~3 MB</span>
         </div>
 
         <ol class="contrib">
@@ -384,7 +384,7 @@
           </li>
           <li>
             <span class="contrib__num">03</span>
-            <div><h3>Gửi log chẩn đoán</h3><p>Log đã che nội dung — dán vào issue là đủ để tái hiện lỗi.</p></div>
+            <div><h3>Gửi log chẩn đoán</h3><p>Một file .zip gồm log app, lý do app bị tắt và (qua Shizuku) log toàn máy — đủ để tái hiện lỗi.</p></div>
           </li>
         </ol>
       </div>
@@ -409,7 +409,7 @@
           <p class="eyebrow eyebrow--dark">Hỗ trợ theo hãng</p>
           <h2 class="h2 h2--dark" id="oem-title">Bắt đầu với Vivo,<br>mở rộng bằng profile.</h2>
         </div>
-        <p class="head__aside head__aside--dark">Mỗi hãng sẽ là một file JSON. Vivo đã chạy; bản V1 bổ sung các hãng khác và cập nhật profile từ xa.</p>
+        <p class="head__aside head__aside--dark">Mỗi hãng là một file JSON đi kèm app. Vivo đã kiểm chứng trên máy thật; các hãng khác có profile beta và cần người dùng thật xác nhận.</p>
       </header>
 
       <div class="table-scroll" data-reveal>
@@ -426,44 +426,44 @@
           </thead>
           <tbody>
             <tr>
-              <th scope="row"><span class="oem__brand">Vivo / iQOO</span><span class="oem__rom">OriginOS 3 · 4 · 5</span></th>
+              <th scope="row"><span class="oem__brand">Vivo / iQOO</span><span class="oem__rom">OriginOS</span></th>
               <td>Tiểu V / Jovi</td>
               <td class="mono">com.vivo.ai.copilot</td>
-              <td><span class="pill pill--solid">MVP · có sẵn</span></td>
-              <td class="oem__note">CopilotPanelWindow · locale fix</td>
+              <td><span class="pill pill--solid">Đã kiểm chứng</span></td>
+              <td class="oem__note">CopilotPanelWindow · script nền · locale fix</td>
             </tr>
             <tr>
               <th scope="row"><span class="oem__brand">Xiaomi / Redmi</span><span class="oem__rom">HyperOS China</span></th>
               <td>XiaoAI</td>
               <td class="mono">com.miui.voiceassist</td>
-              <td><span class="pill">Kế hoạch V1</span></td>
+              <td><span class="pill">Beta</span></td>
               <td class="oem__note">VoiceAssistActivity · autostart gắt</td>
             </tr>
             <tr>
               <th scope="row"><span class="oem__brand">OPPO / OnePlus / Realme</span><span class="oem__rom">ColorOS China</span></th>
               <td>Breeno</td>
               <td class="mono">com.heytap.speechassist</td>
-              <td><span class="pill">Kế hoạch V1</span></td>
+              <td><span class="pill">Beta</span></td>
               <td class="oem__note">SpeechAssistActivity · Action button</td>
             </tr>
             <tr>
               <th scope="row"><span class="oem__brand">Honor / Huawei</span><span class="oem__rom">MagicOS</span></th>
               <td>YOYO</td>
               <td class="mono">com.hihonor.magicvoice</td>
-              <td><span class="pill">Kế hoạch V1</span></td>
+              <td><span class="pill">Beta</span></td>
               <td class="oem__note">VoiceAssistantActivity · lớp phủ</td>
             </tr>
             <tr>
               <th scope="row"><span class="oem__brand">Nubia / RedMagic</span><span class="oem__rom">MyOS</span></th>
               <td>Mora</td>
               <td class="mono">cn.nubia.voiceassist</td>
-              <td><span class="pill">Kế hoạch V1</span></td>
+              <td><span class="pill">Beta</span></td>
               <td class="oem__note">VoiceAssistService · phím cạnh máy</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="footnote" data-reveal>Tên gói và cửa sổ chỉ là điểm khởi đầu — từng profile được kiểm chứng trên ROM thật trước khi phát hành.</p>
+      <p class="footnote" data-reveal>Profile beta lấy tên gói và tên cửa sổ từ thông tin công khai, chưa thử trên máy thật. App không phản ứng thì dùng “Dò trợ lý” để lưu đúng cửa sổ của máy bạn, và gửi profile lên GitHub.</p>
     </div>
   </section>
 
@@ -474,13 +474,13 @@
         <header class="head" data-reveal>
           <p class="eyebrow eyebrow--dark">Riêng tư &amp; câu hỏi</p>
           <h2 class="h2 h2--dark" id="privacy-title">Nó nhìn thấy cửa sổ, không nhìn thấy bạn.</h2>
-          <p class="lede">Trợ năng là quyền nhạy cảm. Đây là chính xác những gì app đọc, và những gì nó không bao giờ chạm vào.</p>
+          <p class="lede">Script nền không cần Trợ năng. Nếu bạn chọn chế độ Đầy đủ, đây là chính xác những gì app đọc, và những gì nó không bao giờ chạm vào.</p>
         </header>
 
         <ul class="privacy-list">
           <li data-reveal>
             <span class="privacy-list__icon"><svg class="i" aria-hidden="true"><use href="#i-shield-check"/></svg></span>
-            <div><h3>Không đọc nội dung màn hình</h3><p>Chỉ so khớp tên gói, tên cửa sổ; khi Gemini mở, chỉ đọc tên nút và mô tả để tìm Micro — không đọc văn bản.</p></div>
+            <div><h3>Không đọc nội dung màn hình</h3><p>Script nền chỉ lọc tên sự kiện trong event log. Chế độ Đầy đủ chỉ so khớp tên gói, tên cửa sổ; khi Gemini mở thì đọc tên nút và mô tả để tìm Micro — không đọc văn bản.</p></div>
           </li>
           <li data-reveal data-delay="1">
             <span class="privacy-list__icon"><svg class="i" aria-hidden="true"><use href="#i-volume-off"/></svg></span>
@@ -488,7 +488,7 @@
           </li>
           <li data-reveal data-delay="2">
             <span class="privacy-list__icon"><svg class="i" aria-hidden="true"><use href="#i-file-archive"/></svg></span>
-            <div><h3>Log đã che trước khi xuất</h3><p>Zip dưới 1MB, xoá text và tên riêng, chỉ xuất khi bạn bấm.</p></div>
+            <div><h3>Log chỉ xuất khi bạn bấm</h3><p>File .zip nằm trên máy cho tới khi bạn tự chia sẻ. Log toàn máy (qua Shizuku) có thể chứa tên app khác hay tên Wi-Fi — chỉ gửi riêng cho người phát triển.</p></div>
           </li>
         </ul>
       </div>
@@ -500,16 +500,16 @@
             <svg class="i" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="faq__a" id="faq-a1" role="region" aria-labelledby="faq-q1"><div>
-            <p>Không. Bản chính không dùng root, không Xposed, không cài system app. Shizuku chỉ để chạy lệnh cấu hình; nếu đang bật, app có thể dùng keyevent 231 làm dự phòng, nhưng không bắt buộc.</p>
+            <p>Không. App không dùng root, không Xposed, không cài system app. Shizuku (không root) cho app quyền shell để chạy script nền và lệnh cấu hình. Không muốn dùng Shizuku thì chọn chế độ Đầy đủ (Trợ năng) và dán lệnh ADB một lần.</p>
           </div></div>
         </div>
         <div class="faq__item">
           <button class="faq__q" type="button" aria-expanded="false" aria-controls="faq-a2" id="faq-q2">
-            Vì sao phải bật Trợ năng?
+            Có bắt buộc bật Trợ năng không?
             <svg class="i" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="faq__a" id="faq-a2" role="region" aria-labelledby="faq-q2"><div>
-            <p>Trợ năng là cách duy nhất để app biết cửa sổ trợ lý gốc vừa mở. Service chỉ đọc tên gói, tên cửa sổ; khi Gemini mở, chỉ đọc tên nút và mô tả để tìm Micro. Không đọc văn bản, không chụp màn hình và không lưu lại gì.</p>
+            <p>Không. Chế độ Script nền (khuyên dùng) chạy script shell qua Shizuku: đọc event log để biết trợ lý gốc vừa mở, bấm Back rồi gọi Gemini bằng keyevent 231 — không cần Trợ năng. Cấu hình một lần cũng không cần. Chỉ chế độ Đầy đủ dùng Trợ năng: service đọc tên gói, tên cửa sổ; khi Gemini mở thì đọc tên nút và mô tả để tìm Micro. Không đọc văn bản, không chụp màn hình và không lưu lại gì.</p>
           </div></div>
         </div>
         <div class="faq__item">
@@ -518,7 +518,7 @@
             <svg class="i" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="faq__a" id="faq-a3" role="region" aria-labelledby="faq-q3"><div>
-            <p>Chuyển hướng chạy trong service của app nên không phụ thuộc PC. Sau reboot, service được hệ thống bật lại nếu Trợ năng còn bật và app không bị ROM chặn tự khởi chạy. Shizuku không bắt buộc lúc chạy.</p>
+            <p>Không phụ thuộc PC: rút cáp vẫn chạy. Script nền mất khi khởi động lại máy — bật lại Shizuku, mở app, bấm “Bật script”. Chế độ Đầy đủ được hệ thống bật lại sau reboot nếu Trợ năng còn bật và app không bị ROM chặn tự khởi chạy. Lưu ý: vuốt app khỏi đa nhiệm trên OriginOS là force-stop và làm tắt Trợ năng — hãy khóa app trong đa nhiệm.</p>
           </div></div>
         </div>
         <div class="faq__item">
@@ -527,7 +527,7 @@
             <svg class="i" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="faq__a" id="faq-a4" role="region" aria-labelledby="faq-q4"><div>
-            <p>Không. App can thiệp vào trợ lý hệ thống bằng quyền Trợ năng nên không phù hợp chính sách Play. APK phát hành trực tiếp trên GitHub Releases, kèm file SHA-256.</p>
+            <p>Không. App can thiệp vào trợ lý hệ thống (qua Shizuku hoặc Trợ năng) nên không phù hợp chính sách Play. APK phát hành trực tiếp trên GitHub Releases, ký bằng một khoá cố định, kèm file SHA-256.</p>
           </div></div>
         </div>
         <div class="faq__item">
@@ -536,7 +536,7 @@
             <svg class="i" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="faq__a" id="faq-a5" role="region" aria-labelledby="faq-q5"><div>
-            <p>Profile là file JSON có phiên bản. Khi tên cửa sổ hoặc tên gói đổi, app báo “profile lệch” và cần bản cập nhật APK/profile. Bản V1 sẽ tự cập nhật profile từ xa mà không phải cài lại app.</p>
+            <p>Profile là file JSON đi kèm APK. Khi tên cửa sổ hoặc tên gói đổi, dùng “Dò trợ lý” để lưu cửa sổ mới ngay trên máy, rồi chờ bản APK cập nhật profile. App không có quyền Internet nên không tự tải profile từ xa.</p>
           </div></div>
         </div>
       </div>
@@ -551,15 +551,15 @@
         Máy của bạn đã có Gemini.<br><span class="accent">Chỉ thiếu một cái nút.</span>
       </h2>
       <p class="final__sub" data-reveal data-delay="2">
-        Tải APK, bật Trợ năng, chạm một lần. Sau đó hô “Hi Jovi” và nghe Gemini trả lời.
+        Tải APK, chọn cách dùng, chạm một lần. Sau đó hô “Hi Jovi” và nghe Gemini trả lời.
       </p>
       <div class="final__cta" data-reveal data-delay="3">
         <a class="btn btn--accent" href="https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk">
-          Tải APK · ~2 MB <svg class="i" aria-hidden="true"><use href="#i-arrow-down-to-line"/></svg>
+          Tải APK · ~3 MB <svg class="i" aria-hidden="true"><use href="#i-arrow-down-to-line"/></svg>
         </a>
-        <a class="btn btn--ghost" href="https://github.com/pdong15dth/gemini-default-ai-phone#cai-bang-app-khuyen-nghi">Hướng dẫn cài</a>
+        <a class="btn btn--ghost" href="https://github.com/pdong15dth/gemini-default-ai-phone#cai-dat-va-thiet-lap">Hướng dẫn cài</a>
       </div>
-      <p class="final__meta" data-reveal data-delay="4">ANDROID 11–15 · KHÔNG ROOT · KHÔNG QUẢNG CÁO · MÃ NGUỒN MỞ</p>
+      <p class="final__meta" data-reveal data-delay="4">ANDROID 11+ · KHÔNG ROOT · KHÔNG QUẢNG CÁO · MÃ NGUỒN MỞ</p>
     </div>
   </section>
 </main>
@@ -585,7 +585,7 @@
 
       <nav class="footer__col" aria-label="Hỗ trợ">
         <h2>Hỗ trợ</h2>
-        <a href="https://github.com/pdong15dth/gemini-default-ai-phone#cai-bang-app-khuyen-nghi">Hướng dẫn cài</a>
+        <a href="https://github.com/pdong15dth/gemini-default-ai-phone#cai-dat-va-thiet-lap">Hướng dẫn cài</a>
         <a href="https://github.com/pdong15dth/gemini-default-ai-phone/issues/new?template=diagnostics.yml">Gửi log chẩn đoán</a>
         <a href="https://github.com/pdong15dth/gemini-default-ai-phone/discussions">Thảo luận cộng đồng</a>
         <a href="https://github.com/pdong15dth/gemini-default-ai-phone/issues">Báo lỗi</a>
