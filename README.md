@@ -176,6 +176,7 @@ Script lắng nghe kênh **events** của logcat, bắt hai tín hiệu:
 Nội dung script (có sẵn tại [`scripts/gemini.sh`](scripts/gemini.sh)):
 
 ```sh
+trap "" HUP INT TERM
 while true; do
   logcat -b events -c
   logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4
@@ -186,6 +187,8 @@ while true; do
   sleep 1.5
 done
 ```
+
+Dòng `trap "" HUP INT TERM` giữ script sống khi rút cáp USB — chi tiết ở [Sửa lỗi rút cáp USB](docs/rut-cap-usb.md).
 
 Ba con số quan trọng:
 
@@ -198,7 +201,7 @@ Dấu `\|` là cố ý: shell sẽ bỏ dấu `\` và truyền regex `CopilotPan
 ### Cách A — Tạo file trực tiếp bằng ADB (đã test)
 
 ```powershell
-adb shell "printf '%s\n' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.5' 'input keyevent 224' 'sleep 0.5' 'input keyevent 231' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
+adb shell "printf '%s\n' 'trap \"\" HUP INT TERM' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.5' 'input keyevent 224' 'sleep 0.5' 'input keyevent 231' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
 ```
 
 <a name="cach-b-day-file-co-san-trong-repo"></a>
@@ -228,6 +231,8 @@ adb shell "ps -ef | grep -v grep | grep gemini.sh"
 ```
 
 Thấy một dòng dạng `shell 2396 1 ... sh /data/local/tmp/gemini.sh` là xong, rút cáp được.
+
+> Rút cáp ra mà script vẫn mất trên một số máy Vivo đời mới thì làm theo [Sửa lỗi rút cáp USB](docs/rut-cap-usb.md).
 
 > **Đừng chạy `pkill` sau bước này.** Lệnh `pkill -9 -f 'while'` sẽ giết luôn script vừa bật, và đó là lý do phổ biến khiến "cài xong mà không thấy Gemini đâu".
 
@@ -262,7 +267,7 @@ Panel Gemini phải hiện lên **kèm Micro bật sẵn**. Đúng thì làm ti�
 ### 2. Ghi đè script trên máy
 
 ```powershell
-adb shell "printf '%s\n' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.5' 'input keyevent 224' 'sleep 0.5' 'input keyevent 231' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
+adb shell "printf '%s\n' 'trap \"\" HUP INT TERM' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.5' 'input keyevent 224' 'sleep 0.5' 'input keyevent 231' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
 ```
 
 Hoặc nếu đang có repo trong máy tính, đẩy thẳng file mới:
@@ -348,7 +353,7 @@ adb shell cmd appops set com.google.android.apps.bard SYSTEM_ALERT_WINDOW allow
 ```
 
 ```powershell
-adb shell "printf '%s\n' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.5' 'input keyevent 224' 'sleep 0.5' 'input keyevent 231' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
+adb shell "printf '%s\n' 'trap \"\" HUP INT TERM' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.5' 'input keyevent 224' 'sleep 0.5' 'input keyevent 231' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
 ```
 
 ```bash
@@ -369,7 +374,7 @@ adb shell "ps -ef | grep -v grep | grep gemini.sh"
 | Đã dùng `231` mà vẫn không tự bật Micro | Bản Gemini khóa tự mở Mic khi gọi panel nổi | Chèn thêm `input tap <X> <Y>` vào nút Micro ngay sau `input keyevent 231`; lấy tọa độ bằng `adb shell settings put system pointer_location 1` |
 | Jovi tắt rồi mà Gemini không hiện | Script không chạy, hoặc đã bị `pkill` | `adb shell "ps -ef \| grep gemini.sh"`, nếu trống thì chạy lại lệnh `nohup` |
 | Gọi "Hi Jovi" lần đầu được, lần sau không nghe nữa | Đã dùng `am force-stop` giết dịch vụ nghe | Bỏ force-stop, dùng `keyevent 4`; mở app Tiểu V một lần để đánh thức lại |
-| Rút cáp là mất | Chưa chạy `nohup`, hoặc mới reboot | Chạy lại [Bước 4](#buoc-4-sau-khi-khoi-dong-lai-may) |
+| Rút cáp là mất | Chưa chạy `nohup`, mới reboot, hoặc OriginOS giết `adbd` / dính SIGHUP | Chạy lại [Bước 4](#buoc-4-sau-khi-khoi-dong-lai-may); nếu vẫn mất, xem [Sửa lỗi rút cáp USB](docs/rut-cap-usb.md) |
 | Bấm Nút lối tắt không có phản ứng | Sai tên sự kiện hoặc sai kênh log | Soi log: `adb shell "logcat -c; logcat -b all \| grep -iE 'shortcut\|START u0\|KeyEvent'"` |
 | PowerShell báo `The module 'ACTION_BUTTON_TO_START_FUNCTIONS' could not be loaded` | Dấu `\|` trong chuỗi `"..."` bị PowerShell hiểu là lệnh | Dùng [Cách B](#cach-b-day-file-co-san-trong-repo) để đẩy file `.sh` thay vì nhồi cả script vào một dòng |
 | `Failure [not installed for 0]` | Bản ROM không có gói đó | Bỏ qua, tùy máy dùng `com.vivo.ai.copilot` hoặc `com.vivo.agent` |
@@ -422,6 +427,8 @@ adb shell cmd package install-existing com.vivo.agent
 ```
 .
 ├── README.md
+├── docs/
+│   └── rut-cap-usb.md
 └── scripts/
     └── gemini.sh
 ```
