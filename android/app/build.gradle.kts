@@ -33,8 +33,8 @@ android {
         applicationId = "com.aikeybridge"
         minSdk = 30
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.1"
+        versionCode = 4
+        versionName = "1.0.2"
 
         val gitSha = System.getenv("GITHUB_SHA")?.take(7) ?: "local"
         buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
