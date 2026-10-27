@@ -17,6 +17,7 @@ Gọi thẳng bảng nổi (overlay) của **Google Gemini** bằng cả câu l�
 - [Bước 2 — ADB: chuyển trợ lý mặc định và vá lỗi crash](#bước-2--adb-chuyển-trợ-lý-mặc-định-và-vá-lỗi-crash)
 - [Bước 3 — Script chạy ngầm chuyển hướng sang Gemini](#bước-3--script-chạy-ngầm-chuyển-hướng-sang-gemini)
 - [Bước 4 — Sau khi khởi động lại máy](#bước-4--sau-khi-khởi-động-lại-máy)
+- [Cập nhật từ bản cũ (tự bật Micro)](#cập-nhật-từ-bản-cũ-tự-bật-micro)
 - [Bộ lệnh rút gọn](#bộ-lệnh-rút-gọn)
 - [Xử lý sự cố](#xử-lý-sự-cố)
 - [Khôi phục về Tiểu V](#khôi-phục-về-tiểu-v)
@@ -26,16 +27,16 @@ Gọi thẳng bảng nổi (overlay) của **Google Gemini** bằng cả câu l�
 
 | Thao tác | Trước | Sau |
 | --- | --- | --- |
-| Hô **"Hi Jovi"** | Tiểu V nhá lên rồi tắt (hoặc crash) | Panel Gemini trồi lên |
-| Nhấn giữ **Nút lối tắt** | Không có hành động / mở Tiểu V | Panel Gemini trồi lên |
+| Hô **"Hi Jovi"** | Tiểu V nhá lên rồi tắt (hoặc crash) | Panel Gemini trồi lên, tự bật Micro |
+| Nhấn giữ **Nút lối tắt** | Không có hành động / mở Tiểu V | Panel Gemini trồi lên, tự bật Micro |
 | Nhấn hai lần Nút lối tắt | Đổi Chuông/Rung | Giữ nguyên |
 
 ## Cơ chế hoạt động
 
 ```
 "Hi Jovi"  ──────► CopilotPanelWindow ──────┐
-                                            ├──► gemini.sh ──► keyevent 219 ──► Gemini overlay
-Nút lối tắt ─────► ACTION_BUTTON_TO_START_  │
+                                            ├──► gemini.sh ──► keyevent 231 ──► Gemini overlay
+Nút lối tắt ─────► ACTION_BUTTON_TO_START_  │                (kèm bật Micro)
                    FUNCTIONS (kênh events)  │
                                             └─ nếu là CopilotPanelWindow:
                                                keyevent 4 (Back) để đóng panel
@@ -43,7 +44,7 @@ Nút lối tắt ─────► ACTION_BUTTON_TO_START_  │
 
 Ba quyết định quan trọng làm nên cách này:
 
-1. **Chuyển trợ lý mặc định sang Google.** `keyevent 219` (`KEYCODE_ASSIST`) sẽ gọi đúng `GsaVoiceInteractionService` của app Google thay vì Tiểu V.
+1. **Chuyển trợ lý mặc định sang Google.** Cả `keyevent 219` (`KEYCODE_ASSIST`) lẫn `keyevent 231` (`KEYCODE_VOICE_ASSIST`) đều gọi đúng `GsaVoiceInteractionService` của app Google thay vì Tiểu V. Khác biệt: `219` chỉ mở panel ở trạng thái chờ, `231` mở thẳng và bật luôn Micro — nên script dùng `231`.
 2. **Không dùng `am force-stop` để tắt Tiểu V.** Force-stop giết luôn dịch vụ nghe giọng nói, khiến "Hi Jovi" chết hẳn ở các lần gọi sau. Chỉ cần bấm Back (`keyevent 4`) để đóng panel.
 3. **Vá lỗi crash `NumberFormatException` của Tiểu V khi máy để tiếng Việt.** Đây là lý do panel chỉ "nhá lên 0.5 giây rồi tắt". Chi tiết ở [Bước 2](#bước-2--adb-chuyển-trợ-lý-mặc-định-và-vá-lỗi-crash).
 
@@ -135,11 +136,19 @@ adb shell cmd locale set-app-locales com.vivo.ai.copilot --locales en-US
 
 ### 5. Test nhanh
 
+Mở panel ở trạng thái chờ:
+
 ```bash
 adb shell input keyevent 219
 ```
 
-Panel Gemini phải trồi lên từ cạnh dưới màn hình và đứng yên. Nếu nó nhá lên rồi tắt, quay lại kiểm tra 4 quyền ở Bước 1.
+Mở thẳng chế độ voice — đây là mã script sẽ dùng:
+
+```bash
+adb shell input keyevent 231
+```
+
+Cả hai đều phải làm panel Gemini trồi lên từ cạnh dưới màn hình và đứng yên. Riêng `231` phải bật Micro ngay mà không cần chạm tay. Nếu panel nhá lên rồi tắt, quay lại kiểm tra 4 quyền ở Bước 1. Nếu `231` chỉ hiện panel chờ, xem [Xử lý sự cố](#xử-lý-sự-cố).
 
 ## Bước 3 — Script chạy ngầm chuyển hướng sang Gemini
 
@@ -147,8 +156,8 @@ Script lắng nghe kênh **events** của logcat, bắt hai tín hiệu:
 
 | Tín hiệu | Khi nào | Hành động |
 | --- | --- | --- |
-| `CopilotPanelWindow` | Hô "Hi Jovi" | `keyevent 4` đóng panel, đợi 0.3s, rồi `keyevent 219` |
-| `ACTION_BUTTON_TO_START_FUNCTIONS` | Nhấn giữ Nút lối tắt | `keyevent 219` ngay |
+| `CopilotPanelWindow` | Hô "Hi Jovi" | `keyevent 4` đóng panel, đợi 0.5s cho Tiểu V nhả Micro, rồi `keyevent 231` |
+| `ACTION_BUTTON_TO_START_FUNCTIONS` | Nhấn giữ Nút lối tắt | `keyevent 231` |
 
 Nội dung script (có sẵn tại [`scripts/gemini.sh`](scripts/gemini.sh)):
 
@@ -156,18 +165,23 @@ Nội dung script (có sẵn tại [`scripts/gemini.sh`](scripts/gemini.sh)):
 while true; do
   logcat -b events -c
   logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4
-  sleep 0.3
-  input keyevent 219
+  sleep 0.5
+  input keyevent 231
   sleep 1.5
 done
 ```
+
+Hai con số quan trọng:
+
+- **`231` chứ không phải `219`.** `219` (`KEYCODE_ASSIST`) trên các bản Gemini gần đây chỉ mở pop-up ở trạng thái chờ, không ép bật Micro. `231` (`KEYCODE_VOICE_ASSIST`) mở thẳng chế độ nghe.
+- **`0.5` chứ không phải `0.3`.** Ngay sau khi bạn nói xong "Hi Jovi", Tiểu V vẫn đang giữ audio focus. Nếu gọi Gemini quá sớm, nó mở lên đúng lúc Micro đang bận và tự tắt chế độ nghe. 0.5s là đủ để Tiểu V nhả hẳn.
 
 Dấu `\|` là cố ý: shell sẽ bỏ dấu `\` và truyền regex `CopilotPanelWindow|ACTION_BUTTON_TO_START_FUNCTIONS` cho `logcat`, đồng thời không bị hiểu nhầm thành pipe.
 
 ### Cách A — Tạo file trực tiếp bằng ADB (đã test)
 
 ```powershell
-adb shell "printf '%s\n' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.3' 'input keyevent 219' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
+adb shell "printf '%s\n' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.5' 'input keyevent 231' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
 ```
 
 ### Cách B — Đẩy file có sẵn trong repo
@@ -208,6 +222,44 @@ adb shell "nohup sh /data/local/tmp/gemini.sh </dev/null >/dev/null 2>&1 &"
 
 Muốn không phải cắm cáp mỗi lần reboot, xem [Giới hạn và ghi chú](#giới-hạn-và-ghi-chú).
 
+## Cập nhật từ bản cũ (tự bật Micro)
+
+Dành cho máy đã cài theo bản trước — script cũ dùng `keyevent 219` và `sleep 0.3`, nên Gemini chỉ mở panel ở trạng thái chờ và bạn phải chạm tay vào nút Micro. Bản mới đổi sang `keyevent 231` (`KEYCODE_VOICE_ASSIST`) để vào thẳng chế độ nghe, đồng thời tăng nhịp chờ lên `0.5s` cho Tiểu V kịp nhả Micro.
+
+Không cần làm lại [Bước 1](#bước-1--cài-app-và-cấp-quyền-trên-máy) và [Bước 2](#bước-2--adb-chuyển-trợ-lý-mặc-định-và-vá-lỗi-crash). Chỉ có 3 bước dưới đây.
+
+### 1. Thử mã voice trước
+
+```bash
+adb shell input keyevent 231
+```
+
+Panel Gemini phải hiện lên **kèm Micro bật sẵn**. Đúng thì làm tiếp bước 2. Nếu vẫn chỉ hiện panel chờ, xem [Xử lý sự cố](#xử-lý-sự-cố).
+
+### 2. Ghi đè script trên máy
+
+```powershell
+adb shell "printf '%s\n' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.5' 'input keyevent 231' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
+```
+
+Hoặc nếu đang có repo trong máy tính, đẩy thẳng file mới:
+
+```bash
+adb push scripts/gemini.sh /data/local/tmp/gemini.sh
+```
+
+### 3. Khởi động lại script
+
+```bash
+adb shell "pkill -9 -f gemini.sh; pkill -9 -f logcat"
+adb shell "nohup sh /data/local/tmp/gemini.sh </dev/null >/dev/null 2>&1 &"
+adb shell "ps -ef | grep -v grep | grep gemini.sh"
+```
+
+Thấy tiến trình `sh /data/local/tmp/gemini.sh` là bản mới đã chạy. Hô "Hi Jovi" để kiểm tra: panel Gemini phải trồi lên và Micro bật sẵn, không cần chạm tay.
+
+> Không cần đổi gì thêm ở phần reboot — [Bước 4](#bước-4--sau-khi-khởi-động-lại-máy) vẫn dùng đúng một dòng `nohup` như cũ, vì file trên máy đã là bản mới.
+
 ## Bộ lệnh rút gọn
 
 Dán lần lượt từng khối vào PowerShell/Terminal sau khi đã cấp đủ quyền ở Bước 1.
@@ -227,7 +279,7 @@ adb shell cmd locale set-app-locales com.vivo.ai.copilot --locales en-US
 ```
 
 ```powershell
-adb shell "printf '%s\n' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.3' 'input keyevent 219' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
+adb shell "printf '%s\n' 'while true; do' 'logcat -b events -c' 'logcat -b events -e CopilotPanelWindow\|ACTION_BUTTON_TO_START_FUNCTIONS -m 1 | grep -q CopilotPanelWindow && input keyevent 4' 'sleep 0.5' 'input keyevent 231' 'sleep 1.5' 'done' > /data/local/tmp/gemini.sh"
 ```
 
 ```bash
@@ -241,6 +293,8 @@ adb shell "ps -ef | grep -v grep | grep gemini.sh"
 | Hiện tượng | Nguyên nhân | Cách xử lý |
 | --- | --- | --- |
 | Hô "Hi Jovi" thấy viền sáng nhá lên 0.5s rồi tắt, Gemini không lên | Crash `NumberFormatException` do locale tiếng Việt | Chạy `adb shell cmd locale set-app-locales com.vivo.ai.copilot --locales en-US` |
+| Panel Gemini hiện lên nhưng không bật Micro, phải chạm tay | Script cũ dùng `219` (`KEYCODE_ASSIST`) chỉ mở panel chờ, hoặc `sleep 0.3` quá ngắn nên Micro còn bận | Cập nhật sang `231` + `sleep 0.5` theo [Cập nhật từ bản cũ](#cập-nhật-từ-bản-cũ-tự-bật-micro) |
+| Đã dùng `231` mà vẫn không tự bật Micro | Bản Gemini khóa tự mở Mic khi gọi panel nổi | Chèn thêm `input tap <X> <Y>` vào nút Micro ngay sau `input keyevent 231`; lấy tọa độ bằng `adb shell settings put system pointer_location 1` |
 | Jovi tắt rồi mà Gemini không hiện | Script không chạy, hoặc đã bị `pkill` | `adb shell "ps -ef \| grep gemini.sh"`, nếu trống thì chạy lại lệnh `nohup` |
 | Gọi "Hi Jovi" lần đầu được, lần sau không nghe nữa | Đã dùng `am force-stop` giết dịch vụ nghe | Bỏ force-stop, dùng `keyevent 4`; mở app Tiểu V một lần để đánh thức lại |
 | Rút cáp là mất | Chưa chạy `nohup`, hoặc mới reboot | Chạy lại [Bước 4](#bước-4--sau-khi-khởi-động-lại-máy) |
@@ -283,6 +337,7 @@ adb shell cmd package install-existing com.vivo.agent
 - **Không root thì script mất sau reboot.** File `gemini.sh` vẫn còn, chỉ cần chạy lại một dòng ở Bước 4. Các hướng "dính vĩnh viễn" (AccessibilityService tự build, Shizuku/Brevent, MacroDroid + quyền `READ_LOGS`) đều phải cài thêm app hoặc build APK — đánh đổi sạch máy lấy sự tiện lợi.
 - **Không nên `pm uninstall` app hệ thống** nếu không cần. Trên bản ROM khóa, lệnh này thường fail; và kể cả khi thành công thì cũng chỉ cần thiết khi bạn muốn Tiểu V biến mất hoàn toàn.
 - **Không dùng `am force-stop com.vivo.ai.copilot`** trong vòng lặp. Nó giết luôn service nhận giọng nói, làm "Hi Jovi" chết dần.
+- **Tự bật Micro phụ thuộc bản Gemini.** Script dùng `231` (`KEYCODE_VOICE_ASSIST`). Nếu bản Gemini trên máy khóa tính năng này, phải chèn `input tap` vào nút Micro — cách đó phụ thuộc độ phân giải/DPI nên đổi màn hình hoặc đổi bản ROM là phải lấy tọa độ lại.
 - Cách này phụ thuộc vào tên sự kiện logcat của ROM. Lên bản OriginOS khác, tên có thể đổi — dùng mục soi log ở trên để cập nhật lại script.
 - Thủ thuật cá nhân, không liên quan đến Vivo hay Google. Tự chịu trách nhiệm với máy của mình.
 
