@@ -1,0 +1,767 @@
+package com.aikeybridge.ui
+
+import android.app.Application
+import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.aikeybridge.data.ActiveConfig
+import com.aikeybridge.data.ConfigResolver
+import com.aikeybridge.data.ConfigSource
+import com.aikeybridge.data.CustomTrigger
+import com.aikeybridge.data.HardwareMode
+import com.aikeybridge.data.UsageMode
+import com.aikeybridge.data.PermissionSnapshot
+import com.aikeybridge.data.PermissionsReader
+import com.aikeybridge.data.SettingsRepository
+import com.aikeybridge.diagnostics.AttemptLog
+import com.aikeybridge.diagnostics.AttemptStats
+import com.aikeybridge.diagnostics.AttemptSummary
+import com.aikeybridge.diagnostics.Diagnostics
+import com.aikeybridge.model.AssistantTarget
+import com.aikeybridge.model.OemProfile
+import com.aikeybridge.service.LogSniffer
+import com.aikeybridge.service.LogStatus
+import com.aikeybridge.service.RedirectState
+import com.aikeybridge.service.RuntimeStatus
+import com.aikeybridge.service.Sniffer
+import com.aikeybridge.shell.ProvisionReport
+import com.aikeybridge.shell.Provisioner
+import com.aikeybridge.shell.ShizukuShell
+import com.aikeybridge.shell.StepPhase
+import com.aikeybridge.shell.WatchScript
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import rikka.shizuku.Shizuku
+
+data class AppEntry(val packageName: String, val label: String)
+
+/** Trạng thái script nền. [running] = null nghĩa là chưa kiểm tra được (thiếu Shizuku). */
+data class ScriptStatus(
+    val running: Boolean? = null,
+    val busy: Boolean = false,
+    val pid: String = "",
+)
+
+class AppViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val app = application
+    private val settingsRepository = SettingsRepository(app)
+    private val source = ConfigSource(app, settingsRepository)
+    private val shell = ShizukuShell(app)
+
+    val catalog = source.catalog
+    val device = source.device
+    val settings = settingsRepository.state
+
+    val config: StateFlow<ActiveConfig> = settings
+        .map(source::resolve)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, source.current())
+
+    private val _permissions = MutableStateFlow(PermissionSnapshot())
+    val permissions: StateFlow<PermissionSnapshot> = _permissions.asStateFlow()
+
+    private val _setup = MutableStateFlow(config.value.let { SetupUiState.from(it.provisioning, it.restore) })
+    val setup: StateFlow<SetupUiState> = _setup.asStateFlow()
+
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
+    private val _exportFile = MutableStateFlow<File?>(null)
+    val exportFile: StateFlow<File?> = _exportFile.asStateFlow()
+
+    private val _apps = MutableStateFlow<List<AppEntry>?>(null)
+    val apps: StateFlow<List<AppEntry>?> = _apps.asStateFlow()
+
+    val logEntries = Diagnostics.entries
+    val attempts = AttemptLog.attempts
+    val redirectState: StateFlow<RedirectState> = RuntimeStatus.state
+    val serviceConnected: StateFlow<Boolean> = RuntimeStatus.connected
+    val sniffer = Sniffer.state
+    val logSniffer = LogSniffer.state
+    val logAccess = LogStatus.access
+    val readLogsCommand: String = "adb shell pm grant ${application.packageName} android.permission.READ_LOGS"
+
+    private val minuteTicker = flow {
+        while (true) {
+            emit(System.currentTimeMillis())
+            delay(30_000)
+        }
+    }
+
+    val now: StateFlow<Long> = minuteTicker
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), System.currentTimeMillis())
+
+    val summary: StateFlow<AttemptSummary> = combine(attempts, minuteTicker) { list, now ->
+        AttemptStats.summarize(list, now)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        AttemptStats.summarize(emptyList(), System.currentTimeMillis()),
+    )
+
+    val romChanged: StateFlow<Boolean> = settings
+        .map { it.provisionedFingerprint != null && it.provisionedFingerprint != device.fingerprint }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private var snifferJob: Job? = null
+
+    private val _script = MutableStateFlow(ScriptStatus())
+    val script: StateFlow<ScriptStatus> = _script.asStateFlow()
+
+    /** Script đã bật sau lần khởi động máy gần nhất thì nhiều khả năng còn chạy. */
+    val scriptStartedThisBoot: Boolean
+        get() {
+            val bootAt = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
+            return settingsRepository.state.value.scriptStartedAt > bootAt
+        }
+
+    /** File script nền ghi mỗi lần chuyển hướng; nằm trong thư mục riêng của app để app đọc được. */
+    private val scriptEventLog: File?
+        get() = app.getExternalFilesDir(null)?.let { File(it, "script-events.log") }
+
+    fun scriptContent(): String? {
+        val active = config.value
+        val watch = active.profile.shellWatch ?: return null
+        val log = scriptEventLog?.absolutePath ?: "/dev/null"
+        return WatchScript.content(
+            watch = watch,
+            keyevent = active.target.shellKeyevent ?: GEMINI_VOICE_KEY,
+            eventLog = log,
+            dismissDelayMs = active.dismissDelayMs,
+        )
+    }
+
+    /** Đưa các lượt script nền đã ghi vào Nhật ký, rồi xoá file. */
+    fun importScriptEvents() {
+        val file = scriptEventLog ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val lines = runCatching { if (file.exists()) file.readLines() else emptyList() }.getOrDefault(emptyList())
+            if (lines.isEmpty()) return@launch
+            runCatching { file.writeText("") }
+            val active = config.value
+            lines.mapNotNull(WatchScript::parseEvent).forEach { (at, kind) ->
+                AttemptLog.record(
+                    com.aikeybridge.diagnostics.Attempt(
+                        at = at,
+                        flow = if (kind == "voice") active.flowLabel else "Nút → ${active.target.displayName}",
+                        ok = true,
+                        durationMs = SCRIPT_FLOW_MS,
+                        detail = "script nền · ${if (kind == "voice") "khẩu lệnh" else "nút"}",
+                    ),
+                )
+            }
+            Diagnostics.info("script", "Nhập ${lines.size} lượt từ script nền.")
+        }
+    }
+
+    fun checkScript() {
+        refreshPermissions()
+        if (!_permissions.value.shizukuGranted) {
+            _script.update { it.copy(running = null, pid = "") }
+            return
+        }
+        viewModelScope.launch {
+            val result = shell.exec(WatchScript.statusCommand())
+            val pid = result.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty()
+            _script.update { it.copy(running = result.stdout.isNotBlank(), pid = pid) }
+        }
+    }
+
+    fun startScript() {
+        val content = scriptContent() ?: run {
+            _message.value = "${config.value.profile.displayName} chưa có script nền."
+            return
+        }
+        refreshPermissions()
+        if (!_permissions.value.shizukuGranted) {
+            _message.value = "Cần Shizuku đã cấp quyền. Không có Shizuku thì copy lệnh ADB bên dưới."
+            return
+        }
+        if (_script.value.busy) return
+        scriptEventLog?.parentFile?.mkdirs()
+        viewModelScope.launch {
+            _script.update { it.copy(busy = true) }
+            val install = shell.exec(WatchScript.installCommand(content))
+            if (!install.ok) {
+                Diagnostics.error("script", "Ghi script lỗi: ${install.output}")
+                _message.value = "Không ghi được script: ${install.output.ifBlank { "lệnh trả về ${install.exitCode}" }}"
+                _script.update { it.copy(busy = false) }
+                return@launch
+            }
+            shell.exec(WatchScript.stopCommand())
+            shell.exec(WatchScript.startCommand())
+            delay(700)
+            val status = shell.exec(WatchScript.statusCommand())
+            val running = status.stdout.isNotBlank()
+            if (running) settingsRepository.setScriptStartedAt(System.currentTimeMillis())
+            _script.value = ScriptStatus(
+                running = running,
+                busy = false,
+                pid = status.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty(),
+            )
+            Diagnostics.log(
+                if (running) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
+                "script",
+                if (running) "Script nền đang chạy (${WatchScript.PATH})." else "Script nền không chạy được.",
+            )
+            _message.value = if (running) {
+                "Script nền đang chạy. Hô “${config.value.profile.wakePhrase ?: config.value.profile.assistantName}” để thử."
+            } else {
+                "Script không chạy được — xem Nhật ký."
+            }
+        }
+    }
+
+    fun stopScript() {
+        refreshPermissions()
+        if (!_permissions.value.shizukuGranted) {
+            _message.value = "Cần Shizuku để tắt script. Hoặc khởi động lại máy."
+            return
+        }
+        viewModelScope.launch {
+            _script.update { it.copy(busy = true) }
+            shell.exec(WatchScript.stopCommand())
+            settingsRepository.setScriptStartedAt(0)
+            delay(300)
+            val status = shell.exec(WatchScript.statusCommand())
+            _script.value = ScriptStatus(running = status.stdout.isNotBlank(), busy = false)
+            Diagnostics.info("script", "Đã tắt script nền.")
+            _message.value = "Đã tắt script nền."
+        }
+    }
+    private var logSnifferJob: Job? = null
+
+    private val binderReceived = Shizuku.OnBinderReceivedListener { refreshPermissions() }
+    private val binderDead = Shizuku.OnBinderDeadListener { refreshPermissions() }
+
+    init {
+        Diagnostics.init(app)
+        AttemptLog.init(app)
+        refreshPermissions()
+        runCatching { Shizuku.addBinderReceivedListenerSticky(binderReceived) }
+        runCatching { Shizuku.addBinderDeadListener(binderDead) }
+
+        viewModelScope.launch {
+            while (true) {
+                delay(30_000)
+                importScriptEvents()
+            }
+        }
+
+        viewModelScope.launch {
+            config.collect { active ->
+                refreshPermissions()
+                val current = _setup.value
+                val ids = active.provisioning.map { it.id }
+                if (!current.running && !current.restoring && current.steps.map { it.id } != ids) {
+                    _setup.value = SetupUiState.from(active.provisioning, active.restore)
+                }
+            }
+        }
+    }
+
+    fun refreshPermissions() {
+        importScriptEvents()
+        val active = config.value
+        _permissions.value = PermissionsReader.read(
+            context = app,
+            settings = settingsRepository.state.value,
+            targetPackages = active.target.packages,
+            assistantRequired = false,
+            nativeAssistantPackages = active.profile.assistantPackages,
+        )
+    }
+
+    fun markOnboardingDone() {
+        settingsRepository.setOnboardingDone(true)
+        settingsRepository.setOnboardingStep(0)
+    }
+
+    fun setOnboardingStep(step: Int) {
+        if (settingsRepository.state.value.onboardingStep != step) settingsRepository.setOnboardingStep(step)
+    }
+
+    /**
+     * Lệnh khởi động Shizuku qua ADB cho đúng máy này (Shizuku 13.6+ dùng libshizuku.so trong thư mục lib của app).
+     * Null nếu chưa cài Shizuku.
+     */
+    val shizukuStartCommand: String?
+        get() = runCatching {
+            val info = app.packageManager.getApplicationInfo(PermissionsReader.SHIZUKU_PACKAGE, 0)
+            "adb shell ${info.nativeLibraryDir}/libshizuku.so"
+        }.getOrNull()
+
+    fun setAutoMic(value: Boolean) = settingsRepository.setAutoMic(value)
+
+    fun setLockScreen(value: Boolean) = settingsRepository.setLockScreen(value)
+
+    fun setRedirectEnabled(value: Boolean) = settingsRepository.setRedirectEnabled(value)
+
+    fun setDedupe(value: Boolean) = settingsRepository.setDedupe(value)
+
+    fun setManualAutostart(value: Boolean) {
+        settingsRepository.setManualAutostart(value)
+        refreshPermissions()
+    }
+
+    fun selectProfile(id: String?, announce: Boolean = true) {
+        settingsRepository.setProfileOverride(id)
+        if (!announce) return
+        val name = when (id) {
+            null -> "tự nhận diện"
+            OemProfile.GENERIC_ID -> "hãng khác"
+            else -> catalog.profile(id)?.displayName ?: id
+        }
+        _message.value = "Đã chuyển profile: $name. Chạy lại Kích hoạt nếu đổi hãng."
+    }
+
+    fun selectTarget(id: String) {
+        settingsRepository.setTarget(id)
+    }
+
+    fun selectCustomTarget(entry: AppEntry) {
+        settingsRepository.setTarget(AssistantTarget.CUSTOM, entry.packageName, entry.label)
+        _message.value = "Đích mới: ${entry.label}. App này không tự bật Micro."
+    }
+
+    fun nudgeDismissDelay(deltaMs: Long) {
+        val next = (config.value.dismissDelayMs + deltaMs)
+            .coerceIn(ConfigResolver.MIN_DISMISS_DELAY, ConfigResolver.MAX_DISMISS_DELAY)
+        settingsRepository.setDismissDelay(next)
+    }
+
+    fun nudgeMicTimeout(deltaMs: Long) {
+        val next = (config.value.micTimeoutMs + deltaMs)
+            .coerceIn(ConfigResolver.MIN_MIC_TIMEOUT, ConfigResolver.MAX_MIC_TIMEOUT)
+        settingsRepository.setMicTimeout(next)
+    }
+
+    fun resetTuning() {
+        settingsRepository.setDismissDelay(null)
+        settingsRepository.setMicTimeout(null)
+        _message.value = "Đã trả độ trễ và timeout về mặc định của profile."
+    }
+
+    fun loadApps() {
+        if (_apps.value != null) return
+        viewModelScope.launch {
+            _apps.value = withContext(Dispatchers.IO) {
+                val pm = app.packageManager
+                val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                pm.queryIntentActivities(launcher, PackageManager.MATCH_ALL)
+                    .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+                    .filter { (pkg, _) -> pkg != app.packageName }
+                    .distinctBy { it.first }
+                    .map { (pkg, label) -> AppEntry(pkg, label) }
+                    .sortedBy { it.label.lowercase() }
+            }
+        }
+    }
+
+    fun startSniffer() {
+        refreshPermissions()
+        if (!_permissions.value.accessibility || !serviceConnected.value) {
+            _message.value = "Cần bật Trợ năng cho AI Key Bridge trước khi dò."
+            return
+        }
+        snifferJob?.cancel()
+        Sniffer.start(SNIFF_WINDOW_MS)
+        Diagnostics.info("sniff", "Bắt đầu dò cửa sổ trong ${SNIFF_WINDOW_MS / 1000}s.")
+        snifferJob = viewModelScope.launch {
+            delay(SNIFF_WINDOW_MS)
+            if (isActive) Sniffer.stop()
+            Diagnostics.info("sniff", "Dò xong · ${Sniffer.state.value.candidates.size} cửa sổ.")
+        }
+    }
+
+    fun stopSniffer() {
+        snifferJob?.cancel()
+        Sniffer.stop()
+    }
+
+    fun saveTrigger(candidate: Sniffer.Candidate) {
+        settingsRepository.addCustomTrigger(CustomTrigger(candidate.packageName, candidate.className))
+        Diagnostics.success("sniff", "Lưu trigger ${candidate.packageName}/${candidate.className}")
+        _message.value = "Đã lưu trigger. Bấm lại nút AI để thử."
+    }
+
+    fun removeTrigger(trigger: CustomTrigger) {
+        settingsRepository.removeCustomTrigger(trigger)
+    }
+
+    fun setUsageMode(mode: UsageMode, announce: Boolean = true) {
+        settingsRepository.setUsageMode(mode)
+        refreshPermissions()
+        if (announce) {
+            _message.value = when (mode) {
+                UsageMode.ONE_TIME -> "Đã chuyển sang Cấu hình một lần — không cần Trợ năng."
+                UsageMode.SCRIPT -> "Đã chuyển sang Script nền — bật script trong màn Script nền."
+                UsageMode.FULL -> "Đã chuyển sang Đầy đủ — cần bật Trợ năng."
+            }
+        }
+    }
+
+    fun setHardwareMode(mode: HardwareMode) {
+        if (settingsRepository.state.value.hardwareMode != mode) {
+            _message.value = if (mode == HardwareMode.LOGCAT) "Nút cứng: chế độ B (đọc event log)." else "Nút cứng: chế độ A (bắt cửa sổ)."
+        }
+        settingsRepository.setHardwareMode(mode)
+        refreshPermissions()
+        LogStatus.permissionChanged()
+    }
+
+    /** Cấp READ_LOGS cho chính app bằng shell của Shizuku (pm grant). */
+    fun grantReadLogs() {
+        refreshPermissions()
+        if (_permissions.value.readLogs) {
+            LogStatus.permissionChanged()
+            _message.value = "Đã có quyền READ_LOGS."
+            return
+        }
+        if (!_permissions.value.shizukuGranted) {
+            _message.value = "Cần Shizuku để tự cấp. Hoặc chạy trên máy tính: $readLogsCommand"
+            return
+        }
+        viewModelScope.launch {
+            val result = shell.exec("pm grant ${app.packageName} android.permission.READ_LOGS")
+            refreshPermissions()
+            LogStatus.permissionChanged()
+            val ok = _permissions.value.readLogs
+            Diagnostics.log(
+                if (ok) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
+                "logcat",
+                if (ok) "Đã cấp READ_LOGS qua Shizuku." else "pm grant READ_LOGS lỗi: ${result.output}",
+            )
+            _message.value = if (ok) {
+                "Đã cấp READ_LOGS. Nếu Android hỏi quyền truy cập log, chọn Cho phép."
+            } else {
+                "Không cấp được READ_LOGS: ${result.output.ifBlank { "lệnh trả về ${result.exitCode}" }}"
+            }
+        }
+    }
+
+    fun startLogSniffer() {
+        refreshPermissions()
+        when {
+            !_permissions.value.accessibility || !serviceConnected.value ->
+                _message.value = "Cần bật Trợ năng cho AI Key Bridge trước khi dò log."
+            !_permissions.value.readLogs ->
+                _message.value = "Cần cấp quyền READ_LOGS trước khi dò log."
+            else -> {
+                logSnifferJob?.cancel()
+                LogSniffer.start(SNIFF_WINDOW_MS)
+                Diagnostics.info("sniff", "Bắt đầu dò event log trong ${SNIFF_WINDOW_MS / 1000}s.")
+                logSnifferJob = viewModelScope.launch {
+                    delay(SNIFF_WINDOW_MS)
+                    if (isActive) LogSniffer.stop()
+                }
+            }
+        }
+    }
+
+    fun stopLogSniffer() {
+        logSnifferJob?.cancel()
+        LogSniffer.stop()
+    }
+
+    fun saveLogPattern(line: LogSniffer.Line) {
+        settingsRepository.addLogPattern(line.key)
+        Diagnostics.success("sniff", "Lưu mẫu log: ${line.key}")
+        _message.value = "Đã lưu mẫu log. Chọn chế độ B rồi bấm nút để thử."
+    }
+
+    fun removeLogPattern(pattern: String) {
+        settingsRepository.removeLogPattern(pattern)
+    }
+
+    fun requestShizukuPermission() {
+        val snapshot = _permissions.value
+        if (!snapshot.shizukuRunning) {
+            _message.value = "Shizuku chưa chạy. Mở Shizuku rồi thử lại."
+            return
+        }
+        runCatching { Shizuku.requestPermission(SHIZUKU_REQUEST_CODE) }
+            .onFailure { _message.value = "Không gửi được yêu cầu quyền: ${it.message}" }
+    }
+
+    fun onShizukuPermissionResult(granted: Boolean) {
+        refreshPermissions()
+        _message.value = if (granted) {
+            "Đã cấp quyền Shizuku. Có thể chạy ${_setup.value.steps.size} lệnh."
+        } else {
+            "Bạn đã từ chối quyền Shizuku."
+        }
+    }
+
+    fun runProvisioning() {
+        if (_setup.value.running) return
+        if (!_permissions.value.shizukuGranted) {
+            _message.value = "Cần cấp quyền Shizuku trước khi chạy lệnh."
+            return
+        }
+        val active = config.value
+        if (active.provisioning.isEmpty()) {
+            settingsRepository.setProvisionedFingerprint(device.fingerprint)
+            _message.value = "${active.target.displayName} không cần lệnh shell nào."
+            return
+        }
+
+        viewModelScope.launch {
+            _setup.value = SetupUiState.from(active.provisioning, active.restore).copy(running = true)
+            Diagnostics.info("setup", "Bắt đầu chạy ${active.provisioning.size} lệnh · ${active.flowLabel}.")
+
+            val report = Provisioner(shell, active.provisioning, active.restore).runProvisioning { step, phase, detail ->
+                _setup.update { state ->
+                    state.copy(
+                        steps = state.steps.map { item ->
+                            if (item.id == step.id) item.copy(status = phase.toStatus(), message = detail) else item
+                        },
+                    )
+                }
+            }
+
+            _setup.update { it.copy(running = false, provisioningReport = report) }
+            Diagnostics.log(
+                if (report.ok) Diagnostics.Level.SUCCESS else Diagnostics.Level.WARN,
+                "setup",
+                "Kết quả ${report.passed}/${report.total} bước.",
+            )
+            if (report.passed > 0) settingsRepository.setProvisionedFingerprint(device.fingerprint)
+            refreshPermissions()
+            _message.value = if (report.ok) {
+                "Đã xác minh đủ ${report.total} bước. Gọi ${active.profile.assistantName} để thử."
+            } else {
+                "Còn ${report.total - report.passed} bước chưa đạt — xem chi tiết."
+            }
+        }
+    }
+
+    fun restoreDefaults() {
+        if (_setup.value.restoring) return
+        if (!_permissions.value.shizukuGranted) {
+            _message.value = "Cần cấp quyền Shizuku trước khi khôi phục."
+            return
+        }
+        val active = config.value
+
+        viewModelScope.launch {
+            _setup.update { state ->
+                state.copy(
+                    restoring = true,
+                    restoreReport = null,
+                    restoreSteps = state.restoreSteps.map { it.copy(status = StepStatus.PENDING, message = "") },
+                )
+            }
+            Diagnostics.info("restore", "Bắt đầu khôi phục mặc định.")
+
+            val report: ProvisionReport =
+                Provisioner(shell, active.provisioning, active.restore).runRestore { step, phase, detail ->
+                    _setup.update { state ->
+                        state.copy(
+                            restoreSteps = state.restoreSteps.map { item ->
+                                if (item.id == step.id) item.copy(status = phase.toStatus(), message = detail) else item
+                            },
+                        )
+                    }
+                }
+
+            _setup.update { it.copy(restoring = false, restoreReport = report) }
+            settingsRepository.setRedirectEnabled(false)
+            settingsRepository.setProvisionedFingerprint(null)
+            refreshPermissions()
+            _message.value = if (report.ok) {
+                "Đã khôi phục. Chọn lại ${active.profile.assistantName} trong cài đặt trợ lý."
+            } else {
+                "Khôi phục xong một phần — kiểm tra các bước lỗi trong nhật ký."
+            }
+        }
+    }
+
+    /** Đọc lại quyền + so fingerprint ROM với lần kích hoạt gần nhất. */
+    fun checkRom() {
+        runDiagnostics(announce = false)
+        settingsRepository.setLastRomCheck(System.currentTimeMillis())
+        val saved = settingsRepository.state.value.provisionedFingerprint
+        val snapshot = _permissions.value
+        _message.value = when {
+            saved == null -> "Chưa kích hoạt lần nào trên máy này."
+            saved != device.fingerprint -> "ROM đã cập nhật từ lần kích hoạt trước — nên chạy lại Kích hoạt & vá lỗi."
+            !snapshot.assistantOk -> "ROM không đổi, nhưng trợ lý mặc định đã bị đặt lại. Chạy lại kích hoạt."
+            else -> "ROM không đổi, cấu hình vẫn còn."
+        }
+    }
+
+    fun runDiagnostics(announce: Boolean = true) {
+        refreshPermissions()
+        val snapshot = _permissions.value
+        val active = config.value
+        Diagnostics.info(
+            "diag",
+            "Thiết bị: ${device.manufacturer} ${device.model} · Android ${device.androidRelease} (API ${device.sdk})",
+        )
+        Diagnostics.info(
+            "diag",
+            "Profile: ${active.profile.id}${if (active.manualProfile) " (chọn tay)" else ""} · đích ${active.target.id}",
+        )
+        Diagnostics.log(
+            if (snapshot.accessibility) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
+            "diag",
+            "Trợ năng: ${if (snapshot.accessibility) "đã bật" else "chưa bật"}",
+        )
+        if (active.target.shellKeyevent != null) {
+            Diagnostics.info(
+                "diag",
+                "Lớp phủ nổi: ${when {
+                    !snapshot.assistantDefault -> "tắt (Google chưa là trợ lý mặc định) · dùng app"
+                    !snapshot.shizukuGranted -> "tắt (chưa có Shizuku) · dùng app"
+                    else -> "bật"
+                }}",
+            )
+        }
+        Diagnostics.info(
+            "diag",
+            "Nút cứng: chế độ ${if (settings.value.hardwareMode == HardwareMode.LOGCAT) "B (event log)" else "A (cửa sổ)"}" +
+                " · READ_LOGS ${if (snapshot.readLogs) "đã cấp" else "chưa cấp"}",
+        )
+        Diagnostics.log(
+            if (snapshot.nativeAssistantInstalled || active.profile.isGeneric) Diagnostics.Level.INFO else Diagnostics.Level.WARN,
+            "diag",
+            "Trợ lý gốc (${active.profile.assistantName}): ${if (snapshot.nativeAssistantInstalled) "có trên máy" else "không thấy gói"}",
+        )
+        Diagnostics.log(
+            if (snapshot.batteryUnrestricted) Diagnostics.Level.SUCCESS else Diagnostics.Level.WARN,
+            "diag",
+            "Pin: ${if (snapshot.batteryUnrestricted) "không bị tối ưu" else "đang bị tối ưu"}",
+        )
+        Diagnostics.log(
+            if (snapshot.shizukuGranted) Diagnostics.Level.SUCCESS else Diagnostics.Level.INFO,
+            "diag",
+            "Shizuku: ${when {
+                snapshot.shizukuGranted -> "đã cấp quyền"
+                snapshot.shizukuRunning -> "đang chạy, chưa cấp quyền"
+                snapshot.shizukuInstalled -> "đã cài, chưa chạy"
+                else -> "chưa cài"
+            }}",
+        )
+        Diagnostics.log(
+            if (snapshot.targetInstalled) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
+            "diag",
+            "${active.target.displayName}: ${if (snapshot.targetInstalled) "đã cài" else "chưa cài"}",
+        )
+        if (announce) _message.value = "Đã chạy chẩn đoán và ghi vào nhật ký."
+    }
+
+    fun exportLogs() {
+        if (exporting) return
+        exporting = true
+        refreshPermissions()
+        val snapshot = _permissions.value
+        if (snapshot.shizukuGranted) _message.value = "Đang gom log hệ thống qua Shizuku…"
+        viewModelScope.launch {
+            try {
+                val report = if (snapshot.shizukuGranted) collectShellReport() else null
+                val file = withContext(Dispatchers.IO) {
+                    Diagnostics.export(
+                        context = app,
+                        device = device,
+                        config = config.value,
+                        settings = settings.value,
+                        permissions = snapshot,
+                        shellReport = report,
+                    )
+                }
+                _exportFile.value = file
+            } finally {
+                exporting = false
+            }
+        }
+    }
+
+    private var exporting = false
+
+    /** Trạng thái hệ thống và logcat toàn máy, đọc bằng quyền shell của Shizuku. */
+    private suspend fun collectShellReport(): Diagnostics.ShellReport {
+        val pkg = app.packageName
+        val active = config.value
+        val commands = buildList {
+            add("Trợ năng" to "settings get secure accessibility_enabled; settings get secure enabled_accessibility_services")
+            add("Trợ lý mặc định" to "settings get secure assistant; settings get secure voice_interaction_service; cmd role get-role-holders android.app.role.ASSISTANT")
+            add("Gói $pkg" to "dumpsys package $pkg | grep -E 'versionName|lastUpdateTime|stopped=|enabled=|READ_LOGS|WRITE_SECURE'")
+            add("Appops $pkg" to "cmd appops get $pkg")
+            add("Whitelist pin" to "dumpsys deviceidle whitelist | grep -iE '$pkg|vivo.agent|copilot|googlequicksearchbox|bard'")
+            add("Tiến trình liên quan" to "ps -A -o PID,USER,NAME | grep -iE 'aikeybridge|shizuku|vivo.agent|copilot|bard|googlequicksearch'")
+            active.provisioning.forEach { add("Kiểm tra: ${it.title}" to it.verify) }
+            add("dumpsys accessibility" to "dumpsys accessibility")
+        }
+        val sections = commands.map { (title, command) ->
+            val result = shell.exec(command)
+            title to "$ $command\n${result.output.ifBlank { "(trống, exit ${result.exitCode})" }}"
+        }
+        // Log toàn máy ~2MB vượt giới hạn binder, nên nén gzip + base64 bên shell rồi giải nén ở đây.
+        val buffers = "-b main -b system -b crash -b events"
+        val gz = shell.exec("logcat -d -v threadtime $buffers | gzip -c | base64 -w 0")
+        val logcatGz = if (gz.ok) runCatching { android.util.Base64.decode(gz.stdout.trim(), android.util.Base64.DEFAULT) }.getOrNull()?.takeIf { it.isNotEmpty() } else null
+        val logcatText = if (logcatGz == null) {
+            shell.exec("logcat -d -v threadtime $buffers -t 3000").takeIf { it.ok }?.stdout
+        } else {
+            null
+        }
+        return Diagnostics.ShellReport(sections, logcatGz, logcatText)
+    }
+
+    fun consumeExport() {
+        _exportFile.value = null
+    }
+
+    fun clearLogs() {
+        Diagnostics.clear()
+        _message.value = "Đã xoá nhật ký và lịch sử lượt chạy trên máy."
+    }
+
+    fun showMessage(text: String) {
+        _message.value = text
+    }
+
+    fun consumeMessage() {
+        _message.value = null
+    }
+
+    override fun onCleared() {
+        runCatching { Shizuku.removeBinderReceivedListener(binderReceived) }
+        runCatching { Shizuku.removeBinderDeadListener(binderDead) }
+        Sniffer.stop()
+        LogSniffer.stop()
+        shell.close()
+        super.onCleared()
+    }
+
+    private fun StepPhase.toStatus(): StepStatus = when (this) {
+        StepPhase.RUNNING -> StepStatus.RUNNING
+        StepPhase.OK -> StepStatus.OK
+        StepPhase.FAILED -> StepStatus.FAILED
+    }
+
+    companion object {
+        const val SHIZUKU_REQUEST_CODE = 2311
+        const val SNIFF_WINDOW_MS = 8_000L
+        const val GEMINI_VOICE_KEY = 231
+
+        /** Ước lượng thời gian script gọi trợ lý (không đo được từ trong script). */
+        const val SCRIPT_FLOW_MS = 600L
+    }
+}

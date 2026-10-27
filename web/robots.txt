@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pdong15dth.github.io/gemini-default-ai-phone/sitemap.xml

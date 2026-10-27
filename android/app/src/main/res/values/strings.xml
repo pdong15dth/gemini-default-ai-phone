@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI Key Bridge</string>
+    <string name="launch_label">Gọi AI</string>
+    <string name="launch_long_label">Gọi AI · mở trợ lý đã chọn</string>
+    <string name="accessibility_label">AI Key Bridge — chuyển trợ lý</string>
+    <string name="accessibility_description">Theo dõi cửa sổ trợ lý gốc của hãng (Tiểu V, XiaoAI, Breeno, YOYO, Mora…) để đóng nó và mở trợ lý AI bạn chọn, như Gemini. Dịch vụ chỉ đọc tên gói và tên lớp cửa sổ, không đọc nội dung màn hình, không ghi âm và không gửi dữ liệu ra ngoài.</string>
+</resources>

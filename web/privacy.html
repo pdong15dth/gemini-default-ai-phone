@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chính sách riêng tư — AI Key Bridge</title>
+<meta name="description" content="AI Key Bridge không thu thập, không gửi và không bán dữ liệu. Đây là chính xác những gì app đọc trên thiết bị của bạn.">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0A0B0D">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<header class="nav is-scrolled">
+  <div class="wrap nav__inner">
+    <a class="brand" href="index.html" aria-label="AI Key Bridge — về trang chủ">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/></svg>
+      </span>
+      <span class="brand__name">AI Key Bridge</span>
+    </a>
+    <a class="btn btn--light btn--sm" href="index.html">Về trang chủ</a>
+  </div>
+</header>
+
+<main class="doc">
+  <div class="wrap"><div class="doc__inner">
+    <a class="doc__back" href="index.html">← Trang chủ</a>
+    <h1 class="doc__title">Chính sách riêng tư</h1>
+    <p class="doc__meta">Cập nhật 27/10/2025 · áp dụng cho AI Key Bridge 0.9.x</p>
+
+    <div class="prose">
+      <p class="callout"><strong>Không có server.</strong> AI Key Bridge chạy hoàn toàn trên máy bạn. Không có tài khoản, không có telemetry, không có SDK quảng cáo hay phân tích của bên thứ ba.</p>
+
+      <h2>App đọc gì</h2>
+      <p>Để biết trợ lý gốc vừa trượt lên, app dùng quyền Trợ năng (AccessibilityService) và chỉ đọc hai trường của sự kiện cửa sổ:</p>
+      <ul>
+        <li>Tên gói của app vừa mở cửa sổ (ví dụ <code>com.vivo.ai.copilot</code>).</li>
+        <li>Tên lớp cửa sổ (ví dụ <code>CopilotPanelWindow</code>).</li>
+      </ul>
+      <p>Khi Gemini đã mở, app duyệt cây nút để tìm nút Micro. Bước này chỉ đọc <code>viewIdResourceName</code> và <code>contentDescription</code> (mô tả của nút), không đọc <code>text</code>, không đọc mật khẩu, không chụp màn hình và không lưu nội dung cửa sổ.</p>
+
+      <h2>Micro và âm thanh</h2>
+      <p>App không xin quyền <code>RECORD_AUDIO</code> và không có khả năng ghi âm. Khi Gemini mở, app chỉ mô phỏng một cú chạm vào nút Micro của Gemini. Âm thanh do Gemini xử lý theo chính sách của Google.</p>
+
+      <h2>Dữ liệu lưu trên máy</h2>
+      <ul>
+        <li>Cấu hình: đích đến, độ trễ, các công tắc. Lưu trong bộ nhớ riêng của app.</li>
+        <li>Nhật ký sự kiện: thời điểm, tên sự kiện, thời lượng. Vòng lặp tối đa 200 mục, tự ghi đè.</li>
+        <li>Profile ROM: file JSON đi kèm app.</li>
+      </ul>
+      <p>Bạn có thể xoá toàn bộ bằng <strong>Nhật ký → Xoá</strong>, hoặc xoá dữ liệu app trong hệ thống.</p>
+
+      <h2>Xuất log chẩn đoán</h2>
+      <p>Log chỉ được tạo khi bạn bấm <strong>Xuất log chẩn đoán</strong>. Log không chứa văn bản màn hình, tên riêng hay số điện thoại — chỉ gồm tên gói, tên lớp cửa sổ, kết quả lệnh và thời lượng. File zip nằm trong bộ nhớ máy cho tới khi bạn tự chia sẻ.</p>
+
+      <h2>Shizuku và ADB</h2>
+      <p>Shizuku là app bên thứ ba, chạy lệnh shell với quyền của chính nó. AI Key Bridge chỉ gửi đúng các lệnh cấu hình hiển thị trong màn hình Kích hoạt, không gửi gì ra mạng. Nếu bạn không cài Shizuku, app in lệnh ADB để bạn tự dán.</p>
+
+      <h2>Quyền hệ thống được dùng</h2>
+      <ul>
+        <li><strong>Trợ năng</strong> — bắt sự kiện cửa sổ trợ lý gốc, tìm nút Micro và thực hiện thao tác chạm.</li>
+        <li><strong>Bỏ giới hạn pin</strong> (khuyến nghị) — giữ service sống sau khi reboot.</li>
+        <li><strong>Truy vấn gói</strong> — kiểm tra Gemini và trợ lý gốc đã cài hay chưa.</li>
+        <li><strong>Shizuku</strong> (tuỳ chọn) — chạy lệnh cấu hình và dự phòng keyevent 231; không bắt buộc lúc chạy.</li>
+      </ul>
+      <p>App không xin quyền vị trí, danh bạ, tin nhắn, camera, bộ nhớ ngoài hay quyền INTERNET.</p>
+
+      <h2>Trẻ em</h2>
+      <p>App không hướng tới trẻ em và không thu thập dữ liệu của bất kỳ ai.</p>
+
+      <h2>Thay đổi chính sách</h2>
+      <p>Mọi thay đổi sẽ được ghi trong <a href="https://github.com/pdong15dth/gemini-default-ai-phone">mã nguồn</a> và có hiệu lực từ commit tương ứng. Vì app không có server, không có bản cập nhật chính sách nào âm thầm chạy trên máy bạn.</p>
+
+      <h2>Liên hệ</h2>
+      <p>Mở issue tại <a href="https://github.com/pdong15dth/gemini-default-ai-phone/issues">github.com/pdong15dth/gemini-default-ai-phone/issues</a>. Vui lòng không dán log chưa che nội dung.</p>
+    </div>
+  </div></div>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__bottom" style="margin-top:0;border-top:0;padding-top:0">
+      <p>Không liên kết, không được bảo trợ bởi Google, Vivo, iQOO, Xiaomi, OPPO, Honor hay Nubia. “Gemini”, “Jovi”, “Tiểu V” là nhãn hiệu của chủ sở hữu tương ứng.</p>
+      <span class="footer__copy">© <span id="year">2025</span> AI Key Bridge</span>
+    </div>
+  </div>
+</footer>
+<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+{
+  "schema": 3,
+  "id": "vivo_originos",
+  "oem": "vivo",
+  "os": "OriginOS",
+  "display_name": "Vivo / iQOO",
+  "assistant_name": "Tiểu V",
+  "wake_phrase": "Hi Jovi",
+  "verified": true,
+  "match": [
+    "vivo",
+    "iqoo"
+  ],
+  "assistant_packages": [
+    "com.vivo.ai.copilot",
+    "com.vivo.agent"
+  ],
+  "cooldown_ms": 1600,
+  "dismiss_delay_ms": 500,
+  "autostart_hint": "i Quản lý → Quản lý ứng dụng → Tự khởi chạy → bật AI Key Bridge.",
+  "triggers": [
+    {
+      "id": "vivo_copilot",
+      "label": "Hi Jovi / nút AI",
+      "package": "com.vivo.ai.copilot",
+      "class_regex": ".*CopilotPanelWindow.*"
+    }
+  ],
+  "log_triggers": [
+    {
+      "id": "vivo_action_button",
+      "label": "Nút tắt Jovi",
+      "pattern": "ACTION_BUTTON_TO_START_FUNCTIONS"
+    }
+  ],
+  "shell_watch": {
+    "panel": "CopilotPanelWindow",
+    "button": "ACTION_BUTTON_TO_START_FUNCTIONS"
+  },
+  "provisioning": [
+    {
+      "id": "jovi_background",
+      "title": "Cho Tiểu V chạy nền",
+      "detail": "Giữ khả năng nghe “Hi Jovi” của trợ lý gốc.",
+      "command": "cmd appops set com.vivo.agent RUN_IN_BACKGROUND allow",
+      "verify": "cmd appops get com.vivo.agent RUN_IN_BACKGROUND",
+      "expect": "allow",
+      "hint": "Máy không có com.vivo.agent thì bỏ qua bước này."
+    },
+    {
+      "id": "jovi_any_background",
+      "title": "Cho Tiểu V chạy nền liên tục",
+      "detail": "Mở thêm RUN_ANY_IN_BACKGROUND nếu ROM yêu cầu.",
+      "command": "cmd appops set com.vivo.agent RUN_ANY_IN_BACKGROUND allow",
+      "verify": "cmd appops get com.vivo.agent RUN_ANY_IN_BACKGROUND",
+      "expect": "allow",
+      "hint": "Máy không có com.vivo.agent thì bỏ qua bước này."
+    },
+    {
+      "id": "locale",
+      "title": "Vá crash locale tiếng Việt",
+      "detail": "Chỉ đổi locale riêng của Tiểu V sang en-US, máy vẫn giữ tiếng Việt.",
+      "command": "cmd locale set-app-locales com.vivo.ai.copilot --locales en-US",
+      "verify": "cmd locale get-app-locales com.vivo.ai.copilot",
+      "expect": "en-US",
+      "hint": "Android 12 trở xuống không có lệnh này: mở Cài đặt → Ứng dụng → Tiểu V → Ngôn ngữ → English."
+    }
+  ],
+  "restore": [
+    {
+      "id": "restore_jovi_background",
+      "title": "Trả appops chạy nền của Tiểu V",
+      "command": "cmd appops reset com.vivo.agent RUN_IN_BACKGROUND",
+      "hint": "Bỏ qua nếu máy không có com.vivo.agent."
+    },
+    {
+      "id": "restore_jovi_any_background",
+      "title": "Trả appops chạy nền liên tục của Tiểu V",
+      "command": "cmd appops reset com.vivo.agent RUN_ANY_IN_BACKGROUND",
+      "hint": "Bỏ qua nếu máy không có com.vivo.agent."
+    },
+    {
+      "id": "restore_locale",
+      "title": "Bỏ locale en-US của Tiểu V",
+      "command": "cmd locale set-app-locales com.vivo.ai.copilot --locales \"\"",
+      "hint": "--locales \"\" xoá locale riêng, Tiểu V theo lại ngôn ngữ của máy."
+    }
+  ]
+}

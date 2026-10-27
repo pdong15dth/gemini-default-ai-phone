@@ -1,0 +1,26 @@
+{
+  "schema": 3,
+  "id": "xiaomi_hyperos",
+  "oem": "xiaomi",
+  "os": "HyperOS",
+  "display_name": "Xiaomi / Redmi / POCO",
+  "assistant_name": "XiaoAI",
+  "verified": false,
+  "match": ["xiaomi", "redmi", "poco"],
+  "assistant_packages": [
+    "com.miui.voiceassist"
+  ],
+  "cooldown_ms": 1600,
+  "dismiss_delay_ms": 550,
+  "autostart_hint": "Bảo mật → Ứng dụng → Quyền → Tự khởi chạy → bật AI Key Bridge, rồi khóa app trong đa nhiệm.",
+  "triggers": [
+    {
+      "id": "xiaoai_panel",
+      "label": "Hey XiaoAI / nút nguồn",
+      "package": "com.miui.voiceassist",
+      "class_regex": ".*(VoiceAssist|FloatWindow|FloatView|Floating|Panel).*"
+    }
+  ],
+  "provisioning": [],
+  "restore": []
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="call_ai"
+        android:shortcutLongLabel="@string/launch_long_label"
+        android:shortcutShortLabel="@string/launch_label">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetClass="com.aikeybridge.LaunchActivity"
+            android:targetPackage="com.aikeybridge" />
+    </shortcut>
+</shortcuts>

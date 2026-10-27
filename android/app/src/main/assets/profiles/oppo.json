@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "id": "oppo_coloros",
+  "oem": "oppo",
+  "os": "ColorOS",
+  "display_name": "OPPO / OnePlus / Realme",
+  "assistant_name": "Breeno",
+  "verified": false,
+  "match": ["oppo", "oneplus", "realme"],
+  "assistant_packages": [
+    "com.heytap.speechassist",
+    "com.coloros.speechassist"
+  ],
+  "cooldown_ms": 1600,
+  "dismiss_delay_ms": 500,
+  "autostart_hint": "Cài đặt → Ứng dụng → Quản lý ứng dụng → AI Key Bridge → Tự khởi chạy + Cho phép hoạt động nền.",
+  "triggers": [
+    {
+      "id": "breeno_heytap",
+      "label": "Breeno / nút Action",
+      "package": "com.heytap.speechassist",
+      "class_regex": ".*(SpeechAssist|FloatWindow|Floating|Breeno).*"
+    },
+    {
+      "id": "breeno_coloros",
+      "label": "Breeno (ColorOS cũ)",
+      "package": "com.coloros.speechassist",
+      "class_regex": ".*(SpeechAssist|FloatWindow|Floating|Breeno).*"
+    }
+  ],
+  "provisioning": [],
+  "restore": []
+}

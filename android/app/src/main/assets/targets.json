@@ -1,0 +1,130 @@
+{
+  "schema": 3,
+  "targets": [
+    {
+      "id": "gemini",
+      "display_name": "Gemini",
+      "packages": [
+        "com.google.android.apps.bard",
+        "com.google.android.googlequicksearchbox"
+      ],
+      "launch": {
+        "type": "package"
+      },
+      "launch_label": "mở app · lớp phủ nổi nếu có Shizuku",
+      "beta": false,
+      "overlay_needs_default_assistant": true,
+      "shell_keyevent": 231,
+      "voice_ui": {
+        "window_wait_ms": 2200,
+        "retry_interval_ms": 120,
+        "mic_view_id_regex": ".*(mic|voice).*",
+        "mic_content_desc_regex": "(?i)micro|voice|nói|noi|speak|assistant|talk",
+        "fallback_x": 0.86,
+        "fallback_y": 0.92
+      },
+      "provisioning": [
+        {
+          "id": "assistant",
+          "title": "Đặt Google làm trợ lý mặc định",
+          "detail": "Qua RoleManager (android.app.role.ASSISTANT); hệ thống tự ghi secure assistant và voice_interaction_service.",
+          "command": "cmd role remove-role-holder android.app.role.ASSISTANT com.google.android.googlequicksearchbox; cmd role add-role-holder android.app.role.ASSISTANT com.google.android.googlequicksearchbox",
+          "verify": "cmd role get-role-holders android.app.role.ASSISTANT",
+          "expect": "googlequicksearchbox",
+          "hint": "Cần app Google (googlequicksearchbox). Android 10+ bỏ qua settings put nếu role không khớp."
+        },
+        {
+          "id": "voice_interaction",
+          "title": "Đặt voice interaction service",
+          "detail": "Cùng dịch vụ trợ lý, dùng cho keyevent 219/231.",
+          "command": "settings put secure voice_interaction_service com.google.android.googlequicksearchbox/com.google.android.voiceinteraction.GsaVoiceInteractionService",
+          "verify": "settings get secure voice_interaction_service",
+          "expect": "googlequicksearchbox",
+          "hint": "Một số ROM dùng tên dịch vụ khác; đọc lại giá trị để chắc chắn."
+        },
+        {
+          "id": "overlay_google",
+          "title": "Cho Google hiển thị trên màn hình khóa",
+          "detail": "Cấp SYSTEM_ALERT_WINDOW bằng appops.",
+          "command": "cmd appops set com.google.android.googlequicksearchbox SYSTEM_ALERT_WINDOW allow",
+          "verify": "cmd appops get com.google.android.googlequicksearchbox SYSTEM_ALERT_WINDOW",
+          "expect": "allow",
+          "hint": "Cài Google từ Play Store trước nếu bước này báo package not found."
+        },
+        {
+          "id": "overlay_gemini",
+          "title": "Cho Gemini hiển thị trên màn hình khóa",
+          "detail": "Cấp SYSTEM_ALERT_WINDOW cho app Gemini.",
+          "command": "cmd appops set com.google.android.apps.bard SYSTEM_ALERT_WINDOW allow",
+          "verify": "cmd appops get com.google.android.apps.bard SYSTEM_ALERT_WINDOW",
+          "expect": "allow",
+          "hint": "Cài Gemini từ Play Store trước nếu bước này báo package not found."
+        }
+      ],
+      "restore": [
+        {
+          "id": "restore_assistant",
+          "title": "Bỏ Google khỏi trợ lý mặc định",
+          "command": "cmd role remove-role-holder android.app.role.ASSISTANT com.google.android.googlequicksearchbox",
+          "hint": "Sau đó chọn lại trợ lý gốc trong Cài đặt → Ứng dụng mặc định → Trợ lý số."
+        },
+        {
+          "id": "restore_overlay_google",
+          "title": "Trả quyền overlay của Google",
+          "command": "cmd appops reset com.google.android.googlequicksearchbox SYSTEM_ALERT_WINDOW",
+          "hint": "Bỏ qua nếu app chưa cài."
+        },
+        {
+          "id": "restore_overlay_gemini",
+          "title": "Trả quyền overlay của Gemini",
+          "command": "cmd appops reset com.google.android.apps.bard SYSTEM_ALERT_WINDOW",
+          "hint": "Bỏ qua nếu app chưa cài."
+        }
+      ]
+    },
+    {
+      "id": "chatgpt",
+      "display_name": "ChatGPT Voice",
+      "packages": [
+        "com.openai.chatgpt"
+      ],
+      "launch": {
+        "type": "assist",
+        "action": "android.intent.action.ASSIST"
+      },
+      "launch_label": "trợ lý giọng nói của ChatGPT",
+      "beta": true,
+      "overlay_needs_default_assistant": false,
+      "voice_ui": {
+        "window_wait_ms": 2600,
+        "retry_interval_ms": 150,
+        "mic_view_id_regex": ".*(voice|speech).*",
+        "mic_content_desc_regex": "(?i)voice mode|start voice|giọng nói|chế độ giọng nói"
+      },
+      "provisioning": [],
+      "restore": []
+    },
+    {
+      "id": "claude",
+      "display_name": "Claude",
+      "packages": [
+        "com.anthropic.claude"
+      ],
+      "launch": {
+        "type": "assist",
+        "action": "android.intent.action.ASSIST"
+      },
+      "launch_label": "lớp phủ trợ lý của Claude",
+      "beta": true,
+      "overlay_needs_default_assistant": false,
+      "voice_ui": {
+        "window_wait_ms": 2600,
+        "retry_interval_ms": 150,
+        "mic_view_id_regex": ".*(voice|mic|dictat).*",
+        "mic_content_desc_regex": "(?i)voice mode|start voice|dictat|micro|giọng nói"
+      },
+      "provisioning": [],
+      "restore": []
+    }
+  ]
+}

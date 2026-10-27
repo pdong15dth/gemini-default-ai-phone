@@ -72,4 +72,4 @@ Hô "Hi Jovi" sau khi rút cáp để xác nhận. Máy thiếu `setsid` (Androi
 
 - **Tùy chọn nhà phát triển → Tắt giám sát quyền (Disable permission monitoring):** bật nếu máy có mục này; nó giảm việc hệ thống thu hồi quyền/tiến trình khi cắm rút cáp.
 - **Thông báo "Đã kết nối gỡ lỗi USB":** chỉ vuốt bỏ thông báo. Bấm vào đó là tắt Gỡ lỗi USB và script mất kết nối.
-- Sau khi reboot, `adbd` trở về chế độ USB và script mất (không root): xem [Bước 4](../README.md#buoc-4-sau-khi-khoi-dong-lai-may) trong README, sau đó chạy lại `adb tcpip 5555` nếu vẫn cần rút cáp.
+- Sau khi reboot, `adbd` trở về chế độ USB và script mất (không root): xem [Bước 4](../HUONG-DAN-SCRIPT-ADB.md#buoc-4-sau-khi-khoi-dong-lai-may) trong hướng dẫn script ADB, sau đó chạy lại `adb tcpip 5555` nếu vẫn cần rút cáp.
