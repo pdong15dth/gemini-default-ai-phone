@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +48,9 @@ import com.aikeybridge.data.UsageMode
 import com.aikeybridge.diagnostics.AttemptSummary
 import com.aikeybridge.service.RedirectState
 import com.aikeybridge.ui.Format
+import com.aikeybridge.ui.ScriptStatus
+import com.aikeybridge.ui.components.PrimaryCta
+import com.aikeybridge.ui.components.StatusDot
 import com.aikeybridge.ui.components.BodyText
 import com.aikeybridge.ui.components.CircleButton
 import com.aikeybridge.ui.components.Gap
@@ -60,6 +65,7 @@ import com.aikeybridge.ui.theme.Danger
 import com.aikeybridge.ui.theme.Hairline
 import com.aikeybridge.ui.theme.Ink
 import com.aikeybridge.ui.theme.RingBase
+import com.aikeybridge.ui.theme.Surface
 import com.aikeybridge.ui.theme.TextFaint
 import com.aikeybridge.ui.theme.TextGhost
 import com.aikeybridge.ui.theme.TextLabel
@@ -83,7 +89,11 @@ fun OverviewScreen(
     onOpenModes: () -> Unit,
     onOpenTriggers: () -> Unit,
     onOpenScript: () -> Unit,
-    scriptRunning: Boolean,
+    scriptStatus: ScriptStatus,
+    scriptStartedThisBoot: Boolean,
+    onCheckScript: () -> Unit,
+    onStartScript: () -> Unit,
+    onStopScript: () -> Unit,
     onToggleRedirect: (Boolean) -> Unit,
     onToggleAutoMic: (Boolean) -> Unit,
     onToggleLockScreen: (Boolean) -> Unit,
@@ -91,9 +101,13 @@ fun OverviewScreen(
 ) {
     val oneTime = settings.usageMode == UsageMode.ONE_TIME
     val script = settings.usageMode == UsageMode.SCRIPT
+    val scriptOn = scriptStatus.running ?: scriptStartedThisBoot
+    if (config.profile.shellWatch != null) {
+        LaunchedEffect(permissions.shizukuGranted) { onCheckScript() }
+    }
     val health = when {
         script && !permissions.assistantDefault -> Health.NEEDS_SETUP
-        script -> if (scriptRunning) Health.READY else Health.SCRIPT_STOPPED
+        script -> if (scriptOn) Health.READY else Health.SCRIPT_STOPPED
         oneTime && !permissions.targetInstalled -> Health.NEEDS_PERMISSION
         oneTime -> if (romChanged) Health.ROM_CHANGED else Health.READY
         !settings.redirectEnabled -> Health.OFF
@@ -147,7 +161,7 @@ fun OverviewScreen(
                 },
                 onClick = fix,
             )
-            if (oneTime) {
+            if (oneTime && !scriptOn) {
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -199,6 +213,18 @@ fun OverviewScreen(
                     "lỗi hôm nay",
                     Modifier.weight(1f).padding(start = 16.dp),
                     valueColor = if (summary.failedToday > 0) Danger else TextMain,
+                )
+            }
+
+            if (config.profile.shellWatch != null) {
+                ScriptCard(
+                    status = scriptStatus,
+                    startedThisBoot = scriptStartedThisBoot,
+                    canControl = permissions.shizukuGranted,
+                    activeMode = script,
+                    onOpen = onOpenScript,
+                    onStart = onStartScript,
+                    onStop = onStopScript,
                 )
             }
 
@@ -320,6 +346,76 @@ private fun StatusRing(
                 }
                 if (actionHint != null) MonoText(actionHint, 9.sp, stateColor)
             }
+        }
+    }
+}
+
+@Composable
+private fun ScriptCard(
+    status: ScriptStatus,
+    startedThisBoot: Boolean,
+    canControl: Boolean,
+    activeMode: Boolean,
+    onOpen: () -> Unit,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+) {
+    val state = scriptState(status, startedThisBoot)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 18.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Surface)
+            .border(1.dp, if (status.running == true) Accent.copy(alpha = 0.35f) else Hairline, RoundedCornerShape(18.dp))
+            .clickable(role = Role.Button, onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            StatusDot(state.color, 8.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    BodyText("Script nền", 14.sp, TextMain, weight = FontWeight.Medium)
+                    MonoText(state.label, 9.5.sp, state.color)
+                }
+                MonoText(
+                    when {
+                        activeMode -> state.detail
+                        status.running == true -> "đang thay “Hi Jovi” dù chế độ đang chọn khác · ${state.detail}"
+                        else -> "như README · không cần Trợ năng · chọn trong Chế độ"
+                    },
+                    9.sp,
+                    TextFaint,
+                    maxLines = 2,
+                )
+            }
+            LucideIcon(R.drawable.lc_chevron_right, TextGhost, 14.dp)
+        }
+        if (canControl) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PrimaryCta(
+                    text = if (status.running == true) "Bật lại" else "Bật script",
+                    onClick = onStart,
+                    modifier = Modifier.weight(1f),
+                    leadingIcon = R.drawable.lc_terminal,
+                    loading = status.busy,
+                    height = 42.dp,
+                    radius = 12.dp,
+                )
+                if (status.running == true) {
+                    OutlineCta(
+                        text = "Tắt",
+                        onClick = onStop,
+                        modifier = Modifier.weight(0.6f),
+                        height = 42.dp,
+                        radius = 12.dp,
+                    )
+                }
+            }
+        } else {
+            MonoText("cần Shizuku để bật / tắt · chạm để xem lệnh ADB", 9.sp, Warn, maxLines = 2)
         }
     }
 }
