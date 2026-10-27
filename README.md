@@ -190,9 +190,17 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
 
 ## Lưu ý trên OriginOS
 
+**Script nền** (khuyên dùng)
+
+- Script chạy dưới quyền `shell` của Shizuku, tách khỏi app. **Vuốt app khỏi đa nhiệm hay kill app đều không ảnh hưởng** — "Hi Jovi" vẫn gọi Gemini.
+- Script và Shizuku không root **mất khi khởi động lại máy**. Sau mỗi lần khởi động: bật lại Shizuku, mở app, bấm **Bật script**.
+- Không cần Trợ năng, không cần Tự khởi chạy.
+
+**Đầy đủ** (Trợ năng)
+
 - **Khóa AI Key Bridge trong đa nhiệm.** Vuốt app khỏi màn đa nhiệm trên OriginOS là *force-stop*, và Android tự **tắt Trợ năng** của app bị force-stop — "Hi Jovi" sẽ ngừng hoạt động cho tới khi bạn bật lại Trợ năng. Mở đa nhiệm, kéo thẻ AI Key Bridge xuống (hoặc chạm biểu tượng khóa) để OriginOS không dọn nó.
-- Bật **Tự khởi chạy**: *i Quản lý → Quản lý ứng dụng → Tự khởi chạy → bật AI Key Bridge*.
-- Shizuku không root mất sau khi khởi động lại máy — chỉ ảnh hưởng chế độ **Script nền** và việc chạy lại lệnh kích hoạt. Chế độ **Đầy đủ** vẫn chạy nhờ Trợ năng.
+- Bật **Tự khởi chạy**: *i Quản lý → Quản lý ứng dụng → Tự khởi chạy → bật AI Key Bridge*, để dịch vụ chạy lại sau khi khởi động máy.
+- Không cần Shizuku lúc chạy — chỉ cần một lần để chạy lệnh kích hoạt (hoặc dán lệnh ADB).
 
 <a name="bao-loi"></a>
 
