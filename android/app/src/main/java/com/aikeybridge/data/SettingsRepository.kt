@@ -41,6 +41,8 @@ data class AppSettings(
     val customTriggers: List<CustomTrigger> = emptyList(),
     val hardwareMode: HardwareMode = HardwareMode.WINDOW,
     val usageMode: UsageMode = UsageMode.FULL,
+    /** false = người dùng chưa chọn cách dùng lần nào; onboarding sẽ gợi ý Script nền nếu máy hỗ trợ. */
+    val usageModeChosen: Boolean = false,
     val scriptStartedAt: Long = 0,
     val customLogPatterns: List<String> = emptyList(),
     val provisionedFingerprint: String? = null,
@@ -157,6 +159,7 @@ class SettingsRepository(context: Context) {
         usageMode = prefs.getString(KEY_USAGE_MODE, null)
             ?.let { name -> UsageMode.entries.firstOrNull { it.name == name } }
             ?: UsageMode.FULL,
+        usageModeChosen = prefs.contains(KEY_USAGE_MODE),
         scriptStartedAt = prefs.getLong(KEY_SCRIPT_STARTED, 0),
         customLogPatterns = prefs.getString(KEY_LOG_PATTERNS, null).orEmpty()
             .lines()
