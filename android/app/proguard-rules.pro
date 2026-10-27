@@ -1,0 +1,3 @@
+-keep class com.aikeybridge.shell.ShellUserService { *; }
+-keep class com.aikeybridge.shell.IShellService { *; }
+-keep class com.aikeybridge.shell.IShellService$* { *; }

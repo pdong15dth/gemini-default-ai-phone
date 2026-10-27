@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "id": "honor_magicos",
+  "oem": "honor",
+  "os": "MagicOS",
+  "display_name": "Honor / Huawei",
+  "assistant_name": "YOYO / Celia",
+  "verified": false,
+  "match": ["honor", "huawei"],
+  "assistant_packages": [
+    "com.hihonor.magicvoice",
+    "com.huawei.vassistant"
+  ],
+  "cooldown_ms": 1600,
+  "dismiss_delay_ms": 450,
+  "autostart_hint": "Trình quản lý điện thoại → Khởi chạy ứng dụng → AI Key Bridge → Quản lý thủ công, bật cả 3 mục.",
+  "triggers": [
+    {
+      "id": "yoyo_honor",
+      "label": "YOYO / nhấn giữ nút nguồn",
+      "package": "com.hihonor.magicvoice",
+      "class_regex": ".*(VoiceAssistant|Magicvoice|FloatWindow|Panel).*"
+    },
+    {
+      "id": "celia_huawei",
+      "label": "Celia / Xiaoyi",
+      "package": "com.huawei.vassistant",
+      "class_regex": ".*(VAssistant|VoiceAssistant|FloatWindow|Panel).*"
+    }
+  ],
+  "provisioning": [],
+  "restore": []
+}

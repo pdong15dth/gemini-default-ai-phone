@@ -1,0 +1,54 @@
+name: Gửi log chẩn đoán
+
+description: Báo lỗi kèm log xuất từ app (đã che nội dung màn hình).
+title: "[diagnostics] "
+labels:
+  - diagnostics
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Log lấy từ **Cài đặt → Nhật ký → Xuất log zip**. File chỉ gồm tên gói, tên lớp cửa sổ, kết quả lệnh và thông tin thiết bị.
+        Không dán ảnh màn hình chứa nội dung cá nhân.
+
+  - type: input
+    id: device
+    attributes:
+      label: Thiết bị và ROM
+      placeholder: "Vivo X100 · OriginOS 5 · Android 15"
+    validations:
+      required: true
+
+  - type: input
+    id: gemini
+    attributes:
+      label: Phiên bản Google Gemini
+      placeholder: "Ví dụ: 1.0.xxxxx"
+    validations:
+      required: false
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Hiện tượng
+      description: Hô "Hi Jovi" thì chuyện gì xảy ra? Gemini có mở nhưng không bật Micro?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Các bước đã thử
+      placeholder: "Đã bật Trợ năng, đã chạy 6/7 lệnh, đã cấp quyền Shizuku…"
+    validations:
+      required: false
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Nội dung log
+      description: Mở file zip, dán log.txt vào đây. Không cần đính kèm file nếu thấy dài.
+      render: text
+    validations:
+      required: true

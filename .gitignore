@@ -1,1 +1,23 @@
 .commandcode/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.kotlin/
+android/captures/
+*.iml
+.idea/
+.DS_Store
+
+# Build artifacts kept out of git
+*.apk
+*.aab
+*.keystore
+*.jks
+!android/app/debug.keystore
+
+# OS / editor
+Thumbs.db
+*.log

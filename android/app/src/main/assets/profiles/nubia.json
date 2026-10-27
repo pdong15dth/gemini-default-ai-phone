@@ -1,0 +1,26 @@
+{
+  "schema": 3,
+  "id": "nubia_myos",
+  "oem": "nubia",
+  "os": "MyOS",
+  "display_name": "Nubia / RedMagic",
+  "assistant_name": "Mora",
+  "verified": false,
+  "match": ["nubia", "redmagic", "red magic"],
+  "assistant_packages": [
+    "cn.nubia.voiceassist"
+  ],
+  "cooldown_ms": 1600,
+  "dismiss_delay_ms": 500,
+  "autostart_hint": "Cài đặt → Ứng dụng → AI Key Bridge → Pin → Không hạn chế, và bật Tự khởi chạy.",
+  "triggers": [
+    {
+      "id": "mora_panel",
+      "label": "Mora / phím cạnh máy",
+      "package": "cn.nubia.voiceassist",
+      "class_regex": ".*(Activity|Window|Float|Panel).*"
+    }
+  ],
+  "provisioning": [],
+  "restore": []
+}

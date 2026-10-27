@@ -8,12 +8,16 @@ Gọi thẳng bảng nổi (overlay) của **Google Gemini** bằng cả câu l�
 
 > Đã chạy thực tế trên máy Vivo OriginOS nội địa qua ADB từ Windows PowerShell. Các bản ROM khác có thể đặt tên gói khác — xem mục [Xử lý sự cố](#xu-ly-su-co).
 
+Có hai cách dùng: **app Android** (Kotlin + Jetpack Compose, không cần PC sau khi cài) hoặc **script ADB thủ công** như hướng dẫn bên dưới. App dùng cùng cơ chế, thêm tự bật Micro, chẩn đoán và khôi phục mặc định.
+
 ## Mục lục
 
+- [Cài bằng app (khuyến nghị)](#cai-bang-app-khuyen-nghi)
+- [Tự build và deploy](#tu-build-va-deploy)
 - [Kết quả đạt được](#ket-qua-dat-duoc)
 - [Cơ chế hoạt động](#co-che-hoat-dong)
 - [Yêu cầu](#yeu-cau)
-- [Bước 1 — Cài app và cấp quyền trên máy](#buoc-1-cai-app-va-cap-quyen-tren-may)
+- [Bước 1 — Cài Google/Gemini và cấp quyền trên máy](#buoc-1-cai-app-va-cap-quyen-tren-may)
 - [Bước 2 — ADB: chuyển trợ lý mặc định và vá lỗi crash](#buoc-2-adb-chuyen-tro-ly-mac-dinh-va-va-loi-crash)
 - [Bước 3 — Script chạy ngầm chuyển hướng sang Gemini](#buoc-3-script-chay-ngam-chuyen-huong-sang-gemini)
 - [Bước 4 — Sau khi khởi động lại máy](#buoc-4-sau-khi-khoi-dong-lai-may)
@@ -23,6 +27,47 @@ Gọi thẳng bảng nổi (overlay) của **Google Gemini** bằng cả câu l�
 - [Xử lý sự cố](#xu-ly-su-co)
 - [Khôi phục về Tiểu V](#khoi-phuc-ve-tieu-v)
 - [Giới hạn và ghi chú](#gioi-han-va-ghi-chu)
+
+<a name="cai-bang-app-khuyen-nghi"></a>
+
+## Cài bằng app (khuyến nghị)
+
+APK beta: [github.com/pdong15dth/gemini-default-ai-phone/releases](https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk) · Android 11+ · không root · không quảng cáo.
+
+1. Tải APK và cài (cho phép cài từ nguồn không xác định).
+2. Mở app → **Bắt đầu cấp quyền** → bật **Trợ năng**.
+   - Android 13+ có thể làm mờ nút Trợ năng với app cài ngoài: mở **Thông tin ứng dụng → menu ⋮ → Cho phép cài đặt bị hạn chế**, rồi quay lại bật.
+   - Bật thêm **Tự khởi chạy**, **Khởi chạy liên kết** và **Pin không hạn chế** cho app trên OriginOS.
+3. Mở tab **Kích hoạt**. Nếu có Shizuku, cấp quyền rồi bấm **Chạy 7 lệnh**; nếu chưa, bấm **Copy ADB** và dán lệnh vào PowerShell/Terminal một lần.
+4. Hô **"Hi Jovi"**. Panel Tiểu V bị đóng, Gemini mở và Micro tự bật.
+
+Nếu từng chạy script ADB, dừng nó trước để không có hai lớp cùng bấm Back:
+
+```bash
+adb shell "pkill -9 -f gemini.sh; pkill -9 -f logcat"
+```
+
+App không bắt buộc Shizuku lúc chuyển hướng. Shizuku dùng để chạy lệnh cấu hình và khôi phục; nếu đang bật và đã cấp quyền, app dùng thêm `keyevent 231` làm dự phòng khi intent mở Gemini thất bại. Sau reboot, Shizuku không root phải bật lại, còn service chuyển hướng vẫn chạy nếu Trợ năng và tự khởi chạy còn bật.
+
+<a name="tu-build-va-deploy"></a>
+
+## Tự build và deploy
+
+Hướng dẫn đầy đủ: [docs/build-va-deploy.md](docs/build-va-deploy.md).
+
+```bash
+cd android
+./gradlew assembleDebug     # app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleRelease   # bản R8 ~2 MB
+```
+
+Landing page nằm trong `web/`, deploy bằng GitHub Actions:
+
+1. Repo → **Settings → Pages → Source: GitHub Actions**.
+2. Push thay đổi trong `web/` lên `main`.
+3. Workflow `.github/workflows/pages.yml` deploy lên `https://pdong15dth.github.io/gemini-default-ai-phone/`.
+
+APK phát hành: đẩy tag `v*` để workflow `.github/workflows/android.yml` build và gắn `ai-key-bridge.apk` vào GitHub Release. Nên cấu hình keystore cố định trong GitHub Secrets trước khi phát hành cho người dùng thật.
 
 <a name="ket-qua-dat-duoc"></a>
 
@@ -69,7 +114,7 @@ Ba quyết định quan trọng làm nên cách này:
 
 <a name="buoc-1-cai-app-va-cap-quyen-tren-may"></a>
 
-## Bước 1 — Cài app và cấp quyền trên máy
+## Bước 1 — Cài Google/Gemini và cấp quyền trên máy
 
 OriginOS kiểm soát chạy ngầm rất gắt. Thiếu quyền thì panel Gemini sẽ hiện lên rồi tự tắt.
 
@@ -415,7 +460,7 @@ adb shell cmd package install-existing com.vivo.agent
 
 ## Giới hạn và ghi chú
 
-- **Không root thì script mất sau reboot.** File `gemini.sh` vẫn còn, chỉ cần chạy lại một dòng ở Bước 4. Các hướng "dính vĩnh viễn" (AccessibilityService tự build, Shizuku/Brevent, MacroDroid + quyền `READ_LOGS`) đều phải cài thêm app hoặc build APK — đánh đổi sạch máy lấy sự tiện lợi.
+- **Với script, không root thì mất sau reboot.** File `gemini.sh` vẫn còn, chỉ cần chạy lại một dòng ở Bước 4. App AI Key Bridge ở trên đã đóng gói AccessibilityService và tự chạy lại theo hệ thống; script chỉ là cách thủ công. Các hướng khác (Shizuku/Brevent, MacroDroid + quyền `READ_LOGS`) vẫn cần cài thêm hoặc build APK.
 - **Không nên `pm uninstall` app hệ thống** nếu không cần. Trên bản ROM khóa, lệnh này thường fail; và kể cả khi thành công thì cũng chỉ cần thiết khi bạn muốn Tiểu V biến mất hoàn toàn.
 - **Không dùng `am force-stop com.vivo.ai.copilot`** trong vòng lặp. Nó giết luôn service nhận giọng nói, làm "Hi Jovi" chết dần.
 - **Tự bật Micro phụ thuộc bản Gemini.** Script dùng `231` (`KEYCODE_VOICE_ASSIST`). Nếu bản Gemini trên máy khóa tính năng này, phải chèn `input tap` vào nút Micro — cách đó phụ thuộc độ phân giải/DPI nên đổi màn hình hoặc đổi bản ROM là phải lấy tọa độ lại.
@@ -426,9 +471,22 @@ adb shell cmd package install-existing com.vivo.agent
 
 ```
 .
-├── README.md
+├── android/                 # app Kotlin + Jetpack Compose
+│   └── app/src/main/
+│       ├── assets/profiles/ # profile ROM (JSON)
+│       ├── java/com/aikeybridge/
+│       └── res/xml/         # cấu hình AccessibilityService
+├── web/                     # landing page tĩnh, deploy GitHub Pages
 ├── docs/
-│   └── rut-cap-usb.md
-└── scripts/
-    └── gemini.sh
+│   ├── build-va-deploy.md   # build APK, ký, phát hành, Pages
+│   ├── rut-cap-usb.md
+│   └── spec-app.md
+├── scripts/
+│   └── gemini.sh            # cách ADB thủ công
+├── .github/workflows/
+│   ├── android.yml          # build APK + release theo tag
+│   └── pages.yml            # deploy landing page
+├── CONTRIBUTING.md
+├── LICENSE
+└── README.md
 ```
