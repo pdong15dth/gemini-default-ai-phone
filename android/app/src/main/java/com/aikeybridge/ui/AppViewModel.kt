@@ -191,7 +191,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val started = WatchService.start(app)
             scriptBusy.value = false
             _message.value = if (started) {
-                "Đang nghe trong app. Android hỏi quyền truy cập log thì chọn Cho phép — sau đó tắt Gỡ lỗi cũng không sao."
+                "Đang nghe trong app. Android hỏi quyền truy cập log thì chọn Cho phép, rồi tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB để dùng app ngân hàng."
             } else {
                 "Không bật được nghe nền — xem Nhật ký."
             }

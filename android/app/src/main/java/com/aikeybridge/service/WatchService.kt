@@ -217,7 +217,8 @@ class WatchService : Service() {
         val config = source.current()
         val wake = config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName
         val (title, text) = when (access) {
-            LogAccess.SYSTEM -> "Đang nghe $wake" to "→ ${config.target.displayName} · tắt Gỡ lỗi vẫn chạy"
+            LogAccess.SYSTEM -> "Đang nghe $wake" to
+                "→ ${config.target.displayName} · dùng app ngân hàng thì tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB, vẫn chạy"
             LogAccess.OWN_ONLY -> "Chạm để cho phép đọc log" to
                 "Android chưa cho app đọc log hệ thống. Mở app và chọn Cho phép."
             LogAccess.NO_PERMISSION -> "Thiếu quyền đọc log" to "Mở app và bấm Kích hoạt (cần Shizuku một lần)."

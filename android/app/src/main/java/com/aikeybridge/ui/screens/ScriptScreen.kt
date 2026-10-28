@@ -97,7 +97,7 @@ fun ScriptScreen(
             BodyText(
                 "Bản thuần Script nền — hoàn toàn không có dịch vụ Trợ năng trong APK nên dùng được mọi app ngân hàng. " +
                     "Bấm bật một lần: app tự chạy các lệnh kích hoạt, tự cấp quyền đọc log qua Shizuku rồi tự nghe $wake ngay trong app. " +
-                    "Xong có thể tắt Gỡ lỗi USB và Tuỳ chọn nhà phát triển.",
+                    "Dùng app ngân hàng thì bắt buộc tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB — nghe nền vẫn chạy.",
                 13.5.sp,
                 Muted,
                 lineHeight = 20.sp,
@@ -165,6 +165,21 @@ fun ScriptScreen(
                                     .padding(6.dp),
                             )
                         }
+                    }
+                }
+
+                if (status.listening) {
+                    // Chỉ hiện khi đã nghe được: tắt Gỡ lỗi trước lúc đó là Shizuku dừng, chưa kịp cấp quyền đọc log.
+                    SectionLabel("Bước cuối · dùng app ngân hàng", Modifier.padding(top = 12.dp))
+                    Panel {
+                        NavRow(
+                            title = "Tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB",
+                            subtitle = "bắt buộc, app ngân hàng chặn khi còn bật · nghe nền vẫn chạy",
+                            subColor = Warn,
+                            trailing = "mở",
+                            onClick = { Intents.openDeveloperSettings(context) },
+                            divider = false,
+                        )
                     }
                 }
 
