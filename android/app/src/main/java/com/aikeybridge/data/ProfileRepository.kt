@@ -6,6 +6,7 @@ import com.aikeybridge.model.AssistantTarget
 import com.aikeybridge.model.LaunchType
 import com.aikeybridge.model.LogTrigger
 import com.aikeybridge.model.OemProfile
+import com.aikeybridge.model.OverlayMic
 import com.aikeybridge.model.ProvisionStep
 import com.aikeybridge.model.RestoreStep
 import com.aikeybridge.model.ShellWatch
@@ -132,6 +133,9 @@ object ProfileRepository {
             overlayNeedsDefaultAssistant = item.optBoolean("overlay_needs_default_assistant", false),
             shellKeyevent = if (item.has("shell_keyevent")) item.getInt("shell_keyevent") else null,
             voiceUi = item.optJSONObject("voice_ui")?.let(::parseVoiceUi),
+            overlayMic = item.optJSONObject("overlay_mic")?.let {
+                OverlayMic(it.getString("window"), it.getDouble("x").toFloat(), it.getDouble("y").toFloat())
+            },
             provisioning = item.optJSONArray("provisioning").provisionSteps(),
             restore = item.optJSONArray("restore").restoreSteps(),
         )
@@ -155,7 +159,7 @@ object ProfileRepository {
         launchLabel = "mở app",
         beta = false,
         overlayNeedsDefaultAssistant = true,
-        shellKeyevent = 231,
+        shellKeyevent = 219,
         voiceUi = VoiceUiSpec(
             windowWaitMs = 2200,
             retryIntervalMs = 120,
@@ -166,6 +170,7 @@ object ProfileRepository {
         ),
         provisioning = emptyList(),
         restore = emptyList(),
+        overlayMic = OverlayMic("FloatyActivity", 0.642f, 0.939f),
     )
 
     private fun JSONArray.strings(): List<String> = List(length()) { getString(it) }

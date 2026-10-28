@@ -157,6 +157,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             keyevent = active.target.shellKeyevent ?: GEMINI_ASSIST_KEY,
             eventLog = log,
             dismissDelayMs = active.dismissDelayMs,
+            mic = active.target.overlayMic,
         )
     }
 

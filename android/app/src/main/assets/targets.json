@@ -15,6 +15,11 @@
       "beta": false,
       "overlay_needs_default_assistant": true,
       "shell_keyevent": 219,
+      "overlay_mic": {
+        "window": "FloatyActivity",
+        "x": 0.642,
+        "y": 0.939
+      },
       "voice_ui": {
         "window_wait_ms": 2200,
         "retry_interval_ms": 120,
