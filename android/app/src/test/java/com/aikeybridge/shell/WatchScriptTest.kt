@@ -91,6 +91,15 @@ class WatchScriptTest {
     }
 
     @Test
+    fun scriptRecordsStateAndHeartbeatNextToEventLog() {
+        val script = WatchScript.content(watch, 231, log)
+
+        assertTrue(script.contains("DIR=\"\${LOG%/*}\""))
+        assertTrue(script.contains("cat /proc/\$\$/cgroup; } > \"\$DIR/script-state.log\""))
+        assertTrue(script.contains("date '+%F %T' > \"\$DIR/script-alive\" 2>/dev/null; sleep 30; done ) &"))
+    }
+
+    @Test
     fun detectsProcessGroupOfAdbd() {
         assertEquals(listOf("0::/uid_0/pid_1834"), WatchScript.processGroups("0::/uid_0/pid_1834\n"))
         assertEquals(

@@ -28,6 +28,13 @@ object WatchScript {
             appendLine("# Chuyển sang nhóm gốc như Shizuku, logcat/input sinh ra sau đó cũng nằm ngoài nhóm của adbd.")
             appendLine("for cg in $ESCAPE_CGROUPS; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
             appendLine("LOG='$eventLog'")
+            appendLine("DIR=\"\${LOG%/*}\"")
+            appendLine("# Chẩn đoán đọc được cả khi Shizuku đã chết: trạng thái lúc khởi động + nhịp còn sống mỗi ${ALIVE_INTERVAL_S}s.")
+            appendLine(
+                "{ echo \"start \$(date '+%F %T') pid=\$\$ ppid=\$PPID uid=\$(id -u) ctx=\$(cat /proc/self/attr/current 2>/dev/null)\"; " +
+                    "cat /proc/\$\$/cgroup; } > \"\$DIR/$STATE_FILE\" 2>/dev/null",
+            )
+            appendLine("( while true; do date '+%F %T' > \"\$DIR/$ALIVE_FILE\" 2>/dev/null; sleep $ALIVE_INTERVAL_S; done ) &")
             appendLine("while true; do")
             appendLine("  logcat -b events -c")
             appendLine("  line=\$(logcat -b events -e '$pattern' -m 1)")
@@ -73,6 +80,11 @@ object WatchScript {
 
     /** In ra "pid args" nếu script đang chạy; rỗng nếu không. */
     fun statusCommand(): String = "ps -A -o PID,ARGS | grep '[a]kb-gemini.sh'"
+
+    /** Hai file script ghi cạnh file sự kiện (thư mục riêng của app, app tự đọc được). */
+    const val STATE_FILE = "script-state.log"
+    const val ALIVE_FILE = "script-alive"
+    const val ALIVE_INTERVAL_S = 30
 
     /** Cây cgroup gốc mà script thử chuyển vào, cùng danh sách với starter của Shizuku. */
     const val ESCAPE_CGROUPS = "/sys/fs/cgroup /acct /dev/cg2_bpf"

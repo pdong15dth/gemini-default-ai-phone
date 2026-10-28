@@ -736,8 +736,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     "while read pid rest; do echo \"== \$pid \$rest\"; cat /proc/\$pid/cgroup; done; " +
                     "ls -l ${WatchScript.ESCAPE_CGROUPS.split(' ').joinToString(" ") { "$it/cgroup.procs" }}",
             )
+            add("Shell & adbd" to "ps -A -o PID,PPID,USER,LABEL,ARGS | grep -E '^ *[0-9]+ +[0-9]+ +shell |[a]dbd'; " +
+                "for p in \$(pidof adbd); do echo \"== adbd \$p\"; cat /proc/\$p/cgroup 2>&1; done")
+            add("Hệ thống shell" to "id; getenforce; uname -a; toybox --version; echo '-- cgroup của shell service'; cat /proc/self/cgroup")
+            add("Cây cgroup" to "mount | grep cgroup; ls -ld /sys/fs/cgroup/uid_0 /sys/fs/cgroup/uid_2000 2>&1")
+            add("File script" to "ls -l /data/local/tmp; echo '-- ${WatchScript.PATH}'; cat ${WatchScript.PATH}")
+            add("dumpsys adb" to "dumpsys adb")
+            add("Nguồn / màn hình" to "dumpsys power | grep -E 'mWakefulness=|mIsPowered=|mBatteryLevel=|mDeviceIdleMode='")
+            add("Cửa sổ trợ lý đang mở" to "dumpsys window windows | grep -iE 'Window\\{.*(copilot|vivo.agent|bard|googlequicksearchbox)'")
+            add("Exit-info Shizuku" to "dumpsys activity exit-info moe.shizuku.privileged.api | head -80")
+            active.profile.assistantPackages.forEach { native ->
+                add("Exit-info $native" to "dumpsys activity exit-info $native | head -60")
+            }
+            add("Deviceidle whitelist" to "dumpsys deviceidle whitelist")
             active.provisioning.forEach { add("Kiểm tra: ${it.title}" to it.verify) }
             add("dumpsys accessibility" to "dumpsys accessibility")
+            add("getprop" to "getprop")
+            // Bỏ các khoá định danh (android_id, tên máy, địa chỉ Bluetooth, token, tài khoản).
+            listOf("global", "secure", "system").forEach { ns ->
+                add("settings $ns" to "settings list $ns | grep -viE '$SETTINGS_PRIVATE'")
+            }
         }
         val sections = commands.map { (title, command) ->
             val result = shell.exec(command)
@@ -794,5 +812,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         /** Ước lượng thời gian script gọi trợ lý (không đo được từ trong script). */
         const val SCRIPT_FLOW_MS = 600L
+
+        /** Khoá settings mang định danh người dùng/máy — không đưa vào log xuất. */
+        const val SETTINGS_PRIVATE = "android_id|bluetooth_address|bluetooth_name|device_name|token|account|ssid|password|email|phone|imei|serial"
     }
 }
