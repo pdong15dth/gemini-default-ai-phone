@@ -56,6 +56,16 @@ class WatchScriptTest {
         assertTrue(script.contains("    if $focused; then\n      sleep 0.6\n      $focused && timeout 2 input tap \$MX \$MY"))
         // Dọn đa nhiệm giết dịch vụ trợ lý của Google: chưa thấy lớp phủ thì gửi lại phím một lần.
         assertTrue(script.contains("[ \$i -eq 7 ] && timeout 2 input keyevent 219"))
+        // Không khai báo gói trợ lý thì không dừng app nào.
+        assertFalse(script.contains("am force-stop"))
+
+        // App Google kẹt ("Invocation source … is not enabled"): gửi lại vẫn không lên thì khởi động lại nó.
+        val owned = WatchScript.content(watch, 219, log, mic = mic.copy(owner = "com.google.android.googlequicksearchbox"))
+        assertTrue(
+            owned.contains(
+                "[ \$i -eq 14 ] && timeout 3 am force-stop com.google.android.googlequicksearchbox && sleep 1 && timeout 2 input keyevent 219",
+            ),
+        )
         assertTrue(script.indexOf("input tap") > script.indexOf("    input keyevent 219\n  fi"))
         assertFalse(WatchScript.content(watch, 219, log).contains("input tap"))
     }

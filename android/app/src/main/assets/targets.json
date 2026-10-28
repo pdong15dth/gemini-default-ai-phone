@@ -17,6 +17,7 @@
       "shell_keyevent": 219,
       "overlay_mic": {
         "window": "FloatyActivity",
+        "package": "com.google.android.googlequicksearchbox",
         "x": 0.642,
         "y": 0.939
       },

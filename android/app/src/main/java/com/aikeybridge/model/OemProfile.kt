@@ -90,6 +90,8 @@ data class OverlayMic(
     val window: String,
     val x: Float,
     val y: Float,
+    /** Gói hiện lớp phủ; script dừng hẳn gói này khi nó kẹt, từ chối mọi lời gọi trợ lý. */
+    val owner: String? = null,
 )
 
 data class VoiceUiSpec(

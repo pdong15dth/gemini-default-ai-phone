@@ -134,7 +134,12 @@ object ProfileRepository {
             shellKeyevent = if (item.has("shell_keyevent")) item.getInt("shell_keyevent") else null,
             voiceUi = item.optJSONObject("voice_ui")?.let(::parseVoiceUi),
             overlayMic = item.optJSONObject("overlay_mic")?.let {
-                OverlayMic(it.getString("window"), it.getDouble("x").toFloat(), it.getDouble("y").toFloat())
+                OverlayMic(
+                    window = it.getString("window"),
+                    x = it.getDouble("x").toFloat(),
+                    y = it.getDouble("y").toFloat(),
+                    owner = it.optString("package").ifBlank { null },
+                )
             },
             provisioning = item.optJSONArray("provisioning").provisionSteps(),
             restore = item.optJSONArray("restore").restoreSteps(),
@@ -170,7 +175,7 @@ object ProfileRepository {
         ),
         provisioning = emptyList(),
         restore = emptyList(),
-        overlayMic = OverlayMic("FloatyActivity", 0.642f, 0.939f),
+        overlayMic = OverlayMic("FloatyActivity", 0.642f, 0.939f, "com.google.android.googlequicksearchbox"),
     )
 
     private fun JSONArray.strings(): List<String> = List(length()) { getString(it) }

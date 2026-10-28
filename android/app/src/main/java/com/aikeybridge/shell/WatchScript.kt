@@ -80,6 +80,13 @@ object WatchScript {
                 appendLine("    fi")
                 appendLine("    # Dọn đa nhiệm giết cả dịch vụ trợ lý của Google; phím đầu tới lúc nó đang chạy lại thì bị bỏ qua.")
                 appendLine("    [ \$i -eq $MIC_RESEND_AT ] && timeout 2 input keyevent $keyevent && echo \"\$(date +%T) gửi lại phím $keyevent\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null")
+                if (mic.owner != null) {
+                    appendLine("    # App trợ lý có lúc kẹt, từ chối mọi lời gọi (\"Invocation source … is not enabled\") tới khi khởi động lại.")
+                    appendLine(
+                        "    [ \$i -eq $MIC_RESET_AT ] && timeout 3 am force-stop ${mic.owner} && sleep 1 && timeout 2 input keyevent $keyevent && " +
+                            "echo \"\$(date +%T) khởi động lại ${mic.owner}, gửi lại phím\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null",
+                    )
+                }
                 appendLine("    sleep 0.2; i=\$((i + 1))")
                 appendLine("  done")
             }
@@ -92,11 +99,14 @@ object WatchScript {
     /** 0.642 → 642: sh chỉ tính số nguyên. */
     fun permille(fraction: Float): Int = (fraction * 1000).roundToInt().coerceIn(0, 1000)
 
-    /** Chờ lớp phủ có focus tối đa khoảng 3 giây trước khi bỏ chạm Micro. */
-    private const val MIC_TRIES = 15
+    /** Chờ lớp phủ có focus tối đa khoảng 7 giây (gồm cả lần khởi động lại app trợ lý) trước khi bỏ chạm Micro. */
+    private const val MIC_TRIES = 28
 
     /** Sau khoảng 1,4 giây chưa thấy lớp phủ thì gửi lại phím trợ lý một lần. */
     private const val MIC_RESEND_AT = 7
+
+    /** Gửi lại rồi mà khoảng 3 giây vẫn chưa thấy lớp phủ thì dừng hẳn app trợ lý cho nó khởi động lại. */
+    private const val MIC_RESET_AT = 14
 
     /** Lớp phủ trượt lên mất khoảng nửa giây sau khi có focus; chạm sớm hơn là trúng ô nhập chữ. */
     private const val MIC_SETTLE_MS = 600L
