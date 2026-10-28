@@ -37,6 +37,10 @@
     "panel": "CopilotPanelWindow",
     "button": "ACTION_BUTTON_TO_START_FUNCTIONS"
   },
+  "usage_watch": {
+    "package": "com.vivo.ai.copilot",
+    "class_regex": ".*\\.ForegroundService"
+  },
   "provisioning": [
     {
       "id": "jovi_background",

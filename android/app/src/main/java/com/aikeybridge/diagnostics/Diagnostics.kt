@@ -12,6 +12,7 @@ import com.aikeybridge.data.ProfileRepository
 import com.aikeybridge.data.DeviceInfo
 import com.aikeybridge.data.SettingsRepository
 import com.aikeybridge.service.LogStatus
+import com.aikeybridge.service.UsageAccess
 import com.aikeybridge.service.WatchStatus
 import com.aikeybridge.shell.WatchScript
 import java.io.File
@@ -292,6 +293,8 @@ object Diagnostics {
         appendLine("Service chạy: ${WatchStatus.running.value}")
         appendLine("Đọc log: ${LogStatus.access.value}")
         appendLine("READ_LOGS: ${LogStatus.hasReadLogs(context)}")
+        appendLine("Truy cập dữ liệu sử dụng: ${UsageAccess.granted(context)}")
+        appendLine("Hiển thị trên ứng dụng khác: ${Settings.canDrawOverlays(context)}")
         appendLine()
         appendLine("### Script shell bản cũ (≤ 1.0.6)")
         val alive = File(dir, WatchScript.ALIVE_FILE)

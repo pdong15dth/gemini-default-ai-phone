@@ -23,6 +23,7 @@ data class OemProfile(
     val autostartHint: String,
     val provisioning: List<ProvisionStep>,
     val restore: List<RestoreStep>,
+    val usageWatch: UsageWatch? = null,
 ) {
     val isGeneric: Boolean get() = id == GENERIC_ID
 
@@ -50,6 +51,18 @@ data class ShellWatch(
     val panel: String,
     val button: String?,
 )
+
+/**
+ * Script nền qua thống kê sử dụng: trợ lý gốc bật foreground service [className] của [packageName]
+ * đúng lúc hiện cửa sổ. Dùng khi ROM chặn app đọc log hệ thống (Vivo Android 17 chỉ cho đọc log của chính app).
+ */
+data class UsageWatch(
+    val packageName: String,
+    val classRegex: Regex?,
+) {
+    fun matches(pkg: String?, cls: String?): Boolean =
+        pkg == packageName && (classRegex == null || (cls != null && classRegex.matches(cls)))
+}
 
 /** Chế độ nút cứng B: một dòng logcat khớp [pattern] nghĩa là người dùng vừa bấm nút. */
 data class LogTrigger(

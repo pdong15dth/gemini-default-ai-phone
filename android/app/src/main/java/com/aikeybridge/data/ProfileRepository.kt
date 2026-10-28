@@ -10,6 +10,7 @@ import com.aikeybridge.model.ProvisionStep
 import com.aikeybridge.model.RestoreStep
 import com.aikeybridge.model.ShellWatch
 import com.aikeybridge.model.TriggerSpec
+import com.aikeybridge.model.UsageWatch
 import com.aikeybridge.model.VoiceUiSpec
 import org.json.JSONArray
 import org.json.JSONObject
@@ -111,6 +112,12 @@ object ProfileRepository {
             autostartHint = root.optString("autostart_hint"),
             provisioning = root.optJSONArray("provisioning").provisionSteps(),
             restore = root.optJSONArray("restore").restoreSteps(),
+            usageWatch = root.optJSONObject("usage_watch")?.let {
+                UsageWatch(
+                    packageName = it.getString("package"),
+                    classRegex = it.optString("class_regex").ifBlank { null }?.let(::Regex),
+                )
+            },
         )
     }
 

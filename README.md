@@ -70,7 +70,7 @@ App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi tr�
 
 App biết trợ lý gốc vừa mở bằng một trong hai cách, tuỳ chế độ:
 
-- **Script nền** (khuyên dùng, không cần Trợ năng): app tự đọc kênh `events` của logcat bằng quyền `READ_LOGS` (Shizuku cấp một lần) và lọc đúng sự kiện `CopilotPanelWindow` / nút lối tắt. Còn Shizuku thì làm y như [hướng dẫn script ADB](HUONG-DAN-SCRIPT-ADB.md): bấm Back, đánh thức màn hình rồi gửi `keyevent 231` — Gemini mở thẳng chế độ nghe. Tắt Gỡ lỗi (Shizuku dừng) thì app mở thẳng chế độ nghe của Gemini bằng intent.
+- **Script nền** (khuyên dùng, không cần Trợ năng): app tự nhận ra lúc Tiểu V hiện lên (trên Vivo qua thống kê sử dụng; ROM khác qua kênh `events` của logcat với quyền `READ_LOGS`). Còn Shizuku thì làm y như [hướng dẫn script ADB](HUONG-DAN-SCRIPT-ADB.md): bấm Back, đánh thức màn hình rồi gửi `keyevent 231`, Gemini mở thẳng chế độ nghe. Đã tắt Gỡ lỗi (Shizuku dừng) thì app vẫn đóng được Tiểu V và mở lớp phủ Gemini như khi giữ nút nguồn.
 - **Đầy đủ**: **AccessibilityService** đọc *tên gói* và *tên lớp cửa sổ* vừa hiện. Khi Gemini mở, service đọc thêm tên và mô tả của các nút để tìm nút Micro rồi chạm.
 
 Cả hai đều không đọc văn bản trên màn hình, không chụp màn hình, không ghi âm. App không có quyền Internet.
@@ -192,10 +192,16 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
 
 **Script nền** (khuyên dùng)
 
-- App tự nghe trong tiến trình của mình (thông báo "Đang nghe “Hi Jovi”"). Đến bản 1.0.6 đây là script chạy bằng quyền `shell`, mà tiến trình shell nằm trong nhóm của `adbd` nên **tắt Gỡ lỗi USB là bị giết theo**. App ngân hàng lại bắt tắt Gỡ lỗi USB, nên từ 1.0.7 phần nghe chuyển vào app.
-- Sau khi bấm **Kích hoạt & Bật nghe nền** và chọn **Cho phép** ở hộp thoại truy cập log của Android, **bắt buộc tắt công tắc tổng "Tuỳ chọn nhà phát triển" và "Gỡ lỗi USB"** nếu dùng app ngân hàng (app ngân hàng chặn khi còn bật). Nghe nền vẫn chạy. Khi đó Shizuku dừng nên app không bấm Back được: Tiểu V có thể còn hiện phía sau Gemini.
-- Khởi động lại máy: app tự bật lại, nhưng Android 13+ chỉ cho đọc log khi app đang mở — chạm thông báo "Chạm để cho phép đọc log" và chọn **Cho phép**. Không cần Shizuku nữa.
-- **Khóa AI Key Bridge trong đa nhiệm** và để **Pin không hạn chế** để OriginOS không dọn app.
+- App tự nghe trong tiến trình của mình (thông báo "Đang nghe “Hi Jovi”"). Đến bản 1.0.6 đây là script chạy bằng quyền `shell`, mà tiến trình shell nằm trong nhóm của `adbd` nên **tắt Gỡ lỗi USB là bị giết theo**; app ngân hàng lại bắt tắt Gỡ lỗi USB.
+- Android 17 trên Vivo không cho app đọc log hệ thống (kể cả khi có `READ_LOGS`), nên app nhận ra "Hi Jovi" qua **thống kê sử dụng**: Tiểu V bật một foreground service đúng lúc hiện cửa sổ.
+- Bật tay một lần trong Cài đặt (màn Script nền có nút mở thẳng từng mục):
+  - **Truy cập dữ liệu sử dụng** cho AI Key Bridge.
+  - **Cửa sổ nổi** (Hiển thị trên ứng dụng khác) cho AI Key Bridge, để mở Gemini khi app đang chạy nền.
+  - **Pin → Kiểm soát pin dưới nền → AI Key Bridge → Cho phép sử dụng pin ngầm**. Để "Kiểm soát thông minh" thì Vivo đóng băng app sau vài giây chạy nền và "Hi Jovi" không còn tác dụng.
+- Sau khi bấm **Kích hoạt & Bật nghe nền**, **bắt buộc tắt công tắc tổng "Tuỳ chọn nhà phát triển" và "Gỡ lỗi USB"** nếu dùng app ngân hàng. Nghe nền vẫn chạy:
+  - Còn Shizuku (đang bật Gỡ lỗi): đóng Tiểu V và mở lớp phủ Gemini đang nghe, như script cũ.
+  - Đã tắt Gỡ lỗi: app mở một màn trong suốt để Tiểu V mất focus và tự đóng, rồi gọi **lớp phủ Gemini đang nghe** như khi giữ nút nguồn (`launchAssist` của hệ thống). Không cần Shizuku.
+- **Khóa AI Key Bridge trong đa nhiệm** để OriginOS không dọn app. Sau khi khởi động lại máy, mở app một lần để bật lại nghe nền.
 
 **Đầy đủ** (Trợ năng)
 

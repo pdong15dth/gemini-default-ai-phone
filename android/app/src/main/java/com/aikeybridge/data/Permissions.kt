@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.PowerManager
 import android.provider.Settings
 import com.aikeybridge.service.AssistantAccessibilityService
+import com.aikeybridge.service.UsageAccess
 import rikka.shizuku.Shizuku
 
 data class PermissionSnapshot(
@@ -22,6 +23,8 @@ data class PermissionSnapshot(
     val assistantRequired: Boolean = true,
     val nativeAssistantInstalled: Boolean = false,
     val readLogs: Boolean = false,
+    val usageAccess: Boolean = false,
+    val overlay: Boolean = false,
 ) {
     val assistantOk: Boolean get() = assistantDefault || !assistantRequired
     val ready: Boolean get() = accessibility && assistantOk && targetInstalled
@@ -54,6 +57,8 @@ object PermissionsReader {
             nativeAssistantInstalled = nativeAssistantPackages.any { isInstalled(context, it) },
             readLogs = context.checkSelfPermission(android.Manifest.permission.READ_LOGS) ==
                 PackageManager.PERMISSION_GRANTED,
+            usageAccess = UsageAccess.granted(context),
+            overlay = Settings.canDrawOverlays(context),
         )
     }
 

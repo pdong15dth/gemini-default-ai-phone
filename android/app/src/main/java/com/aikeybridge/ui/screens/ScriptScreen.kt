@@ -81,6 +81,7 @@ fun ScriptScreen(
     LaunchedEffect(permissions.shizukuGranted) { onCheck() }
     val wake = config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName
     val state = scriptState(status)
+    val usage = config.profile.usageWatch != null
 
     Column(modifier.fillMaxSize()) {
         SubHeader(onBack = onBack) {
@@ -96,7 +97,7 @@ fun ScriptScreen(
             Gap(10.dp)
             BodyText(
                 "Bản thuần Script nền — hoàn toàn không có dịch vụ Trợ năng trong APK nên dùng được mọi app ngân hàng. " +
-                    "Bấm bật một lần: app tự chạy các lệnh kích hoạt, tự cấp quyền đọc log qua Shizuku rồi tự nghe $wake ngay trong app. " +
+                    "Bấm bật một lần: app tự chạy các lệnh kích hoạt qua Shizuku rồi tự nghe $wake ngay trong app. " +
                     "Dùng app ngân hàng thì bắt buộc tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB — nghe nền vẫn chạy.",
                 13.5.sp,
                 Muted,
@@ -134,7 +135,7 @@ fun ScriptScreen(
                                     status.busy -> "Đang kích hoạt & bật nghe nền…"
                                     status.listening -> "Đang nghe $wake trong app"
                                     status.running && status.access == LogAccess.OWN_ONLY -> "Android chưa cho đọc log"
-                                    status.running && status.access == LogAccess.NO_PERMISSION -> "Thiếu quyền đọc log"
+                                    status.running && status.access == LogAccess.NO_PERMISSION -> "Thiếu quyền để nghe"
                                     status.running -> "Đang mở event log…"
                                     else -> "Đã tắt"
                                 },
@@ -146,7 +147,8 @@ fun ScriptScreen(
                                     status.listening -> "tắt Gỡ lỗi vẫn chạy · tự bật lại sau khi khởi động máy"
                                     status.running && status.access == LogAccess.OWN_ONLY ->
                                         "bấm Bật lại và chọn Cho phép · không thấy hộp thoại thì đợi 1 phút rồi bấm lại"
-                                    status.running && status.access == LogAccess.NO_PERMISSION -> "bấm Kích hoạt (cần Shizuku một lần)"
+                                    status.running && status.access == LogAccess.NO_PERMISSION ->
+                                        if (usage) "bật Truy cập dữ liệu sử dụng ở mục bên dưới" else "bấm Kích hoạt (cần Shizuku một lần)"
                                     status.running -> "Android hỏi quyền truy cập log thì chọn Cho phép"
                                     else -> "hô $wake sẽ vẫn mở ${config.profile.assistantName}"
                                 },
@@ -163,6 +165,47 @@ fun ScriptScreen(
                                     .clip(RoundedCornerShape(6.dp))
                                     .clickable(role = Role.Button, onClick = onCheck)
                                     .padding(6.dp),
+                            )
+                        }
+                    }
+                }
+
+                if (usage) {
+                    // Vivo không cho shell bật hộ hai quyền này cho app cài ngoài: người dùng bật tay một lần.
+                    SectionLabel("Quyền bật tay một lần", Modifier.padding(top = 12.dp))
+                    Panel {
+                        NavRow(
+                            title = "Truy cập dữ liệu sử dụng",
+                            subtitle = if (permissions.usageAccess) {
+                                "đã bật · nghe ${config.profile.assistantName} không cần đọc log"
+                            } else {
+                                "bắt buộc · chạm để bật cho AI Key Bridge"
+                            },
+                            subColor = if (permissions.usageAccess) Accent else Warn,
+                            trailing = if (permissions.usageAccess) null else "bật",
+                            onClick = if (permissions.usageAccess) null else { { Intents.openUsageAccess(context) } },
+                        )
+                        NavRow(
+                            title = "Hiển thị trên ứng dụng khác",
+                            subtitle = if (permissions.overlay) {
+                                "đã bật · mở ${config.target.displayName} được khi đã tắt Gỡ lỗi"
+                            } else {
+                                "cần để mở ${config.target.displayName} khi đã tắt Gỡ lỗi · chạm để bật"
+                            },
+                            subColor = if (permissions.overlay) Accent else Warn,
+                            trailing = if (permissions.overlay) null else "bật",
+                            onClick = if (permissions.overlay) null else { { Intents.openOverlaySettings(context) } },
+                            divider = config.profile.oem != "vivo",
+                        )
+                        if (config.profile.oem == "vivo") {
+                            // Không đọc được thiết lập này: "Kiểm soát thông minh" mặc định làm Vivo đóng băng app sau vài giây chạy nền.
+                            NavRow(
+                                title = "Pin dưới nền",
+                                subtitle = "Pin → Kiểm soát pin dưới nền → AI Key Bridge → Cho phép sử dụng pin ngầm",
+                                subColor = Warn,
+                                trailing = "mở",
+                                onClick = { Intents.openVivoBackgroundPower(context) },
+                                divider = false,
                             )
                         }
                     }
@@ -222,9 +265,8 @@ fun ScriptScreen(
                 }
                 Gap(10.dp)
                 BodyText(
-                    "Lưu ý: Tắt Gỡ lỗi là Shizuku dừng, nhưng nghe nền vẫn chạy vì nằm trong app. Lúc đó app không bấm Back được nên " +
-                        "${config.profile.assistantName} có thể còn hiện phía sau ${config.target.displayName}. " +
-                        "Khoá AI Key Bridge trong đa nhiệm và để Pin không hạn chế để ROM không dọn app.",
+                    "Lưu ý: Tắt Gỡ lỗi là Shizuku dừng, nhưng nghe nền vẫn chạy vì nằm trong app và vẫn mở lớp phủ " +
+                        "${config.target.displayName} như giữ nút nguồn. Khoá AI Key Bridge trong đa nhiệm để ROM không dọn app.",
                     11.sp,
                     TextFaint,
                     Modifier.padding(horizontal = 2.dp),
@@ -266,13 +308,14 @@ fun ScriptScreen(
                 val ctaText = when {
                     status.busy -> "Đang kích hoạt & bật nghe nền…"
                     permissions.shizukuGranted -> if (status.running) "Kích hoạt & Bật lại" else "Kích hoạt & Bật nghe nền"
-                    permissions.readLogs -> if (status.running) "Bật lại nghe nền" else "Bật nghe nền"
+                    permissions.readLogs || (usage && permissions.usageAccess) ->
+                        if (status.running) "Bật lại nghe nền" else "Bật nghe nền"
                     !permissions.shizukuInstalled -> "Tải Shizuku"
                     !permissions.shizukuRunning -> "Mở Shizuku"
                     else -> "Cấp quyền Shizuku"
                 }
                 val ctaAction: () -> Unit = when {
-                    permissions.shizukuGranted || permissions.readLogs -> onStart
+                    permissions.shizukuGranted || permissions.readLogs || (usage && permissions.usageAccess) -> onStart
                     !permissions.shizukuInstalled || !permissions.shizukuRunning -> {
                         { Intents.openShizuku(context) }
                     }
@@ -305,7 +348,7 @@ internal fun scriptState(status: ScriptStatus): ScriptStateUi = when {
     status.running && status.access == LogAccess.OWN_ONLY ->
         ScriptStateUi("chưa được đọc log", "mở màn Script nền, bấm Bật lại, chọn Cho phép", Danger)
     status.running && status.access == LogAccess.NO_PERMISSION ->
-        ScriptStateUi("thiếu quyền", "bấm Kích hoạt (cần Shizuku một lần)", Danger)
+        ScriptStateUi("thiếu quyền", "mở màn Script nền để bật quyền", Danger)
     status.running -> ScriptStateUi("đang mở log", "chọn Cho phép nếu Android hỏi", Warn)
     else -> ScriptStateUi("đã tắt", "không cần Trợ năng", TextDim)
 }

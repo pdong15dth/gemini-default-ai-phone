@@ -8,7 +8,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Mở trợ lý từ nền; cấp bằng appops qua Shizuku/ADB, không hiện lớp phủ nào. -->
+    <!-- Nghe "Hi Jovi" qua thống kê sử dụng khi ROM chặn đọc log (Vivo): người dùng bật trong Cài đặt. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <!-- Mở trợ lý từ nền: cửa sổ nổi 1px chỉ gắn trong lúc mở. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Chế độ nút cứng B: chỉ có hiệu lực khi cấp qua `pm grant` bằng Shizuku/ADB. -->
     <uses-permission
@@ -34,9 +38,6 @@
         </intent>
         <intent>
             <action android:name="android.intent.action.ASSIST" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VOICE_COMMAND" />
         </intent>
     </queries>
 

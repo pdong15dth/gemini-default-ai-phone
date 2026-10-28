@@ -1,6 +1,5 @@
 package com.aikeybridge.service
 
-import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,7 +12,6 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.os.PowerManager
 import android.os.SystemClock
 import com.aikeybridge.MainActivity
 import com.aikeybridge.R
@@ -33,6 +31,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,6 +66,7 @@ class WatchService : Service() {
     private lateinit var source: ConfigSource
     private lateinit var shell: ShizukuShell
     private lateinit var watcher: LogcatWatcher
+    private lateinit var usageWatcher: UsageWatcher
 
     @Volatile
     private var quietUntil = 0L
@@ -83,6 +83,9 @@ class WatchService : Service() {
         source = ConfigSource(this)
         shell = ShizukuShell(this)
         watcher = LogcatWatcher(listOf("events"), OWN_ONLY_AFTER_MS, ::onLine)
+        usageWatcher = UsageWatcher(this, { source.current().profile.usageWatch }) {
+            trigger(source.current(), WatchMatch.Kind.VOICE)
+        }
         createChannel()
         val initial = notification(LogStatus.access.value)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -103,6 +106,28 @@ class WatchService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (source.current().profile.usageWatch != null) startUsageWatch() else startLogWatch()
+        return START_STICKY
+    }
+
+    /** ROM chặn app đọc log hệ thống (Vivo Android 17): nghe qua thống kê sử dụng. */
+    private fun startUsageWatch() {
+        watcher.stop()
+        if (!UsageAccess.granted(this)) {
+            usageWatcher.stop()
+            LogStatus.set(LogAccess.NO_PERMISSION)
+            Diagnostics.warn("watch", "Thiếu quyền Truy cập dữ liệu sử dụng — bật tay trong Cài đặt.")
+            return
+        }
+        if (!usageWatcher.running) {
+            usageWatcher.start(scope)
+            Diagnostics.info("watch", "Nghe qua thống kê sử dụng (không cần đọc log).")
+        }
+        LogStatus.set(LogAccess.SYSTEM)
+    }
+
+    private fun startLogWatch() {
+        usageWatcher.stop()
         when {
             !LogStatus.hasReadLogs(this) -> {
                 watcher.stop()
@@ -117,11 +142,11 @@ class WatchService : Service() {
                 Diagnostics.info("watch", "Mở event log trong app.")
             }
         }
-        return START_STICKY
     }
 
     override fun onDestroy() {
         watcher.stop()
+        usageWatcher.stop()
         scope.cancel()
         shell.close()
         WatchStatus.setRunning(false)
@@ -136,6 +161,11 @@ class WatchService : Service() {
         val watch = config.shellWatch ?: return
         val current = match?.takeIf { it.watch == watch } ?: WatchMatch(watch).also { match = it }
         val kind = current.kindOf(line) ?: return
+        trigger(config, kind)
+    }
+
+    private fun trigger(config: ActiveConfig, kind: WatchMatch.Kind) {
+        if (SystemClock.elapsedRealtime() < quietUntil) return
         if (!busy.compareAndSet(false, true)) return
         scope.launch {
             val startedAt = SystemClock.elapsedRealtime()
@@ -145,7 +175,7 @@ class WatchService : Service() {
                 Diagnostics.error("watch", throwable.message ?: throwable.toString())
                 false to "lỗi: ${throwable.javaClass.simpleName}"
             } finally {
-                // Cửa sổ trợ lý gốc đóng/mở còn sinh thêm vài dòng log; bỏ qua như script ngủ 1.5s rồi xoá log.
+                // Cửa sổ trợ lý gốc đóng/mở còn sinh thêm vài sự kiện; bỏ qua như script ngủ 1.5s rồi xoá log.
                 quietUntil = SystemClock.elapsedRealtime() + COOLDOWN_MS
                 busy.set(false)
             }
@@ -178,27 +208,36 @@ class WatchService : Service() {
             Diagnostics.warn("watch", "Gửi phím qua Shizuku lỗi: ${result.output} — mở bằng intent.")
         }
 
-        val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
-        val asleep = getSystemService(PowerManager::class.java)?.isInteractive == false
-        val outcome = if (locked || asleep) {
-            val started = runCatching {
-                startActivity(
-                    Intent(this, TriggerActivity::class.java)
-                        .putExtra(TriggerActivity.EXTRA_VOICE, true)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-                )
-            }
-            LaunchOutcome(started.isSuccess, started.exceptionOrNull()?.message ?: "TriggerActivity")
-        } else {
-            AssistantLauncher.launchVoice(this, target)
+        // Không bấm Back được: mở TriggerActivity trong suốt để lấy focus (Tiểu V đóng khi mất focus, cũng là cách
+        // bật màn hình khi đang tắt/khoá), rồi activity đó gọi lớp phủ trợ lý như giữ nút nguồn.
+        // Android 15+ chỉ cho app có quyền "Hiển thị trên ứng dụng khác" mở activity từ nền khi đang có
+        // cửa sổ nổi hiện. Gắn tạm một cửa sổ 1px trong suốt, không nhận chạm, rồi gỡ ngay sau khi mở.
+        val overlay = OverlayGate.open(this)
+        if (overlay == null) {
+            // Thiếu quyền cửa sổ nổi thì không mở được activity từ nền: gọi thẳng lớp phủ, cửa sổ gốc còn ở dưới.
+            val assist = AssistOverlay.launch(this)
+            Diagnostics.log(
+                if (assist.ok) Diagnostics.Level.WARN else Diagnostics.Level.ERROR,
+                "watch",
+                "Không Shizuku · chưa có quyền hiển thị trên ứng dụng khác · ${assist.detail} · ${config.profile.assistantName} còn ở dưới",
+            )
+            return assist.ok to "lớp phủ · ${assist.detail}"
         }
+        delay(OVERLAY_SETTLE_MS)
+        val started = runCatching {
+            startActivity(
+                Intent(this, TriggerActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            )
+        }
+        OverlayGate.closeLater(overlay)
+        val detail = started.exceptionOrNull()?.message ?: "TriggerActivity → lớp phủ"
         Diagnostics.log(
-            if (outcome.ok) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
+            if (started.isSuccess) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
             "watch",
-            "Không Shizuku · ${outcome.detail}" +
-                if (voice) " · không đóng được ${config.profile.assistantName}" else "",
+            "Không Shizuku · $detail",
         )
-        return outcome.ok to "intent · ${outcome.detail}"
+        return started.isSuccess to detail
     }
 
     private fun shizukuReady(): Boolean = runCatching {
@@ -248,6 +287,7 @@ class WatchService : Service() {
         /** Kênh events có thể im vài giây; đợi lâu hơn trước khi kết luận Android chỉ cho đọc log của chính app. */
         private const val OWN_ONLY_AFTER_MS = 12_000L
         private const val COOLDOWN_MS = 1_500L
+        private const val OVERLAY_SETTLE_MS = 150L
 
         /** Bật hoặc mở lại logcat nếu Android vừa từ chối. Gọi nhiều lần không sao. */
         fun start(context: Context): Boolean = runCatching {

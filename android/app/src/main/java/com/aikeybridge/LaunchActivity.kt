@@ -8,6 +8,7 @@ import com.aikeybridge.diagnostics.Attempt
 import com.aikeybridge.diagnostics.AttemptLog
 import com.aikeybridge.diagnostics.Diagnostics
 import com.aikeybridge.service.AssistantAccessibilityService
+import com.aikeybridge.service.AssistOverlay
 import com.aikeybridge.service.AssistantLauncher
 
 /**
@@ -30,7 +31,9 @@ class LaunchActivity : Activity() {
             if (config == null) {
                 Diagnostics.error("shortcut", "Không tải được cấu hình.")
             } else {
-                val outcome = AssistantLauncher.launch(this, config.target)
+                // Như giữ nút nguồn: lớp phủ trợ lý mặc định; không được thì mở thẳng app đích.
+                val assist = AssistOverlay.launch(this)
+                val outcome = if (assist.ok) assist else AssistantLauncher.launch(this, config.target)
                 Diagnostics.log(
                     if (outcome.ok) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
                     "shortcut",
@@ -42,7 +45,7 @@ class LaunchActivity : Activity() {
                         flow = "Lối tắt → ${config.target.displayName}",
                         ok = outcome.ok,
                         durationMs = SystemClock.elapsedRealtime() - startedAt,
-                        detail = if (outcome.ok) "đã mở app · không Trợ năng" else outcome.detail,
+                        detail = if (outcome.ok) "${outcome.detail} · không Trợ năng" else outcome.detail,
                     ),
                 )
             }

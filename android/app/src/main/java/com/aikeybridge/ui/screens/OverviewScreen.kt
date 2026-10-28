@@ -171,7 +171,7 @@ fun OverviewScreen(
                 ) {
                     BodyText(
                         "${config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName} vẫn mở ${config.profile.assistantName} " +
-                            "ở chế độ một lần. Chuyển sang Đầy đủ để thay bằng ${config.target.displayName}.",
+                            "ở chế độ một lần. Chuyển sang Script nền để thay bằng ${config.target.displayName}.",
                         12.sp,
                         Warn,
                         Modifier.weight(1f),
@@ -390,7 +390,7 @@ private fun ScriptCard(
             }
             LucideIcon(R.drawable.lc_chevron_right, TextGhost, 14.dp)
         }
-        if (permissions.shizukuGranted || permissions.readLogs) {
+        if (permissions.shizukuGranted || permissions.readLogs || permissions.usageAccess) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PrimaryCta(
                     text = if (running) "Bật lại" else if (permissions.shizukuGranted) "Kích hoạt & Bật nghe nền" else "Bật nghe nền",

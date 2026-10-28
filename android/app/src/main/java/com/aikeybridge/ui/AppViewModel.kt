@@ -149,8 +149,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         refreshPermissions()
-        if (!_permissions.value.shizukuGranted && !_permissions.value.readLogs) {
-            _message.value = "Cần Shizuku để cấp quyền đọc log lần đầu. Không có Shizuku thì copy lệnh ADB bên dưới."
+        // Vivo Android 17 không cho app đọc log hệ thống: nghe qua thống kê sử dụng, không cần READ_LOGS.
+        val usage = config.value.profile.usageWatch != null
+        val canListen = if (usage) _permissions.value.usageAccess else _permissions.value.readLogs
+        if (!_permissions.value.shizukuGranted && !canListen) {
+            _message.value = if (usage) {
+                "Bật quyền Truy cập dữ liệu sử dụng cho AI Key Bridge (mục bên dưới), hoặc mở Shizuku để chạy lệnh kích hoạt."
+            } else {
+                "Cần Shizuku để cấp quyền đọc log lần đầu. Không có Shizuku thì copy lệnh ADB bên dưới."
+            }
             return
         }
         if (scriptBusy.value) return
@@ -181,16 +188,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 shell.exec(WatchScript.stopCommand())
                 refreshPermissions()
             }
-            if (!_permissions.value.readLogs) {
-                Diagnostics.error("watch", "Chưa có READ_LOGS sau khi cấp qua Shizuku.")
-                _message.value = "Không cấp được quyền đọc log — xem Nhật ký."
-                scriptBusy.value = false
-                return@launch
-            }
             settingsRepository.setWatchEnabled(true)
+            // Bấm bật nghe nền là chọn Script nền: service chỉ tự bật lại ở chế độ này.
+            if (settingsRepository.state.value.usageMode != UsageMode.SCRIPT) settingsRepository.setUsageMode(UsageMode.SCRIPT)
+            if (!usage && !_permissions.value.readLogs && _permissions.value.shizukuGranted) {
+                // Cấp READ_LOGS làm Android giết app; service bật lại theo START_STICKY, app tự mở lại.
+                WatchService.start(app)
+                Diagnostics.info("watch", "Cấp READ_LOGS — app sẽ tự khởi động lại.")
+                shell.exec(WatchGrants.readLogsCommand(app.packageName))
+                refreshPermissions()
+            }
+            val ready = if (usage) _permissions.value.usageAccess else _permissions.value.readLogs
             val started = WatchService.start(app)
             scriptBusy.value = false
-            _message.value = if (started) {
+            _message.value = if (started && !ready && usage) {
+                "Còn thiếu quyền Truy cập dữ liệu sử dụng — bật ở mục bên dưới để app nghe được ${config.value.profile.assistantName}."
+            } else if (started) {
                 "Đang nghe trong app. Android hỏi quyền truy cập log thì chọn Cho phép, rồi tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB để dùng app ngân hàng."
             } else {
                 "Không bật được nghe nền — xem Nhật ký."

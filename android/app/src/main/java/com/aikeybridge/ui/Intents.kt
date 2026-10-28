@@ -20,6 +20,24 @@ object Intents {
         }
     }
 
+    /** Quyền "Truy cập dữ liệu sử dụng" — nghe Hi Jovi khi ROM chặn đọc log. */
+    fun openUsageAccess(context: Context) {
+        val forApp = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${context.packageName}"))
+        if (!start(context, forApp)) start(context, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+    }
+
+    /** Quyền "Hiển thị trên ứng dụng khác" — mở Gemini từ nền khi đã tắt Gỡ lỗi. */
+    fun openOverlaySettings(context: Context) {
+        val forApp = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+        if (!start(context, forApp)) openAppDetails(context)
+    }
+
+    /** Vivo: Pin → Kiểm soát pin dưới nền, nơi chọn "Cho phép sử dụng pin ngầm" để app không bị đóng băng. */
+    fun openVivoBackgroundPower(context: Context) {
+        val power = Intent().setClassName("com.iqoo.powersaving", "com.iqoo.powersaving.PowerSavingManagerActivity")
+        if (!start(context, power)) openAppDetails(context)
+    }
+
     fun openAppDetails(context: Context) {
         start(
             context,

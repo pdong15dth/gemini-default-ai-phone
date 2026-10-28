@@ -87,7 +87,11 @@ class LogcatWatcher(
                     if (!seen.get()) LogStatus.set(LogAccess.OWN_ONLY)
                 }
                 runCatching {
-                    val command = listOf("logcat", "-v", "brief", "-T", "1") + buffers.flatMap { listOf("-b", it) }
+                    // Chỉ lấy dòng mới từ bây giờ: "-T 1" in lại dòng cũ của chính app (pid của lần chạy trước),
+                    // dễ bị tưởng là log hệ thống khi Android chỉ cho đọc log của chính app.
+                    val now = System.currentTimeMillis()
+                    val since = "%d.%03d".format(now / 1000, now % 1000)
+                    val command = listOf("logcat", "-v", "brief", "-T", since) + buffers.flatMap { listOf("-b", it) }
                     val proc = ProcessBuilder(command).redirectErrorStream(true).start()
                     process = proc
                     proc.inputStream.bufferedReader().useLines { lines ->
