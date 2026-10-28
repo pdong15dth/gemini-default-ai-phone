@@ -193,7 +193,7 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
 **Script nền** (khuyên dùng)
 
 - App tự nghe trong tiến trình của mình (thông báo "Đang nghe “Hi Jovi”"). Đến bản 1.0.6 đây là script chạy bằng quyền `shell`, mà tiến trình shell nằm trong nhóm của `adbd` nên **tắt Gỡ lỗi USB là bị giết theo**. App ngân hàng lại bắt tắt Gỡ lỗi USB, nên từ 1.0.7 phần nghe chuyển vào app.
-- Sau khi bấm **Kích hoạt & Bật nghe nền** và chọn **Cho phép** ở hộp thoại truy cập log của Android, có thể **tắt Gỡ lỗi USB / Tuỳ chọn nhà phát triển**. Khi đó Shizuku dừng nên app không bấm Back được: Tiểu V có thể còn hiện phía sau Gemini.
+- Sau khi bấm **Kích hoạt & Bật nghe nền** và chọn **Cho phép** ở hộp thoại truy cập log của Android, **bắt buộc tắt công tắc tổng "Tuỳ chọn nhà phát triển" và "Gỡ lỗi USB"** nếu dùng app ngân hàng (app ngân hàng chặn khi còn bật). Nghe nền vẫn chạy. Khi đó Shizuku dừng nên app không bấm Back được: Tiểu V có thể còn hiện phía sau Gemini.
 - Khởi động lại máy: app tự bật lại, nhưng Android 13+ chỉ cho đọc log khi app đang mở — chạm thông báo "Chạm để cho phép đọc log" và chọn **Cho phép**. Không cần Shizuku nữa.
 - **Khóa AI Key Bridge trong đa nhiệm** và để **Pin không hạn chế** để OriginOS không dọn app.
 

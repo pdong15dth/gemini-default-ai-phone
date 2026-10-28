@@ -429,7 +429,7 @@ private fun ScriptCard(
         }
         if (status.listening) {
             MonoText(
-                "Nghe ngay trong app · tắt Gỡ lỗi / Tuỳ chọn nhà phát triển vẫn chạy, tự bật lại sau khi khởi động máy.",
+                "Nghe ngay trong app · dùng app ngân hàng thì bắt buộc tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB, nghe nền vẫn chạy.",
                 9.sp,
                 TextFaint,
                 maxLines = 2,
