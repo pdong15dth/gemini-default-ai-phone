@@ -431,25 +431,12 @@ private fun ScriptCard(
             )
         }
         if (runningOrBoot) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Accent.copy(alpha = 0.08f))
-                    .clickable(role = Role.Button) { Intents.openDeveloperSettings(context) }
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BodyText(
-                    "Đã bật Script → Chạm để mở Tuỳ chọn nhà phát triển & tắt Gỡ lỗi (dùng app Bank)",
-                    11.5.sp,
-                    Accent,
-                    Modifier.weight(1f),
-                    lineHeight = 16.sp,
-                )
-                LucideIcon(R.drawable.lc_chevron_right, Accent, 13.dp)
-            }
+            MonoText(
+                "Đã tự giữ Gỡ lỗi USB để tắt Wi-Fi / tắt Gỡ lỗi không dây không chết script. Không tắt Tuỳ chọn nhà phát triển.",
+                9.sp,
+                TextFaint,
+                maxLines = 2,
+            )
         }
     }
 }

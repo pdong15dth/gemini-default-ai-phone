@@ -220,6 +220,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 _setup.update { it.copy(running = false, provisioningReport = report) }
                 if (report.passed > 0) settingsRepository.setProvisionedFingerprint(device.fingerprint)
             }
+            // Giữ adb_enabled=1 để khi người dùng tắt Gỡ lỗi không dây hoặc ngắt Wi-Fi ra đường dùng 4G,
+            // init không dừng adbd và không giết nhóm cgroup chứa script nền.
+            shell.exec("settings put global adb_enabled 1")
             val install = shell.exec(WatchScript.installCommand(content))
             if (!install.ok) {
                 Diagnostics.error("script", "Ghi script lỗi: ${install.output}")
@@ -248,7 +251,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (running) "Script nền đang chạy (${WatchScript.PATH})." else "Script nền không chạy được.",
             )
             _message.value = if (running) {
-                "Script nền đang chạy! Bạn có thể tắt Gỡ lỗi / Developer Mode để dùng app ngân hàng."
+                "Script nền đang chạy. Hô “${config.value.profile.wakePhrase ?: config.value.profile.assistantName}” để thử."
             } else {
                 "Script không chạy được — xem Nhật ký."
             }

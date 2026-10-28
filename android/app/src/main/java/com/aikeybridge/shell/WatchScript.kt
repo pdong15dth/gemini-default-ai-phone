@@ -28,7 +28,6 @@ object WatchScript {
             appendLine("# Tắt Gỡ lỗi / Tuỳ chọn nhà phát triển thì init dừng adbd và giết cả nhóm tiến trình (cgroup) của nó.")
             appendLine("# Chuyển sang nhóm gốc như Shizuku, logcat/input sinh ra sau đó cũng nằm ngoài nhóm của adbd.")
             appendLine("for cg in $ESCAPE_CGROUPS; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
-            appendLine("for cg in /sys/fs/cgroup/uid_2000 /acct/uid_2000; do grep -q '/pid_' /proc/\$\$/cgroup 2>/dev/null && echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
             appendLine("LOG='$eventLog'")
             appendLine("DIR=\"\${LOG%/*}\"")
             appendLine("# Chẩn đoán đọc được cả khi Shizuku đã chết: trạng thái lúc khởi động + nhịp còn sống mỗi ${ALIVE_INTERVAL_S}s.")

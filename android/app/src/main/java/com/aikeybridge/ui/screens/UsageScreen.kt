@@ -94,7 +94,7 @@ fun UsageScreen(
                 points = listOf(
                     "$wake → $target, Micro bật sẵn",
                     "Không dùng Trợ năng · Tương thích 100% mọi app ngân hàng",
-                    "Bật xong có thể tắt luôn Gỡ lỗi / Developer Mode",
+                    "Tự giữ sống khi tắt Gỡ lỗi không dây / ra ngoài dùng 4G",
                 ),
                 cost = "Chạy ngầm trong RAM · bật lại sau khi khởi động lại máy",
                 onClick = { selected = UsageMode.SCRIPT },

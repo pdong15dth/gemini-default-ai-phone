@@ -93,7 +93,7 @@ fun ScriptScreen(
             Gap(10.dp)
             BodyText(
                 "Bản thuần Script nền — hoàn toàn không có dịch vụ Trợ năng trong APK nên dùng được mọi app ngân hàng. " +
-                    "Bấm bật một lần: app tự chạy các lệnh kích hoạt + chạy script ngầm trong RAM, sau đó bạn có thể tắt luôn Gỡ lỗi / Developer Mode.",
+                    "Bấm bật một lần: app tự chạy các lệnh kích hoạt + bật Gỡ lỗi USB giữ nền + chạy script ngầm trong RAM.",
                 13.5.sp,
                 Muted,
                 lineHeight = 20.sp,
@@ -172,15 +172,13 @@ fun ScriptScreen(
                 }
 
                 if (status.running == true || startedThisBoot) {
-                    SectionLabel("An toàn với App Ngân hàng", Modifier.padding(top = 12.dp))
+                    SectionLabel("Giữ Script sống 24/7", Modifier.padding(top = 12.dp))
                     Panel {
                         NavRow(
-                            title = "Tắt Gỡ lỗi & Tuỳ chọn nhà phát triển",
-                            subtitle = "script đã tách độc lập trong RAM · tắt xong vào mọi app bank bình thường",
-                            subColor = Accent,
-                            trailing = "mở cài đặt",
-                            trailingColor = Accent,
-                            onClick = { Intents.openDeveloperSettings(context) },
+                            title = "Có thể tắt Gỡ lỗi không dây / tắt Wi-Fi",
+                            subtitle = "NHƯNG giữ bật Gỡ lỗi USB & Tuỳ chọn nhà phát triển (tắt là Android giết script)",
+                            subColor = Warn,
+                            onClick = null,
                             divider = false,
                         )
                     }
@@ -225,7 +223,7 @@ fun ScriptScreen(
                 }
                 Gap(10.dp)
                 BodyText(
-                    "Quy trình chuẩn cho máy dùng app Bank: Bật Shizuku → Bấm “Kích hoạt & Bật script nền” → Mở Tuỳ chọn nhà phát triển tắt Gỡ lỗi & tắt Developer Mode. Script sẽ sống liên tục tới khi bạn tắt nguồn/khởi động lại máy.",
+                    "Lưu ý: Không tắt Gỡ lỗi USB hoặc Tuỳ chọn nhà phát triển (tắt là Android dừng adbd và giết cả Shizuku lẫn script nền). Bạn có thể tắt Gỡ lỗi không dây hoặc ngắt Wi-Fi dùng 4G bình thường vì app đã tự giữ công tắc Gỡ lỗi USB.",
                     11.sp,
                     TextFaint,
                     Modifier.padding(horizontal = 2.dp),
