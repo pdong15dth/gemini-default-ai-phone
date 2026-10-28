@@ -94,9 +94,9 @@ fun UsageScreen(
                 points = listOf(
                     "$wake → $target, Micro bật sẵn",
                     "Không dùng Trợ năng · Tương thích 100% mọi app ngân hàng",
-                    "Tự giữ sống khi tắt Gỡ lỗi không dây / ra ngoài dùng 4G",
+                    "Tắt Gỡ lỗi USB / Tuỳ chọn nhà phát triển vẫn chạy",
                 ),
-                cost = "Chạy ngầm trong RAM · bật lại sau khi khởi động lại máy",
+                cost = "Cần Shizuku một lần · sau khởi động máy chạm thông báo để cho phép đọc log",
                 onClick = { selected = UsageMode.SCRIPT },
             )
             Gap(12.dp)

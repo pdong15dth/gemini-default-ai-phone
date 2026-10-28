@@ -28,7 +28,8 @@ import androidx.compose.ui.unit.sp
 import com.aikeybridge.R
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.PermissionSnapshot
-import com.aikeybridge.shell.WatchScript
+import com.aikeybridge.service.LogAccess
+import com.aikeybridge.shell.WatchGrants
 import com.aikeybridge.ui.Intents
 import com.aikeybridge.ui.ScriptStatus
 import com.aikeybridge.ui.components.BodyText
@@ -54,14 +55,16 @@ import com.aikeybridge.ui.theme.TextFaint
 import com.aikeybridge.ui.theme.TextLabel
 import com.aikeybridge.ui.theme.Warn
 
-/** Script nền như README: chạy bằng quyền shell qua Shizuku, không cần Trợ năng. */
+/**
+ * Script nền (Bank-Safe): app tự nghe event log bằng READ_LOGS, không cần Trợ năng.
+ * Shizuku chỉ cần một lần để cấp quyền; tắt Gỡ lỗi / Tuỳ chọn nhà phát triển sau đó vẫn chạy.
+ */
 @Composable
 fun ScriptScreen(
     config: ActiveConfig,
     permissions: PermissionSnapshot,
     status: ScriptStatus,
-    startedThisBoot: Boolean,
-    scriptContent: String?,
+    watchReady: Boolean,
     onboarding: Boolean,
     onBack: () -> Unit,
     onCheck: () -> Unit,
@@ -77,7 +80,7 @@ fun ScriptScreen(
     val context = LocalContext.current
     LaunchedEffect(permissions.shizukuGranted) { onCheck() }
     val wake = config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName
-    val running = status.running ?: startedThisBoot
+    val state = scriptState(status)
 
     Column(modifier.fillMaxSize()) {
         SubHeader(onBack = onBack) {
@@ -93,13 +96,14 @@ fun ScriptScreen(
             Gap(10.dp)
             BodyText(
                 "Bản thuần Script nền — hoàn toàn không có dịch vụ Trợ năng trong APK nên dùng được mọi app ngân hàng. " +
-                    "Bấm bật một lần: app tự chạy các lệnh kích hoạt + bật Gỡ lỗi USB giữ nền + chạy script ngầm trong RAM.",
+                    "Bấm bật một lần: app tự chạy các lệnh kích hoạt, tự cấp quyền đọc log qua Shizuku rồi tự nghe $wake ngay trong app. " +
+                    "Xong có thể tắt Gỡ lỗi USB và Tuỳ chọn nhà phát triển.",
                 13.5.sp,
                 Muted,
                 lineHeight = 20.sp,
             )
 
-            if (scriptContent == null) {
+            if (!watchReady) {
                 Gap(16.dp)
                 BodyText(
                     "${config.profile.displayName} chưa có mẫu cửa sổ mặc định. Bấm “Dò cửa sổ trợ lý” bên dưới để tự bắt cửa sổ bằng Shizuku.",
@@ -123,41 +127,34 @@ fun ScriptScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        StatusDot(
-                            when {
-                                status.running == true -> Accent
-                                status.running == false -> Danger
-                                running -> Warn
-                                else -> TextDim
-                            },
-                            7.dp,
-                        )
+                        StatusDot(state.color, 7.dp)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             BodyText(
                                 when {
-                                    status.busy -> "Đang kích hoạt & bật script…"
-                                    status.running == true -> "Đang chạy ngầm trong RAM"
-                                    status.running == false -> "Đã dừng"
-                                    startedThisBoot -> "Đang chạy (đã tắt Shizuku / Gỡ lỗi)"
-                                    else -> "Chưa bật từ lần khởi động máy này"
+                                    status.busy -> "Đang kích hoạt & bật nghe nền…"
+                                    status.listening -> "Đang nghe $wake trong app"
+                                    status.running && status.access == LogAccess.OWN_ONLY -> "Android chưa cho đọc log"
+                                    status.running && status.access == LogAccess.NO_PERMISSION -> "Thiếu quyền đọc log"
+                                    status.running -> "Đang mở event log…"
+                                    else -> "Đã tắt"
                                 },
                                 14.sp,
                                 com.aikeybridge.ui.theme.TextMain,
                             )
                             MonoText(
                                 when {
-                                    status.running == true && status.detachedFromAdbd == true ->
-                                        "pid ${status.pid} · đã tách khỏi adbd · tắt Gỡ lỗi không chết"
-                                    status.running == true -> "pid ${status.pid} · ${WatchScript.PATH}"
-                                    startedThisBoot -> "đã bật trong phiên khởi động này · gọi $wake để thử"
-                                    status.running == null -> "bật Shizuku để kích hoạt & khởi chạy"
+                                    status.listening -> "tắt Gỡ lỗi vẫn chạy · tự bật lại sau khi khởi động máy"
+                                    status.running && status.access == LogAccess.OWN_ONLY ->
+                                        "bấm Bật lại và chọn Cho phép · không thấy hộp thoại thì đợi 1 phút rồi bấm lại"
+                                    status.running && status.access == LogAccess.NO_PERMISSION -> "bấm Kích hoạt (cần Shizuku một lần)"
+                                    status.running -> "Android hỏi quyền truy cập log thì chọn Cho phép"
                                     else -> "hô $wake sẽ vẫn mở ${config.profile.assistantName}"
                                 },
                                 9.sp,
-                                if (status.running == true || startedThisBoot) Accent else TextFaint,
+                                if (status.listening) Accent else TextFaint,
                             )
                         }
-                        if (permissions.shizukuGranted) {
+                        if (status.running) {
                             MonoText(
                                 "kiểm tra",
                                 9.5.sp,
@@ -168,19 +165,6 @@ fun ScriptScreen(
                                     .padding(6.dp),
                             )
                         }
-                    }
-                }
-
-                if (status.running == true || startedThisBoot) {
-                    SectionLabel("Giữ Script sống 24/7", Modifier.padding(top = 12.dp))
-                    Panel {
-                        NavRow(
-                            title = "Có thể tắt Gỡ lỗi không dây / tắt Wi-Fi",
-                            subtitle = "NHƯNG giữ bật Gỡ lỗi USB & Tuỳ chọn nhà phát triển (tắt là Android giết script)",
-                            subColor = Warn,
-                            onClick = null,
-                            divider = false,
-                        )
                     }
                 }
 
@@ -223,15 +207,17 @@ fun ScriptScreen(
                 }
                 Gap(10.dp)
                 BodyText(
-                    "Lưu ý: Không tắt Gỡ lỗi USB hoặc Tuỳ chọn nhà phát triển (tắt là Android dừng adbd và giết cả Shizuku lẫn script nền). Bạn có thể tắt Gỡ lỗi không dây hoặc ngắt Wi-Fi dùng 4G bình thường vì app đã tự giữ công tắc Gỡ lỗi USB.",
+                    "Lưu ý: Tắt Gỡ lỗi là Shizuku dừng, nhưng nghe nền vẫn chạy vì nằm trong app. Lúc đó app không bấm Back được nên " +
+                        "${config.profile.assistantName} có thể còn hiện phía sau ${config.target.displayName}. " +
+                        "Khoá AI Key Bridge trong đa nhiệm và để Pin không hạn chế để ROM không dọn app.",
                     11.sp,
                     TextFaint,
                     Modifier.padding(horizontal = 2.dp),
                     lineHeight = 16.sp,
                 )
 
-                SectionLabel("Không có Shizuku · chạy từ máy tính", Modifier.padding(top = 12.dp))
-                val commands = WatchScript.adbCommands(scriptContent).joinToString("\n")
+                SectionLabel("Không có Shizuku · cấp quyền từ máy tính", Modifier.padding(top = 12.dp))
+                val commands = WatchGrants.adbCommands(context.packageName).joinToString("\n")
                 Text(
                     commands,
                     color = TextBody,
@@ -247,7 +233,7 @@ fun ScriptScreen(
                         .clickable(role = Role.Button) {
                             context.getSystemService(ClipboardManager::class.java)
                                 ?.setPrimaryClip(ClipData.newPlainText("Script nền", commands))
-                            onMessage("Đã copy lệnh ADB bật script nền.")
+                            onMessage("Đã copy lệnh ADB cấp quyền. Chạy xong mở lại app và bấm Bật nghe nền.")
                         }
                         .padding(10.dp),
                 )
@@ -261,21 +247,21 @@ fun ScriptScreen(
                 .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (scriptContent != null) {
+            if (watchReady) {
                 val ctaText = when {
-                    status.busy -> "Đang kích hoạt & bật script…"
+                    status.busy -> "Đang kích hoạt & bật nghe nền…"
+                    permissions.shizukuGranted -> if (status.running) "Kích hoạt & Bật lại" else "Kích hoạt & Bật nghe nền"
+                    permissions.readLogs -> if (status.running) "Bật lại nghe nền" else "Bật nghe nền"
                     !permissions.shizukuInstalled -> "Tải Shizuku"
                     !permissions.shizukuRunning -> "Mở Shizuku"
-                    !permissions.shizukuGranted -> "Cấp quyền Shizuku"
-                    status.running == true -> "Kích hoạt & Bật lại script"
-                    else -> "Kích hoạt & Bật script nền"
+                    else -> "Cấp quyền Shizuku"
                 }
                 val ctaAction: () -> Unit = when {
+                    permissions.shizukuGranted || permissions.readLogs -> onStart
                     !permissions.shizukuInstalled || !permissions.shizukuRunning -> {
                         { Intents.openShizuku(context) }
                     }
-                    !permissions.shizukuGranted -> onRequestShizuku
-                    else -> onStart
+                    else -> onRequestShizuku
                 }
                 PrimaryCta(
                     text = ctaText,
@@ -284,8 +270,8 @@ fun ScriptScreen(
                     leadingIcon = R.drawable.lc_terminal,
                     loading = status.busy,
                 )
-                if (status.running == true && permissions.shizukuGranted) {
-                    OutlineCta(text = "Tắt script", onClick = onStop, modifier = Modifier.fillMaxWidth())
+                if (status.running) {
+                    OutlineCta(text = "Tắt nghe nền", onClick = onStop, modifier = Modifier.fillMaxWidth())
                 }
             }
             if (onboarding) {
@@ -298,10 +284,13 @@ fun ScriptScreen(
 /** Nhãn ngắn cho trạng thái script nền, dùng ở Cài đặt và Chế độ. */
 internal data class ScriptStateUi(val label: String, val detail: String, val color: androidx.compose.ui.graphics.Color)
 
-internal fun scriptState(status: ScriptStatus, startedThisBoot: Boolean): ScriptStateUi = when {
+internal fun scriptState(status: ScriptStatus): ScriptStateUi = when {
     status.busy -> ScriptStateUi("…", "đang xử lý", TextDim)
-    status.running == true -> ScriptStateUi("đang chạy", "pid ${status.pid} · không cần Trợ năng", Accent)
-    status.running == false -> ScriptStateUi("đã dừng", "chạm để bật lại", Danger)
-    startedThisBoot -> ScriptStateUi("có lẽ chạy", "cần Shizuku để kiểm tra", Warn)
-    else -> ScriptStateUi("chưa bật", "như README · không cần Trợ năng", TextDim)
+    status.listening -> ScriptStateUi("đang nghe", "trong app · tắt Gỡ lỗi vẫn chạy", Accent)
+    status.running && status.access == LogAccess.OWN_ONLY ->
+        ScriptStateUi("chưa được đọc log", "mở màn Script nền, bấm Bật lại, chọn Cho phép", Danger)
+    status.running && status.access == LogAccess.NO_PERMISSION ->
+        ScriptStateUi("thiếu quyền", "bấm Kích hoạt (cần Shizuku một lần)", Danger)
+    status.running -> ScriptStateUi("đang mở log", "chọn Cho phép nếu Android hỏi", Warn)
+    else -> ScriptStateUi("đã tắt", "không cần Trợ năng", TextDim)
 }

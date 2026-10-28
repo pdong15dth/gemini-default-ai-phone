@@ -84,7 +84,6 @@ fun ModesScreen(
     onOpenShortcuts: () -> Unit,
     onOpenScript: () -> Unit,
     scriptStatus: ScriptStatus,
-    scriptStartedThisBoot: Boolean,
     onCheckScript: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -114,11 +113,11 @@ fun ModesScreen(
                     },
                     subtitle = when (settings.usageMode) {
                         UsageMode.ONE_TIME -> "không Trợ năng · lối tắt Gọi AI"
-                        UsageMode.SCRIPT -> "script ${scriptState(scriptStatus, scriptStartedThisBoot).label} · không Trợ năng"
+                        UsageMode.SCRIPT -> "script ${scriptState(scriptStatus).label} · không Trợ năng"
                         UsageMode.FULL -> "Trợ năng · thay ${config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName}"
                     },
                     subColor = if (settings.usageMode == UsageMode.SCRIPT) {
-                        scriptState(scriptStatus, scriptStartedThisBoot).color
+                        scriptState(scriptStatus).color
                     } else {
                         TextFaint
                     },

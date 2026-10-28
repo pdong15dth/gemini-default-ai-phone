@@ -78,7 +78,6 @@ fun SettingsScreen(
     onOpenShortcuts: () -> Unit,
     onOpenScript: () -> Unit,
     scriptStatus: ScriptStatus,
-    scriptStartedThisBoot: Boolean,
     onCheckScript: () -> Unit,
     onCheckRom: () -> Unit,
     onExport: () -> Unit,
@@ -171,7 +170,7 @@ fun SettingsScreen(
                 )
                 if (config.shellWatch != null) {
                     LaunchedEffect(Unit) { onCheckScript() }
-                    val state = scriptState(scriptStatus, scriptStartedThisBoot)
+                    val state = scriptState(scriptStatus)
                     NavRow(
                         title = "Script nền",
                         subtitle = state.detail,

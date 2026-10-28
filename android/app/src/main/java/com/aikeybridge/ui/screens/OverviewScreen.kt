@@ -92,7 +92,6 @@ fun OverviewScreen(
     onOpenTriggers: () -> Unit,
     onOpenScript: () -> Unit,
     scriptStatus: ScriptStatus,
-    scriptStartedThisBoot: Boolean,
     onCheckScript: () -> Unit,
     onStartScript: () -> Unit,
     onStopScript: () -> Unit,
@@ -104,7 +103,7 @@ fun OverviewScreen(
 ) {
     val oneTime = settings.usageMode == UsageMode.ONE_TIME
     val script = !oneTime
-    val scriptOn = scriptStatus.running ?: scriptStartedThisBoot
+    val scriptOn = scriptStatus.listening
     if (config.shellWatch != null) {
         LaunchedEffect(permissions.shizukuGranted) { onCheckScript() }
     }
@@ -215,7 +214,6 @@ fun OverviewScreen(
             if (config.shellWatch != null) {
                 ScriptCard(
                     status = scriptStatus,
-                    startedThisBoot = scriptStartedThisBoot,
                     permissions = permissions,
                     activeMode = script,
                     onOpen = onOpenScript,
@@ -350,7 +348,6 @@ private fun StatusRing(
 @Composable
 private fun ScriptCard(
     status: ScriptStatus,
-    startedThisBoot: Boolean,
     permissions: PermissionSnapshot,
     activeMode: Boolean,
     onOpen: () -> Unit,
@@ -359,8 +356,8 @@ private fun ScriptCard(
     onRequestShizuku: () -> Unit,
 ) {
     val context = LocalContext.current
-    val state = scriptState(status, startedThisBoot)
-    val runningOrBoot = status.running == true || startedThisBoot
+    val state = scriptState(status)
+    val running = status.running
     Column(
         Modifier
             .fillMaxWidth()
@@ -368,7 +365,7 @@ private fun ScriptCard(
             .padding(bottom = 18.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(Surface)
-            .border(1.dp, if (runningOrBoot) Accent.copy(alpha = 0.35f) else Hairline, RoundedCornerShape(18.dp))
+            .border(1.dp, if (status.listening) Accent.copy(alpha = 0.35f) else Hairline, RoundedCornerShape(18.dp))
             .clickable(role = Role.Button, onClick = onOpen)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -383,7 +380,7 @@ private fun ScriptCard(
                 MonoText(
                     when {
                         activeMode -> state.detail
-                        status.running == true -> "đang chạy ngầm trong RAM · ${state.detail}"
+                        running -> state.detail
                         else -> "không cần Trợ năng · tương thích mọi app ngân hàng"
                     },
                     9.sp,
@@ -393,10 +390,10 @@ private fun ScriptCard(
             }
             LucideIcon(R.drawable.lc_chevron_right, TextGhost, 14.dp)
         }
-        if (permissions.shizukuGranted) {
+        if (permissions.shizukuGranted || permissions.readLogs) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PrimaryCta(
-                    text = if (status.running == true) "Kích hoạt & Bật lại" else "Kích hoạt & Bật script",
+                    text = if (running) "Bật lại" else if (permissions.shizukuGranted) "Kích hoạt & Bật nghe nền" else "Bật nghe nền",
                     onClick = onStart,
                     modifier = Modifier.weight(1f),
                     leadingIcon = R.drawable.lc_terminal,
@@ -404,7 +401,7 @@ private fun ScriptCard(
                     height = 42.dp,
                     radius = 12.dp,
                 )
-                if (status.running == true) {
+                if (running) {
                     OutlineCta(
                         text = "Tắt",
                         onClick = onStop,
@@ -414,7 +411,7 @@ private fun ScriptCard(
                     )
                 }
             }
-        } else if (!runningOrBoot) {
+        } else if (!running) {
             PrimaryCta(
                 text = when {
                     !permissions.shizukuInstalled -> "Tải Shizuku để bật Script"
@@ -430,9 +427,9 @@ private fun ScriptCard(
                 radius = 12.dp,
             )
         }
-        if (runningOrBoot) {
+        if (status.listening) {
             MonoText(
-                "Đã tự giữ Gỡ lỗi USB để tắt Wi-Fi / tắt Gỡ lỗi không dây không chết script. Không tắt Tuỳ chọn nhà phát triển.",
+                "Nghe ngay trong app · tắt Gỡ lỗi / Tuỳ chọn nhà phát triển vẫn chạy, tự bật lại sau khi khởi động máy.",
                 9.sp,
                 TextFaint,
                 maxLines = 2,

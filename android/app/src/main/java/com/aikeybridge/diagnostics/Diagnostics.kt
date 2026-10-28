@@ -10,6 +10,9 @@ import com.aikeybridge.data.AppSettings
 import com.aikeybridge.data.PermissionSnapshot
 import com.aikeybridge.data.ProfileRepository
 import com.aikeybridge.data.DeviceInfo
+import com.aikeybridge.data.SettingsRepository
+import com.aikeybridge.service.LogStatus
+import com.aikeybridge.service.WatchStatus
 import com.aikeybridge.shell.WatchScript
 import java.io.File
 import java.text.SimpleDateFormat
@@ -284,6 +287,13 @@ object Diagnostics {
         val dir = context.getExternalFilesDir(null)
         if (dir == null) return "Không có thư mục ngoài của app."
         appendLine("Bây giờ: ${fullTime(System.currentTimeMillis())}")
+        appendLine("### Nghe nền trong app")
+        appendLine("Đã bật: ${SettingsRepository(context).state.value.watchEnabled}")
+        appendLine("Service chạy: ${WatchStatus.running.value}")
+        appendLine("Đọc log: ${LogStatus.access.value}")
+        appendLine("READ_LOGS: ${LogStatus.hasReadLogs(context)}")
+        appendLine()
+        appendLine("### Script shell bản cũ (≤ 1.0.6)")
         val alive = File(dir, WatchScript.ALIVE_FILE)
         if (alive.exists()) {
             appendLine("Còn sống lần cuối: ${runCatching { alive.readText().trim() }.getOrDefault("?")} (script ghi mỗi ${WatchScript.ALIVE_INTERVAL_S}s)")
