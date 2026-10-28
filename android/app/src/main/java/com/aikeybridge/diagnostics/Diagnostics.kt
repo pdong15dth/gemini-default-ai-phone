@@ -10,6 +10,7 @@ import com.aikeybridge.data.AppSettings
 import com.aikeybridge.data.PermissionSnapshot
 import com.aikeybridge.data.ProfileRepository
 import com.aikeybridge.data.DeviceInfo
+import com.aikeybridge.shell.WatchScript
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -203,6 +204,8 @@ object Diagnostics {
                 File(dir, HISTORY_FILE).takeIf { it.exists() }?.let { zip.writeFile("history.log", it) }
             }
             zip.writeText("exit-reasons.txt", exitReasons(context))
+            zip.writeText("script-state.txt", scriptState(context))
+            zip.writeText("packages.txt", packageVersions(context, config))
             // Không có READ_LOGS thì logcat chỉ trả log của chính app — vẫn có ích (crash, service).
             zip.writeLogcat("logcat-app.txt")
             shellReport?.let { report ->
@@ -231,6 +234,8 @@ object Diagnostics {
                 "log.txt, history*.log, attempts.txt: log của AI Key Bridge — tên gói, tên lớp cửa sổ,\n" +
                     "trạng thái lệnh và thời lượng. Không chứa văn bản trên màn hình, âm thanh, danh bạ hay vị trí.\n" +
                     "exit-reasons.txt: các lần app bị tắt và lý do (vuốt khỏi đa nhiệm, ROM dọn RAM, crash...).\n" +
+                    "script-state.txt: script nền lúc khởi động (pid, cgroup) và lần cuối còn sống.\n" +
+                    "packages.txt: phiên bản app liên quan (Shizuku, Gemini, trợ lý gốc).\n" +
                     "logcat-*.txt, system-state.txt: log hệ thống của cả máy. Có thể chứa tên app khác,\n" +
                     "tên Wi-Fi hay tài khoản — chỉ gửi riêng cho người phát triển, không đăng công khai.\n",
             )
@@ -269,6 +274,43 @@ object Diagnostics {
             process.waitFor(5, TimeUnit.SECONDS)
         }.onFailure { write("Không đọc được logcat: $it\n".toByteArray()) }
         closeEntry()
+    }
+
+    /**
+     * File script nền tự ghi, đọc được cả khi Shizuku đã chết: trạng thái lúc khởi động (pid, cgroup)
+     * và lần cuối còn sống. Nhịp sống cũ hơn vài chu kỳ = script đã chết khoảng lúc đó.
+     */
+    private fun scriptState(context: Context): String = buildString {
+        val dir = context.getExternalFilesDir(null)
+        if (dir == null) return "Không có thư mục ngoài của app."
+        appendLine("Bây giờ: ${fullTime(System.currentTimeMillis())}")
+        val alive = File(dir, WatchScript.ALIVE_FILE)
+        if (alive.exists()) {
+            appendLine("Còn sống lần cuối: ${runCatching { alive.readText().trim() }.getOrDefault("?")} (script ghi mỗi ${WatchScript.ALIVE_INTERVAL_S}s)")
+            appendLine("File sửa lúc: ${fullTime(alive.lastModified())}")
+        } else {
+            appendLine("Chưa có nhịp sống — script chưa chạy bản mới lần nào.")
+        }
+        appendLine()
+        appendLine("### Lúc khởi động script")
+        val state = File(dir, WatchScript.STATE_FILE)
+        appendLine(if (state.exists()) runCatching { state.readText().trim() }.getOrDefault("?") else "(không có)")
+    }
+
+    /** Phiên bản các app liên quan — Shizuku, đích, trợ lý gốc. Đọc bằng PackageManager, không cần Shizuku. */
+    private fun packageVersions(context: Context, config: ActiveConfig): String = buildString {
+        val packages = (listOf(context.packageName, "moe.shizuku.privileged.api") +
+            config.target.packages + config.profile.assistantPackages).distinct()
+        packages.forEach { pkg ->
+            val info = runCatching { context.packageManager.getPackageInfo(pkg, 0) }.getOrNull()
+            if (info == null) {
+                appendLine("$pkg: không thấy")
+            } else {
+                append("$pkg: ${info.versionName} (${info.longVersionCode})")
+                append(" · cập nhật ${fullTime(info.lastUpdateTime)}")
+                appendLine(if (info.applicationInfo?.enabled == false) " · đã tắt" else "")
+            }
+        }
     }
 
     /** Lý do các lần tiến trình bị tắt gần đây — phân biệt vuốt khỏi đa nhiệm (force-stop) với ROM dọn RAM. */
