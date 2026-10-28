@@ -92,6 +92,7 @@ fun OverviewScreen(
     onOpenTriggers: () -> Unit,
     onOpenScript: () -> Unit,
     scriptStatus: ScriptStatus,
+    scriptStartedThisBoot: Boolean,
     onCheckScript: () -> Unit,
     onStartScript: () -> Unit,
     onStopScript: () -> Unit,
@@ -103,7 +104,7 @@ fun OverviewScreen(
 ) {
     val oneTime = settings.usageMode == UsageMode.ONE_TIME
     val script = !oneTime
-    val scriptOn = scriptStatus.listening
+    val scriptOn = scriptStatus.running ?: scriptStartedThisBoot
     if (config.shellWatch != null) {
         LaunchedEffect(permissions.shizukuGranted) { onCheckScript() }
     }
@@ -171,7 +172,7 @@ fun OverviewScreen(
                 ) {
                     BodyText(
                         "${config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName} vẫn mở ${config.profile.assistantName} " +
-                            "ở chế độ một lần. Chuyển sang Đầy đủ để thay bằng ${config.target.displayName}.",
+                            "ở chế độ một lần. Chuyển sang Script nền để thay bằng ${config.target.displayName}.",
                         12.sp,
                         Warn,
                         Modifier.weight(1f),
@@ -214,6 +215,7 @@ fun OverviewScreen(
             if (config.shellWatch != null) {
                 ScriptCard(
                     status = scriptStatus,
+                    startedThisBoot = scriptStartedThisBoot,
                     permissions = permissions,
                     activeMode = script,
                     onOpen = onOpenScript,
@@ -348,6 +350,7 @@ private fun StatusRing(
 @Composable
 private fun ScriptCard(
     status: ScriptStatus,
+    startedThisBoot: Boolean,
     permissions: PermissionSnapshot,
     activeMode: Boolean,
     onOpen: () -> Unit,
@@ -356,8 +359,8 @@ private fun ScriptCard(
     onRequestShizuku: () -> Unit,
 ) {
     val context = LocalContext.current
-    val state = scriptState(status)
-    val running = status.running
+    val state = scriptState(status, startedThisBoot)
+    val runningOrBoot = status.running == true || startedThisBoot
     Column(
         Modifier
             .fillMaxWidth()
@@ -365,7 +368,7 @@ private fun ScriptCard(
             .padding(bottom = 18.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(Surface)
-            .border(1.dp, if (status.listening) Accent.copy(alpha = 0.35f) else Hairline, RoundedCornerShape(18.dp))
+            .border(1.dp, if (runningOrBoot) Accent.copy(alpha = 0.35f) else Hairline, RoundedCornerShape(18.dp))
             .clickable(role = Role.Button, onClick = onOpen)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -380,7 +383,7 @@ private fun ScriptCard(
                 MonoText(
                     when {
                         activeMode -> state.detail
-                        running -> state.detail
+                        status.running == true -> "đang chạy ngầm trong RAM · ${state.detail}"
                         else -> "không cần Trợ năng · tương thích mọi app ngân hàng"
                     },
                     9.sp,
@@ -390,10 +393,10 @@ private fun ScriptCard(
             }
             LucideIcon(R.drawable.lc_chevron_right, TextGhost, 14.dp)
         }
-        if (permissions.shizukuGranted || permissions.readLogs) {
+        if (permissions.shizukuGranted) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PrimaryCta(
-                    text = if (running) "Bật lại" else if (permissions.shizukuGranted) "Kích hoạt & Bật nghe nền" else "Bật nghe nền",
+                    text = if (status.running == true) "Kích hoạt & Bật lại" else "Kích hoạt & Bật script",
                     onClick = onStart,
                     modifier = Modifier.weight(1f),
                     leadingIcon = R.drawable.lc_terminal,
@@ -401,7 +404,7 @@ private fun ScriptCard(
                     height = 42.dp,
                     radius = 12.dp,
                 )
-                if (running) {
+                if (status.running == true) {
                     OutlineCta(
                         text = "Tắt",
                         onClick = onStop,
@@ -411,7 +414,7 @@ private fun ScriptCard(
                     )
                 }
             }
-        } else if (!running) {
+        } else if (!runningOrBoot) {
             PrimaryCta(
                 text = when {
                     !permissions.shizukuInstalled -> "Tải Shizuku để bật Script"
@@ -427,9 +430,9 @@ private fun ScriptCard(
                 radius = 12.dp,
             )
         }
-        if (status.listening) {
+        if (runningOrBoot) {
             MonoText(
-                "Nghe ngay trong app · dùng app ngân hàng thì bắt buộc tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB, nghe nền vẫn chạy.",
+                "Script chạy riêng, không phụ thuộc app. Tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB để dùng app ngân hàng vẫn chạy.",
                 9.sp,
                 TextFaint,
                 maxLines = 2,

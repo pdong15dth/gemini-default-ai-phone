@@ -13,7 +13,7 @@ object Intents {
         start(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
-    /** Mở Tuỳ chọn nhà phát triển để người dùng tắt công tắc tổng và Gỡ lỗi USB trước khi vào app ngân hàng. */
+    /** Mở Tuỳ chọn nhà phát triển để người dùng tắt Gỡ lỗi không dây / Developer Mode trước khi vào app ngân hàng. */
     fun openDeveloperSettings(context: Context) {
         if (!start(context, Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))) {
             start(context, Intent(Settings.ACTION_SETTINGS))

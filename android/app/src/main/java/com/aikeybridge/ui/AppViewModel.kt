@@ -20,19 +20,15 @@ import com.aikeybridge.diagnostics.AttemptSummary
 import com.aikeybridge.diagnostics.Diagnostics
 import com.aikeybridge.model.AssistantTarget
 import com.aikeybridge.model.OemProfile
-import com.aikeybridge.service.LogAccess
 import com.aikeybridge.service.LogSniffer
 import com.aikeybridge.service.LogStatus
 import com.aikeybridge.service.RedirectState
 import com.aikeybridge.service.RuntimeStatus
 import com.aikeybridge.service.Sniffer
-import com.aikeybridge.service.WatchService
-import com.aikeybridge.service.WatchStatus
 import com.aikeybridge.shell.ProvisionReport
 import com.aikeybridge.shell.Provisioner
 import com.aikeybridge.shell.ShizukuShell
 import com.aikeybridge.shell.StepPhase
-import com.aikeybridge.shell.WatchGrants
 import com.aikeybridge.shell.WatchScript
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -54,15 +50,13 @@ import rikka.shizuku.Shizuku
 
 data class AppEntry(val packageName: String, val label: String)
 
-/** Trạng thái nghe nền trong app (chế độ Script nền). */
+/** Trạng thái script nền. [running] = null nghĩa là chưa kiểm tra được (thiếu Shizuku). */
 data class ScriptStatus(
-    val running: Boolean = false,
+    val running: Boolean? = null,
     val busy: Boolean = false,
-    val access: LogAccess = LogAccess.OFF,
-) {
-    /** Service đang chạy và Android đã cho đọc log hệ thống. */
-    val listening: Boolean get() = running && access == LogAccess.SYSTEM
-}
+    val pid: String = "",
+    val detachedFromAdbd: Boolean? = null,
+)
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -127,84 +121,191 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private var snifferJob: Job? = null
 
-    private val scriptBusy = MutableStateFlow(false)
-    val script: StateFlow<ScriptStatus> = combine(WatchStatus.running, LogStatus.access, scriptBusy) { running, access, busy ->
-        ScriptStatus(running = running, busy = busy, access = if (running) access else LogAccess.OFF)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, ScriptStatus())
-
-    /** Mở app: nếu người dùng đã bật nghe nền thì bật lại / mở lại logcat để Android hỏi quyền đọc log. */
-    fun checkScript() {
-        refreshPermissions()
-        if (WatchService.wanted(settingsRepository)) WatchService.start(app)
-    }
+    private val _script = MutableStateFlow(ScriptStatus())
+    val script: StateFlow<ScriptStatus> = _script.asStateFlow()
 
     /**
-     * Kích hoạt nghe nền: có Shizuku thì chạy lệnh kích hoạt của profile + cấp quyền cho app (một lần,
-     * còn nguyên khi tắt Gỡ lỗi), dừng script shell cũ nếu còn, rồi bật service nghe trong app.
-     * Không còn ép bật Gỡ lỗi USB — app ngân hàng chặn đúng công tắc đó.
+     * Nhịp sống script ghi mỗi [WatchScript.ALIVE_INTERVAL_S] giây vào thư mục của app, đọc được cả khi Shizuku đã dừng.
+     * true = còn chạy, false = đã dừng trong lần khởi động này, null = chưa chạy từ khi bật máy.
      */
+    private fun scriptAlive(): Boolean? {
+        val alive = scriptEventLog?.parentFile?.let { File(it, WatchScript.ALIVE_FILE) } ?: return null
+        val now = System.currentTimeMillis()
+        val bootAt = now - android.os.SystemClock.elapsedRealtime()
+        val modified = alive.lastModified()
+        if (modified < bootAt) return null
+        return now - modified < (WatchScript.ALIVE_INTERVAL_S * 2 + ALIVE_GRACE_S) * 1000L
+    }
+
+    /** Script đã bật sau lần khởi động máy gần nhất thì nhiều khả năng còn chạy. */
+    val scriptStartedThisBoot: Boolean
+        get() {
+            val bootAt = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
+            return settingsRepository.state.value.scriptStartedAt > bootAt
+        }
+
+    /** File script nền ghi mỗi lần chuyển hướng; nằm trong thư mục riêng của app để app đọc được. */
+    private val scriptEventLog: File?
+        get() = app.getExternalFilesDir(null)?.let { File(it, "script-events.log") }
+
+    fun scriptContent(): String? {
+        val active = config.value
+        val watch = active.shellWatch ?: return null
+        val log = scriptEventLog?.absolutePath ?: "/dev/null"
+        return WatchScript.content(
+            watch = watch,
+            keyevent = active.target.shellKeyevent ?: GEMINI_ASSIST_KEY,
+            eventLog = log,
+            dismissDelayMs = active.dismissDelayMs,
+        )
+    }
+
+    /** Đưa các lượt script nền đã ghi vào Nhật ký, rồi xoá file. */
+    fun importScriptEvents() {
+        val file = scriptEventLog ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val lines = runCatching { if (file.exists()) file.readLines() else emptyList() }.getOrDefault(emptyList())
+            if (lines.isEmpty()) return@launch
+            runCatching { file.writeText("") }
+            val active = config.value
+            lines.mapNotNull(WatchScript::parseEvent).forEach { (at, kind) ->
+                AttemptLog.record(
+                    com.aikeybridge.diagnostics.Attempt(
+                        at = at,
+                        flow = if (kind == "voice") active.flowLabel else "Nút → ${active.target.displayName}",
+                        ok = true,
+                        durationMs = SCRIPT_FLOW_MS,
+                        detail = "script nền · ${if (kind == "voice") "khẩu lệnh" else "nút"}",
+                    ),
+                )
+            }
+            Diagnostics.info("script", "Nhập ${lines.size} lượt từ script nền.")
+        }
+    }
+
+    fun checkScript() {
+        refreshPermissions()
+        if (!_permissions.value.shizukuGranted) {
+            // Không có Shizuku thì không xem được tiến trình: dựa vào nhịp sống script tự ghi.
+            _script.update { it.copy(running = scriptAlive(), pid = "", detachedFromAdbd = null) }
+            return
+        }
+        viewModelScope.launch {
+            val result = shell.exec(WatchScript.statusCommand())
+            val pid = result.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty()
+            val running = result.stdout.isNotBlank()
+            val detached = if (running && pid.isNotEmpty()) {
+                val cg = shell.exec(WatchScript.cgroupCommand(pid))
+                if (cg.ok && cg.stdout.isNotBlank()) WatchScript.processGroups(cg.stdout).isEmpty() else null
+            } else {
+                null
+            }
+            _script.update { it.copy(running = running, pid = pid, detachedFromAdbd = detached) }
+        }
+    }
+
     fun startScript() {
-        if (config.value.shellWatch == null) {
-            _message.value = "${config.value.profile.displayName} chưa có mẫu cửa sổ để nghe. Hãy bấm Dò trợ lý."
+        val content = scriptContent() ?: run {
+            _message.value = "${config.value.profile.displayName} chưa có mẫu cửa sổ cho script nền. Hãy bấm Dò trợ lý."
             return
         }
         refreshPermissions()
-        if (!_permissions.value.shizukuGranted && !_permissions.value.readLogs) {
-            _message.value = "Cần Shizuku để cấp quyền đọc log lần đầu. Không có Shizuku thì copy lệnh ADB bên dưới."
+        if (!_permissions.value.shizukuGranted) {
+            _message.value = "Cần Shizuku đã cấp quyền. Không có Shizuku thì copy lệnh ADB bên dưới."
             return
         }
-        if (scriptBusy.value) return
+        if (_script.value.busy) return
+        scriptEventLog?.parentFile?.mkdirs()
         viewModelScope.launch {
-            scriptBusy.value = true
-            if (_permissions.value.shizukuGranted) {
-                val active = config.value
-                if (active.provisioning.isNotEmpty()) {
-                    _setup.value = SetupUiState.from(active.provisioning, active.restore).copy(running = true)
-                    Diagnostics.info("setup", "Tự chạy ${active.provisioning.size} lệnh kích hoạt trước khi bật nghe nền · ${active.flowLabel}.")
-                    val report = Provisioner(shell, active.provisioning, active.restore).runProvisioning { step, phase, detail ->
-                        _setup.update { state ->
-                            state.copy(
-                                steps = state.steps.map { item ->
-                                    if (item.id == step.id) item.copy(status = phase.toStatus(), message = detail) else item
-                                },
-                            )
-                        }
+            _script.update { it.copy(busy = true) }
+            val active = config.value
+            if (active.provisioning.isNotEmpty()) {
+                _setup.value = SetupUiState.from(active.provisioning, active.restore).copy(running = true)
+                Diagnostics.info("setup", "Tự chạy ${active.provisioning.size} lệnh kích hoạt trước khi bật script · ${active.flowLabel}.")
+                val report = Provisioner(shell, active.provisioning, active.restore).runProvisioning { step, phase, detail ->
+                    _setup.update { state ->
+                        state.copy(
+                            steps = state.steps.map { item ->
+                                if (item.id == step.id) item.copy(status = phase.toStatus(), message = detail) else item
+                            },
+                        )
                     }
-                    _setup.update { it.copy(running = false, provisioningReport = report) }
-                    if (report.passed > 0) settingsRepository.setProvisionedFingerprint(device.fingerprint)
                 }
-                WatchGrants.commands(app.packageName).forEach { command ->
-                    val result = shell.exec(command)
-                    if (!result.ok) Diagnostics.warn("watch", "$command → ${result.output.ifBlank { "lỗi ${result.exitCode}" }}")
-                }
-                // Script shell của bản cũ còn chạy thì mỗi lần hô sẽ gọi trợ lý hai lần.
-                shell.exec(WatchScript.stopCommand())
-                refreshPermissions()
+                _setup.update { it.copy(running = false, provisioningReport = report) }
+                if (report.passed > 0) settingsRepository.setProvisionedFingerprint(device.fingerprint)
             }
-            if (!_permissions.value.readLogs) {
-                Diagnostics.error("watch", "Chưa có READ_LOGS sau khi cấp qua Shizuku.")
-                _message.value = "Không cấp được quyền đọc log — xem Nhật ký."
-                scriptBusy.value = false
+            val install = shell.exec(WatchScript.installCommand(content))
+            if (!install.ok) {
+                Diagnostics.error("script", "Ghi script lỗi: ${install.output}")
+                _message.value = "Không ghi được script: ${install.output.ifBlank { "lệnh trả về ${install.exitCode}" }}"
+                _script.update { it.copy(busy = false) }
                 return@launch
             }
-            settingsRepository.setWatchEnabled(true)
-            val started = WatchService.start(app)
-            scriptBusy.value = false
-            _message.value = if (started) {
-                "Đang nghe trong app. Android hỏi quyền truy cập log thì chọn Cho phép, rồi tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB để dùng app ngân hàng."
+            shell.exec(WatchScript.stopCommand())
+            shell.exec(WatchScript.startCommand())
+            delay(700)
+            val status = shell.exec(WatchScript.statusCommand())
+            val running = status.stdout.isNotBlank()
+            if (running) settingsRepository.setScriptStartedAt(System.currentTimeMillis())
+            val pid = status.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty()
+            val detached = if (running && pid.isNotEmpty()) logScriptCgroup(pid) else null
+            _script.value = ScriptStatus(
+                running = running,
+                busy = false,
+                pid = pid,
+                detachedFromAdbd = detached,
+            )
+            refreshPermissions()
+            Diagnostics.log(
+                if (running) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
+                "script",
+                if (running) "Script nền đang chạy (${WatchScript.PATH})." else "Script nền không chạy được.",
+            )
+            _message.value = if (running) {
+                "Script nền đang chạy. Hô “${config.value.profile.wakePhrase ?: config.value.profile.assistantName}” để thử, " +
+                    "rồi tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB để dùng app ngân hàng — script vẫn chạy."
             } else {
-                "Không bật được nghe nền — xem Nhật ký."
+                "Script không chạy được — xem Nhật ký."
             }
+        }
+    }
+
+    /** Script còn trong nhóm tiến trình của adbd thì tắt Gỡ lỗi sẽ giết nó — ghi lại để đọc log biết ngay. */
+    private suspend fun logScriptCgroup(pid: String): Boolean? {
+        val result = shell.exec(WatchScript.cgroupCommand(pid))
+        if (!result.ok || result.stdout.isBlank()) {
+            Diagnostics.warn("script", "Không đọc được cgroup của script (pid $pid): ${result.output}")
+            return null
+        }
+        val groups = WatchScript.processGroups(result.stdout)
+        return if (groups.isEmpty()) {
+            Diagnostics.success("script", "Script đã ra nhóm gốc · tắt Gỡ lỗi không làm script dừng.")
+            true
+        } else {
+            Diagnostics.warn(
+                "script",
+                "Script vẫn trong nhóm tiến trình ${groups.joinToString()} · tắt Gỡ lỗi có thể làm script dừng.",
+            )
+            false
         }
     }
 
     fun stopScript() {
-        settingsRepository.setWatchEnabled(false)
-        WatchService.stop(app)
         refreshPermissions()
-        if (_permissions.value.shizukuGranted) viewModelScope.launch { shell.exec(WatchScript.stopCommand()) }
-        Diagnostics.info("watch", "Đã tắt nghe nền.")
-        _message.value = "Đã tắt nghe nền."
+        if (!_permissions.value.shizukuGranted) {
+            _message.value = "Cần Shizuku để tắt script. Hoặc khởi động lại máy."
+            return
+        }
+        viewModelScope.launch {
+            _script.update { it.copy(busy = true) }
+            shell.exec(WatchScript.stopCommand())
+            settingsRepository.setScriptStartedAt(0)
+            delay(300)
+            val status = shell.exec(WatchScript.statusCommand())
+            _script.value = ScriptStatus(running = status.stdout.isNotBlank(), busy = false)
+            Diagnostics.info("script", "Đã tắt script nền.")
+            _message.value = "Đã tắt script nền."
+        }
     }
     private var logSnifferJob: Job? = null
 
@@ -219,6 +320,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runCatching { Shizuku.addBinderDeadListener(binderDead) }
 
         viewModelScope.launch {
+            while (true) {
+                delay(30_000)
+                importScriptEvents()
+            }
+        }
+
+        viewModelScope.launch {
             config.collect { active ->
                 refreshPermissions()
                 val current = _setup.value
@@ -231,6 +339,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshPermissions() {
+        importScriptEvents()
         val active = config.value
         _permissions.value = PermissionsReader.read(
             context = app,
@@ -389,11 +498,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setUsageMode(mode: UsageMode, announce: Boolean = true) {
         settingsRepository.setUsageMode(mode)
         refreshPermissions()
-        if (mode == UsageMode.SCRIPT) checkScript() else WatchService.stop(app)
         if (announce) {
             _message.value = when (mode) {
                 UsageMode.ONE_TIME -> "Đã chuyển sang Cấu hình một lần — không cần Trợ năng."
-                UsageMode.SCRIPT -> "Đã chuyển sang Script nền — bật nghe nền trong màn Script nền."
+                UsageMode.SCRIPT -> "Đã chuyển sang Script nền — bật script trong màn Script nền."
                 UsageMode.FULL -> "Đã chuyển sang Đầy đủ — cần bật Trợ năng."
             }
         }
@@ -800,7 +908,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         const val SHIZUKU_REQUEST_CODE = 2311
+        const val ALIVE_GRACE_S = 15
         const val SNIFF_WINDOW_MS = 8_000L
+        /**
+         * KEYCODE_ASSIST, như giữ nút nguồn: lớp phủ Gemini kèm ảnh chụp màn hình nên khoanh tròn để hỏi được.
+         * 231 (VOICE_ASSIST) bật Micro ngay nhưng không khoanh được, chạm màn hình là lớp phủ tắt.
+         */
+        const val GEMINI_ASSIST_KEY = 219
+
+        /** Ước lượng thời gian script gọi trợ lý (không đo được từ trong script). */
+        const val SCRIPT_FLOW_MS = 600L
 
         /** Khoá settings mang định danh người dùng/máy — không đưa vào log xuất. */
         const val SETTINGS_PRIVATE = "android_id|bluetooth_address|bluetooth_name|device_name|token|account|ssid|password|email|phone|imei|serial"

@@ -94,9 +94,9 @@ fun UsageScreen(
                 points = listOf(
                     "$wake → $target, Micro bật sẵn",
                     "Không dùng Trợ năng · Tương thích 100% mọi app ngân hàng",
-                    "Bắt buộc tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB để dùng app ngân hàng — vẫn chạy",
+                    "Tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB vẫn chạy — bắt buộc tắt để dùng app ngân hàng",
                 ),
-                cost = "Cần Shizuku một lần · sau khởi động máy chạm thông báo để cho phép đọc log",
+                cost = "Chạy ngầm trong RAM · bật lại sau khi khởi động lại máy",
                 onClick = { selected = UsageMode.SCRIPT },
             )
             Gap(12.dp)

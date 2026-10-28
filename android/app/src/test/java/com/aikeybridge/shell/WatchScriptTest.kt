@@ -35,21 +35,10 @@ class WatchScriptTest {
 
         // Nút: không còn "sleep 0.5" chung trước khi gọi trợ lý như bản cũ.
         val esac = lines.indexOf("esac")
-        assertEquals(WatchScript.assistCommand(231), lines[esac + 1])
-        assertTrue(lines[esac + 1].startsWith("if dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then input keyevent 231;"))
+        assertEquals("if dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then", lines[esac + 1])
+        assertEquals("input keyevent 231", lines[esac + 2])
         // Khẩu lệnh dùng độ trễ của cấu hình.
         assertTrue(script.contains("kind=voice; sleep 0.7 ;;"))
-    }
-
-    @Test
-    fun fireCommandIsOneRoundOfTheScript() {
-        // Nghe trong app + còn Shizuku: khẩu lệnh Back đóng trợ lý gốc, đợi, rồi gọi trợ lý như script.
-        assertEquals(
-            "input keyevent 4; sleep 0.7; ${WatchScript.assistCommand(231)}",
-            WatchScript.fireCommand(voice = true, keyevent = 231, dismissDelayMs = 700),
-        )
-        // Nút: không có panel nào để đóng.
-        assertEquals(WatchScript.assistCommand(231), WatchScript.fireCommand(voice = false, keyevent = 231, dismissDelayMs = 700))
     }
 
     @Test

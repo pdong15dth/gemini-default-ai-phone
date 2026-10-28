@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Process
 import android.os.SystemClock
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -55,16 +54,8 @@ object LogStatus {
         context.checkSelfPermission(Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
 }
 
-/**
- * Đọc logcat liên tục và đẩy từng dòng ra [onLine]. Tự chạy lại khi tiến trình logcat chết.
- * Android 13+ hỏi quyền truy cập log mỗi lần mở logcat mới và tự từ chối khi app không ở màn hình trước,
- * nên quyền đọc log hệ thống được xét lại cho từng tiến trình logcat.
- */
-class LogcatWatcher(
-    private val buffers: List<String> = DEFAULT_BUFFERS,
-    private val ownOnlyAfterMs: Long = OWN_ONLY_AFTER_MS,
-    private val onLine: (String) -> Unit,
-) {
+/** Đọc logcat liên tục (main/system/events) và đẩy từng dòng ra [onLine]. Tự chạy lại khi tiến trình logcat chết. */
+class LogcatWatcher(private val onLine: (String) -> Unit) {
 
     private var job: Job? = null
 
@@ -79,39 +70,40 @@ class LogcatWatcher(
         job = scope.launch(Dispatchers.IO) {
             val ownPid = Process.myPid()
             var backoff = MIN_BACKOFF_MS
+            var systemSeenAt = 0L
             while (isActive) {
-                val seen = AtomicBoolean(false)
-                LogStatus.set(LogAccess.WAITING)
-                val watchdog = launch {
-                    delay(ownOnlyAfterMs)
-                    if (!seen.get()) LogStatus.set(LogAccess.OWN_ONLY)
-                }
+                val startedAt = SystemClock.elapsedRealtime()
                 runCatching {
-                    val command = listOf("logcat", "-v", "brief", "-T", "1") + buffers.flatMap { listOf("-b", it) }
-                    val proc = ProcessBuilder(command).redirectErrorStream(true).start()
+                    val proc = ProcessBuilder(
+                        "logcat", "-v", "brief", "-T", "1",
+                        "-b", "main", "-b", "system", "-b", "events",
+                    ).redirectErrorStream(true).start()
                     process = proc
                     proc.inputStream.bufferedReader().useLines { lines ->
                         for (line in lines) {
                             if (!isActive) break
-                            if (!seen.get()) {
-                                val pid = PID.find(line)?.groupValues?.get(1)?.toIntOrNull()
-                                if (pid != null && pid != ownPid && seen.compareAndSet(false, true)) {
-                                    LogStatus.set(LogAccess.SYSTEM)
-                                }
+                            val pid = PID.find(line)?.groupValues?.get(1)?.toIntOrNull()
+                            if (pid != null && pid != ownPid && systemSeenAt == 0L) {
+                                systemSeenAt = SystemClock.elapsedRealtime()
+                                LogStatus.set(LogAccess.SYSTEM)
                             }
                             onLine(line)
                         }
                     }
                 }
-                watchdog.cancel()
                 process?.destroy()
                 process = null
                 if (!isActive) break
-                if (!seen.get()) LogStatus.set(LogAccess.OWN_ONLY)
-                if (seen.get()) backoff = MIN_BACKOFF_MS
+                if (systemSeenAt == 0L && SystemClock.elapsedRealtime() - startedAt > OWN_ONLY_AFTER_MS) {
+                    LogStatus.set(LogAccess.OWN_ONLY)
+                }
                 delay(backoff)
                 backoff = (backoff * 2).coerceAtMost(MAX_BACKOFF_MS)
             }
+        }
+        scope.launch {
+            delay(OWN_ONLY_AFTER_MS)
+            if (running && LogStatus.access.value == LogAccess.WAITING) LogStatus.set(LogAccess.OWN_ONLY)
         }
     }
 
@@ -125,7 +117,6 @@ class LogcatWatcher(
 
     private companion object {
         val PID = Regex("^[VDIWEF]/[^(]*\\(\\s*(\\d+)\\)")
-        val DEFAULT_BUFFERS = listOf("main", "system", "events")
         const val MIN_BACKOFF_MS = 1_000L
         const val MAX_BACKOFF_MS = 30_000L
         const val OWN_ONLY_AFTER_MS = 6_000L

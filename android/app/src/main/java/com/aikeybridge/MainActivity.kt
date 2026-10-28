@@ -40,8 +40,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Kiểm tra quyền và mở lại event log khi app ở trước — lúc Android cho phép hỏi quyền đọc log.
-        viewModel.checkScript()
+        viewModel.refreshPermissions()
     }
 
     override fun onDestroy() {
