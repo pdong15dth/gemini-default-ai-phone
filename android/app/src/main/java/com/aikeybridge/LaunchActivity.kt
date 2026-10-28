@@ -8,12 +8,13 @@ import com.aikeybridge.diagnostics.Attempt
 import com.aikeybridge.diagnostics.AttemptLog
 import com.aikeybridge.diagnostics.Diagnostics
 import com.aikeybridge.service.AssistantAccessibilityService
+import com.aikeybridge.service.AssistOverlay
 import com.aikeybridge.service.AssistantLauncher
 
 /**
  * Lối tắt "Gọi AI" để gán vào phím tắt của ROM, chạm mặt lưng hoặc màn hình chính.
  * Có Trợ năng: giao cho service (lớp phủ nếu có Shizuku, tự bật Micro).
- * Không có Trợ năng: mở thẳng app đích, người dùng tự bấm Micro.
+ * Không có Trợ năng: gọi lớp phủ trợ lý mặc định như giữ nút nguồn; không được thì mở thẳng app đích.
  */
 class LaunchActivity : Activity() {
 
@@ -30,7 +31,9 @@ class LaunchActivity : Activity() {
             if (config == null) {
                 Diagnostics.error("shortcut", "Không tải được cấu hình.")
             } else {
-                val outcome = AssistantLauncher.launch(this, config.target)
+                // Như giữ nút nguồn: lớp phủ trợ lý mặc định (khoanh tròn để hỏi được); không được thì mở app đích.
+                val assist = AssistOverlay.launch(this)
+                val outcome = if (assist.ok) assist else AssistantLauncher.launch(this, config.target)
                 Diagnostics.log(
                     if (outcome.ok) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
                     "shortcut",
@@ -42,7 +45,7 @@ class LaunchActivity : Activity() {
                         flow = "Lối tắt → ${config.target.displayName}",
                         ok = outcome.ok,
                         durationMs = SystemClock.elapsedRealtime() - startedAt,
-                        detail = if (outcome.ok) "đã mở app · không Trợ năng" else outcome.detail,
+                        detail = if (outcome.ok) "${outcome.detail} · không Trợ năng" else outcome.detail,
                     ),
                 )
             }

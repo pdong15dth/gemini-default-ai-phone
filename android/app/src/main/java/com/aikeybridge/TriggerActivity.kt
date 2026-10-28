@@ -18,11 +18,7 @@ class TriggerActivity : Activity() {
         if (config == null) {
             Diagnostics.error("lock", "TriggerActivity không tải được profile.")
         } else {
-            val outcome = if (intent.getBooleanExtra(EXTRA_VOICE, false)) {
-                AssistantLauncher.launchVoice(this, config.target)
-            } else {
-                AssistantLauncher.launch(this, config.target)
-            }
+            val outcome = AssistantLauncher.launch(this, config.target)
             Diagnostics.log(
                 if (outcome.ok) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
                 "lock",
@@ -38,9 +34,7 @@ class TriggerActivity : Activity() {
         finish()
     }
 
-    companion object {
-        /** Mở thẳng chế độ nghe của đích (nghe nền không có Shizuku để gửi phím trợ lý). */
-        const val EXTRA_VOICE = "voice"
-        private const val FINISH_DELAY_MS = 250L
+    private companion object {
+        const val FINISH_DELAY_MS = 250L
     }
 }

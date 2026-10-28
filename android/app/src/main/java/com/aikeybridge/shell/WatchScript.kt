@@ -1,7 +1,9 @@
 package com.aikeybridge.shell
 
+import com.aikeybridge.model.OverlayMic
 import com.aikeybridge.model.ShellWatch
 import java.util.Base64
+import kotlin.math.roundToInt
 
 /**
  * Script nền chạy bằng quyền shell, cùng cơ chế với scripts/gemini.sh trong README:
@@ -16,8 +18,15 @@ object WatchScript {
      * @param dismissDelayMs chờ sau Back để trợ lý gốc nhả Micro; chỉ áp dụng cho khẩu lệnh.
      * Nút lối tắt không có panel nào cần đóng nên gọi trợ lý ngay. Màn hình đang sáng thì bỏ
      * bước đánh thức (224) và khoảng chờ sau nó.
+     * @param mic có thì chạm nút Micro sau khi lớp phủ hiện, để vừa khoanh tròn được (phím 219) vừa nghe ngay.
      */
-    fun content(watch: ShellWatch, keyevent: Int, eventLog: String, dismissDelayMs: Long = 500): String {
+    fun content(
+        watch: ShellWatch,
+        keyevent: Int,
+        eventLog: String,
+        dismissDelayMs: Long = 500,
+        mic: OverlayMic? = null,
+    ): String {
         val pattern = listOfNotNull(watch.panel, watch.button).joinToString("|")
         val panelCase = watch.panel.split('|').filter { it.isNotBlank() }.joinToString("|") { "*$it*" }
         val dismiss = seconds(dismissDelayMs)
@@ -36,30 +45,61 @@ object WatchScript {
                     "cat /proc/\$\$/cgroup; } > \"\$DIR/$STATE_FILE\" 2>/dev/null",
             )
             appendLine("( while true; do date '+%F %T' > \"\$DIR/$ALIVE_FILE\" 2>/dev/null; sleep $ALIVE_INTERVAL_S; done ) &")
+            if (mic != null) {
+                appendLine("# Toạ độ nút Micro của lớp phủ theo tỉ lệ màn hình, tính một lần (wm size in kích thước dọc).")
+                appendLine("set -- \$(wm size | tail -1 | sed 's/.*: //; s/x/ /')")
+                appendLine("MX=\$((\$1 * ${permille(mic.x)} / 1000)); MY=\$((\$2 * ${permille(mic.y)} / 1000))")
+            }
             appendLine("while true; do")
             appendLine("  logcat -b events -c")
             appendLine("  line=\$(logcat -b events -e '$pattern' -m 1)")
             appendLine("  case \"\$line\" in")
+            appendLine("    # Cửa sổ trợ lý gốc tự đóng cũng sinh dòng có tên nó: bỏ qua, không mở trợ lý ngoài ý muốn.")
+            appendLine("    *\"Focus leaving\"*) continue ;;")
             appendLine("    $panelCase) input keyevent 4; kind=voice; sleep $dismiss ;;")
             appendLine("    *) kind=button ;;")
             appendLine("  esac")
-            appendLine("  ${assistCommand(keyevent)}")
+            appendLine("  if dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then")
+            appendLine("    input keyevent $keyevent")
+            appendLine("  else")
+            appendLine("    input keyevent 224")
+            appendLine("    sleep 0.5")
+            appendLine("    input keyevent $keyevent")
+            appendLine("  fi")
+            appendLine("  echo \"\$(date +%T) \$kind · đã gửi phím $keyevent\" > \"\$DIR/$TRACE_FILE\" 2>/dev/null")
+            if (mic != null) {
+                val focused = "timeout 2 dumpsys window displays 2>/dev/null | grep -q 'mCurrentFocus=.*${mic.window}'"
+                appendLine("  # Chỉ chạm khi lớp phủ đã giữ focus và đứng yên: chạm lúc lớp phủ còn trượt lên là trúng ô nhập chữ,")
+                appendLine("  # chạm khi chưa hiện là trúng app bên dưới. timeout để script không kẹt và bỏ lỡ lần gọi sau.")
+                appendLine("  i=0")
+                appendLine("  while [ \$i -lt $MIC_TRIES ]; do")
+                appendLine("    if $focused; then")
+                appendLine("      sleep ${seconds(MIC_SETTLE_MS)}")
+                appendLine("      $focused && timeout 2 input tap \$MX \$MY && echo \"\$(date +%T) chạm Micro\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null")
+                appendLine("      break")
+                appendLine("    fi")
+                appendLine("    # Dọn đa nhiệm giết cả dịch vụ trợ lý của Google; phím đầu tới lúc nó đang chạy lại thì bị bỏ qua.")
+                appendLine("    [ \$i -eq $MIC_RESEND_AT ] && timeout 2 input keyevent $keyevent && echo \"\$(date +%T) gửi lại phím $keyevent\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null")
+                appendLine("    sleep 0.2; i=\$((i + 1))")
+                appendLine("  done")
+            }
             appendLine("  echo \"\$(date +%s) \$kind\" >> \"\$LOG\" 2>/dev/null")
-            appendLine("  sleep 1.5")
+            appendLine("  sleep 0.5")
             appendLine("done")
         }
     }
 
-    /** Đánh thức màn hình nếu đang tắt (224) rồi gửi phím trợ lý; giống hệt thân vòng lặp của script. */
-    fun assistCommand(keyevent: Int): String =
-        "if dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then input keyevent $keyevent; " +
-            "else input keyevent 224; sleep 0.5; input keyevent $keyevent; fi"
+    /** 0.642 → 642: sh chỉ tính số nguyên. */
+    fun permille(fraction: Float): Int = (fraction * 1000).roundToInt().coerceIn(0, 1000)
 
-    /** Một lượt của script, để app gọi qua Shizuku khi tự nghe event log: khẩu lệnh thì Back đóng trợ lý gốc trước. */
-    fun fireCommand(voice: Boolean, keyevent: Int, dismissDelayMs: Long): String {
-        val dismiss = if (voice) "input keyevent 4; sleep ${seconds(dismissDelayMs)}; " else ""
-        return dismiss + assistCommand(keyevent)
-    }
+    /** Chờ lớp phủ có focus tối đa khoảng 3 giây trước khi bỏ chạm Micro. */
+    private const val MIC_TRIES = 15
+
+    /** Sau khoảng 1,4 giây chưa thấy lớp phủ thì gửi lại phím trợ lý một lần. */
+    private const val MIC_RESEND_AT = 7
+
+    /** Lớp phủ trượt lên mất khoảng nửa giây sau khi có focus; chạm sớm hơn là trúng ô nhập chữ. */
+    private const val MIC_SETTLE_MS = 600L
 
     /** 500 → "0.5" cho lệnh sleep của toybox. */
     fun seconds(ms: Long): String {
@@ -90,6 +130,9 @@ object WatchScript {
     /** Hai file script ghi cạnh file sự kiện (thư mục riêng của app, app tự đọc được). */
     const val STATE_FILE = "script-state.log"
     const val ALIVE_FILE = "script-alive"
+
+    /** Các bước của lần gọi gần nhất kèm giờ, để biết script kẹt ở đâu. */
+    const val TRACE_FILE = "script-trace.log"
     const val ALIVE_INTERVAL_S = 30
 
     /** Cây cgroup gốc mà script thử chuyển vào, cùng danh sách với starter của Shizuku. */

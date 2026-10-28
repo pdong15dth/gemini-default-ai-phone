@@ -40,6 +40,18 @@ class ProvisionerTest {
     }
 
     @Test
+    fun alreadyCorrectStepIsNotRunAgain() = kotlinx.coroutines.runBlocking {
+        // Chạy lại lệnh đặt vai trò trợ lý làm hệ thống giết Google và trợ lý gốc: đúng sẵn thì không chạy.
+        val shell = FakeShell(mapOf("get one" to ShellResult(0, "value-one", "")))
+
+        val report = Provisioner(shell, listOf(step("one", "set one", "get one", "value-one")), emptyList())
+            .runProvisioning { _, _, _ -> }
+
+        assertTrue(report.ok)
+        assertEquals(listOf("get one"), shell.calls)
+    }
+
+    @Test
     fun missingPackageDuringRestoreCountsAsHandled() = kotlinx.coroutines.runBlocking {
         val shell = FakeShell(
             mapOf("reset missing" to ShellResult(1, "", "Unknown package: com.example")),
@@ -62,7 +74,11 @@ class ProvisionerTest {
     )
 
     private class FakeShell(private val results: Map<String, ShellResult>) : ShellRunner {
-        override suspend fun exec(command: String): ShellResult =
-            results[command] ?: ShellResult(-1, "", "unexpected command: $command")
+        val calls = mutableListOf<String>()
+
+        override suspend fun exec(command: String): ShellResult {
+            calls += command
+            return results[command] ?: ShellResult(-1, "", "unexpected command: $command")
+        }
     }
 }

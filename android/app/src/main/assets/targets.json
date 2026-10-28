@@ -14,7 +14,12 @@
       "launch_label": "mở app · lớp phủ nổi nếu có Shizuku",
       "beta": false,
       "overlay_needs_default_assistant": true,
-      "shell_keyevent": 231,
+      "shell_keyevent": 219,
+      "overlay_mic": {
+        "window": "FloatyActivity",
+        "x": 0.642,
+        "y": 0.939
+      },
       "voice_ui": {
         "window_wait_ms": 2200,
         "retry_interval_ms": 120,
@@ -41,6 +46,15 @@
           "verify": "settings get secure voice_interaction_service",
           "expect": "googlequicksearchbox",
           "hint": "Một số ROM dùng tên dịch vụ khác; đọc lại giá trị để chắc chắn."
+        },
+        {
+          "id": "screen_context",
+          "title": "Cho Gemini xem màn hình",
+          "detail": "Bật \"Dùng dữ liệu của màn hình và ứng dụng\" của trợ lý mặc định — tắt thì lớp phủ Gemini không khoanh tròn để hỏi được. Chưa từng đặt (null) nghĩa là đang bật theo mặc định.",
+          "command": "settings put secure assist_structure_enabled 1; settings put secure assist_screenshot_enabled 1",
+          "verify": "case \"$(settings get secure assist_structure_enabled) $(settings get secure assist_screenshot_enabled)\" in *0*) echo off ;; *) echo on ;; esac",
+          "expect": "on",
+          "hint": "Muốn tắt lại: Cài đặt → Ứng dụng mặc định → Trợ lý số → Dùng dữ liệu của màn hình và ứng dụng."
         },
         {
           "id": "overlay_google",

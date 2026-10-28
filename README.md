@@ -48,7 +48,7 @@ App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi tr�
 | 🎯 | **Chọn đích** | Gemini, ChatGPT Voice, Claude hoặc bất kỳ app nào khác. |
 | ⌨️ | **Lối tắt "Gọi AI"** | Gán vào chạm mặt lưng, khởi chạy nhanh, nút thông minh hoặc màn hình chính. |
 | 🛠️ | **Kích hoạt & vá lỗi** | Chạy các lệnh cấu hình một lần qua Shizuku (hoặc copy lệnh ADB): đặt Google làm trợ lý mặc định, cho Tiểu V chạy nền, vá crash locale tiếng Việt. Mỗi lệnh đều đọc lại giá trị để xác minh. |
-| 📜 | **Script nền** | App tự nghe event log như script trong [hướng dẫn ADB](HUONG-DAN-SCRIPT-ADB.md) — không cần Trợ năng, tắt Gỡ lỗi vẫn chạy. |
+| 📜 | **Script nền** | Chạy đúng script trong [hướng dẫn ADB](HUONG-DAN-SCRIPT-ADB.md) bằng Shizuku — không cần Trợ năng. |
 | 🔍 | **Dò trợ lý** | ROM chưa có profile? Bấm Dò rồi gọi trợ lý gốc, app lưu cửa sổ đó làm trigger. |
 | 📊 | **Nhật ký** | Tỉ lệ thành công, thời gian chuyển hướng trung bình, biểu đồ 7 ngày. |
 | 📦 | **Xuất log chẩn đoán** | Một file `.zip` gồm log app, lý do các lần app bị tắt, logcat và trạng thái hệ thống — gửi cho người phát triển khi gặp lỗi. |
@@ -70,7 +70,7 @@ App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi tr�
 
 App biết trợ lý gốc vừa mở bằng một trong hai cách, tuỳ chế độ:
 
-- **Script nền** (khuyên dùng, không cần Trợ năng): app tự đọc kênh `events` của logcat bằng quyền `READ_LOGS` (Shizuku cấp một lần) và lọc đúng sự kiện `CopilotPanelWindow` / nút lối tắt. Còn Shizuku thì làm y như [hướng dẫn script ADB](HUONG-DAN-SCRIPT-ADB.md): bấm Back, đánh thức màn hình rồi gửi `keyevent 231` — Gemini mở thẳng chế độ nghe. Tắt Gỡ lỗi (Shizuku dừng) thì app mở thẳng chế độ nghe của Gemini bằng intent.
+- **Script nền** (khuyên dùng, không cần Trợ năng): script shell chạy bằng quyền shell của Shizuku, đọc kênh `events` của logcat và lọc đúng sự kiện `CopilotPanelWindow` / nút lối tắt. Gặp sự kiện thì bấm Back, đánh thức màn hình rồi gửi `keyevent 219` — lớp phủ Gemini hiện lên như khi giữ nút nguồn, khoanh tròn để hỏi được. Giống hệt cách trong [hướng dẫn script ADB](HUONG-DAN-SCRIPT-ADB.md), nhưng không cần máy tính. Script chạy riêng bằng quyền shell nên tắt Tuỳ chọn nhà phát triển, Gỡ lỗi USB, dừng Shizuku hay vuốt tắt app đều không làm script dừng; chỉ mất khi khởi động lại máy.
 - **Đầy đủ**: **AccessibilityService** đọc *tên gói* và *tên lớp cửa sổ* vừa hiện. Khi Gemini mở, service đọc thêm tên và mô tả của các nút để tìm nút Micro rồi chạm.
 
 Cả hai đều không đọc văn bản trên màn hình, không chụp màn hình, không ghi âm. App không có quyền Internet.
@@ -115,7 +115,7 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
 
 | Chế độ | Thay "Hi Jovi" | Nút / phím tắt | Tự bật Micro | Cần |
 | --- | --- | --- | --- | --- |
-| **Script nền** (khuyên dùng) | ✅ | ✅ | ✅ | Shizuku một lần để cấp quyền đọc log |
+| **Script nền** (khuyên dùng) | ✅ | ✅ | ✅ | Shizuku (bật lại sau mỗi lần khởi động máy) |
 | **Đầy đủ** | ✅ | ✅ | ✅ | Trợ năng, app chạy nền nhẹ |
 | **Cấu hình một lần** | ❌ (vẫn là Tiểu V) | ✅ | ❌ | Shizuku hoặc ADB một lần, không chạy nền |
 
@@ -151,7 +151,7 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
   <tr>
     <td><b>Gán phím & lối tắt.</b> Gán lối tắt "Gọi AI" vào chạm mặt lưng, khởi chạy nhanh hoặc nút thông minh.</td>
     <td><b>Nút cứng → AI.</b> Chế độ B: đặt nút thành "không hành động", app đọc event log (cần quyền <code>READ_LOGS</code>).</td>
-    <td><b>Script nền.</b> Bật/tắt nghe nền trong app, không cần Trợ năng.</td>
+    <td><b>Script nền.</b> Bật/tắt script shell chạy bằng Shizuku, không cần Trợ năng.</td>
   </tr>
 </table>
 
@@ -192,10 +192,9 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
 
 **Script nền** (khuyên dùng)
 
-- App tự nghe trong tiến trình của mình (thông báo "Đang nghe “Hi Jovi”"). Đến bản 1.0.6 đây là script chạy bằng quyền `shell`, mà tiến trình shell nằm trong nhóm của `adbd` nên **tắt Gỡ lỗi USB là bị giết theo**. App ngân hàng lại bắt tắt Gỡ lỗi USB, nên từ 1.0.7 phần nghe chuyển vào app.
-- Sau khi bấm **Kích hoạt & Bật nghe nền** và chọn **Cho phép** ở hộp thoại truy cập log của Android, **bắt buộc tắt công tắc tổng "Tuỳ chọn nhà phát triển" và "Gỡ lỗi USB"** nếu dùng app ngân hàng (app ngân hàng chặn khi còn bật). Nghe nền vẫn chạy. Khi đó Shizuku dừng nên app không bấm Back được: Tiểu V có thể còn hiện phía sau Gemini.
-- Khởi động lại máy: app tự bật lại, nhưng Android 13+ chỉ cho đọc log khi app đang mở — chạm thông báo "Chạm để cho phép đọc log" và chọn **Cho phép**. Không cần Shizuku nữa.
-- **Khóa AI Key Bridge trong đa nhiệm** và để **Pin không hạn chế** để OriginOS không dọn app.
+- Script chạy dưới quyền `shell` của Shizuku, tách khỏi app. **Vuốt app khỏi đa nhiệm hay kill app đều không ảnh hưởng** — "Hi Jovi" vẫn gọi Gemini.
+- Script và Shizuku không root **mất khi khởi động lại máy**. Sau mỗi lần khởi động: bật lại Shizuku, mở app, bấm **Bật script**.
+- Không cần Trợ năng, không cần Tự khởi chạy.
 
 **Đầy đủ** (Trợ năng)
 
