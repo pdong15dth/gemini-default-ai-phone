@@ -1,3 +1,5 @@
 -keep class com.aikeybridge.shell.ShellUserService { *; }
 -keep class com.aikeybridge.shell.IShellService { *; }
 -keep class com.aikeybridge.shell.IShellService$* { *; }
+-keep class rikka.shizuku.** { *; }
+-keep class moe.shizuku.** { *; }

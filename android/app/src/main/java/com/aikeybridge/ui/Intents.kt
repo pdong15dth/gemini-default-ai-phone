@@ -57,6 +57,22 @@ object Intents {
         openAppDetails(context)
     }
 
+    /** MIUI / HyperOS: mở màn "Quyền khác" của AI Key Bridge (Mở cửa sổ mới khi chạy trong nền, Hiển thị trên màn hình khóa). */
+    fun openMiuiOtherPermissions(context: Context) {
+        val editors = listOf(
+            "com.miui.permcenter.permissions.PermissionsEditorActivity",
+            "com.miui.permcenter.permissions.AppPermissionsEditorActivity",
+        )
+        for (cls in editors) {
+            val intent = Intent("miui.intent.action.APP_PERM_EDITOR")
+                .setClassName("com.miui.securitycenter", cls)
+                .putExtra("extra_pkgname", context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (start(context, intent)) return
+        }
+        openAppDetails(context)
+    }
+
     /** Vivo: Cài đặt → Nút thông minh (nhấn / nhấn đúp / nhấn giữ). */
     fun openSmartKey(context: Context): Boolean =
         start(context, Intent("com.vivo.settings.acticon.JOVI_KEY")) ||

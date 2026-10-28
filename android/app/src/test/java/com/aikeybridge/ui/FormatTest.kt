@@ -56,5 +56,13 @@ class FormatTest {
             "appops googlequicksearchbox" to "SYSTEM_ALERT_WINDOW · allow",
             Format.shortCommand("cmd appops set com.google.android.googlequicksearchbox SYSTEM_ALERT_WINDOW allow"),
         )
+        assertEquals(
+            "appops aikeybridge" to "SYSTEM_ALERT_WINDOW · allow",
+            Format.shortCommand(
+                "appops set com.aikeybridge 10020 allow 2>/dev/null; " +
+                    "appops set com.aikeybridge 10021 allow 2>/dev/null; " +
+                    "cmd appops set com.aikeybridge SYSTEM_ALERT_WINDOW allow",
+            ),
+        )
     }
 }

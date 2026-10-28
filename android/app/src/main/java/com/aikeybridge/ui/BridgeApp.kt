@@ -114,7 +114,9 @@ fun BridgeApp(viewModel: AppViewModel) {
 
     LaunchedEffect(exportFile) {
         exportFile?.let {
-            shareLog(context, it)
+            if (!shareLog(context, it)) {
+                viewModel.showMessage("Đã lưu log tại ${it.absolutePath} (không mở được bảng chia sẻ).")
+            }
             viewModel.consumeExport()
         }
     }

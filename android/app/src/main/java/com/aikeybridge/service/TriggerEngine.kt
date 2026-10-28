@@ -164,9 +164,18 @@ class TriggerEngine(
             launched = launchDirect(target, needsActivity)
             if (launched) appeared = waitForTarget(config, config.micTimeoutMs)
         }
+        if (!appeared && !usedOverlay && shizukuGranted() && tryShellPackage(target, wake = needsActivity)) {
+            Diagnostics.info("launch", "Mở ${target.displayName} qua quyền shell (vượt chặn chạy nền của ROM).")
+            appeared = waitForTarget(config, config.micTimeoutMs)
+        }
 
         if (!appeared) {
-            Diagnostics.error("wait", "Không thấy cửa sổ ${target.displayName} sau ${config.micTimeoutMs}ms.")
+            val hint = if (config.profile.oem == "xiaomi") {
+                " (kiểm tra Quyền khác → Mở cửa sổ mới khi chạy trong nền của AI Key Bridge)"
+            } else {
+                ""
+            }
+            Diagnostics.error("wait", "Không thấy cửa sổ ${target.displayName} sau ${config.micTimeoutMs}ms$hint.")
             RuntimeStatus.setState(RedirectState.FAILED)
             return FlowOutcome(false, "timeout ${config.micTimeoutMs}ms · không thấy ${target.displayName}")
         }
@@ -242,6 +251,23 @@ class TriggerEngine(
             Diagnostics.warn("launch", "keyevent $keyevent lỗi: ${result.output}")
         }
         return result.ok
+    }
+
+    private suspend fun tryShellPackage(target: com.aikeybridge.model.AssistantTarget, wake: Boolean): Boolean {
+        if (!shizukuGranted()) return false
+        for (pkg in target.packages) {
+            val component = service.packageManager.getLaunchIntentForPackage(pkg)?.component?.flattenToShortString()
+                ?: continue
+            if (wake) {
+                shell.exec("input keyevent 224")
+                delay(250)
+            }
+            val result = shell.exec(
+                "am start --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n $component",
+            )
+            if (result.ok) return true
+        }
+        return false
     }
 
     private suspend fun tapMicWithRetry(config: ActiveConfig): TapResult {

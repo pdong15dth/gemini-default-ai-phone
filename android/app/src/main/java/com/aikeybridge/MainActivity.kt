@@ -49,17 +49,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-internal fun shareLog(context: Context, file: java.io.File) {
+internal fun shareLog(context: Context, file: java.io.File): Boolean =
     runCatching {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         val share = Intent(Intent.ACTION_SEND).apply {
             type = "application/zip"
             putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = android.content.ClipData.newRawUri(file.name, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(share, "Chia sẻ log chẩn đoán"))
-    }
-}
+        val chooser = Intent.createChooser(share, "Chia sẻ log chẩn đoán")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(chooser)
+    }.isSuccess
 
 /**
  * Khởi động lại tiến trình app. Shizuku chỉ gửi binder cho tiến trình khởi chạy sau khi server đã chạy,
