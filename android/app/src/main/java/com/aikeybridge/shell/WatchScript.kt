@@ -19,6 +19,7 @@ object WatchScript {
      */
     fun content(watch: ShellWatch, keyevent: Int, eventLog: String, dismissDelayMs: Long = 500): String {
         val pattern = listOfNotNull(watch.panel, watch.button).joinToString("|")
+        val panelCase = watch.panel.split('|').filter { it.isNotBlank() }.joinToString("|") { "*$it*" }
         val dismiss = seconds(dismissDelayMs)
         return buildString {
             appendLine("#!/system/bin/sh")
@@ -27,6 +28,7 @@ object WatchScript {
             appendLine("# Tắt Gỡ lỗi / Tuỳ chọn nhà phát triển thì init dừng adbd và giết cả nhóm tiến trình (cgroup) của nó.")
             appendLine("# Chuyển sang nhóm gốc như Shizuku, logcat/input sinh ra sau đó cũng nằm ngoài nhóm của adbd.")
             appendLine("for cg in $ESCAPE_CGROUPS; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
+            appendLine("for cg in /sys/fs/cgroup/uid_2000 /acct/uid_2000; do grep -q '/pid_' /proc/\$\$/cgroup 2>/dev/null && echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
             appendLine("LOG='$eventLog'")
             appendLine("DIR=\"\${LOG%/*}\"")
             appendLine("# Chẩn đoán đọc được cả khi Shizuku đã chết: trạng thái lúc khởi động + nhịp còn sống mỗi ${ALIVE_INTERVAL_S}s.")
@@ -39,7 +41,7 @@ object WatchScript {
             appendLine("  logcat -b events -c")
             appendLine("  line=\$(logcat -b events -e '$pattern' -m 1)")
             appendLine("  case \"\$line\" in")
-            appendLine("    *${watch.panel}*) input keyevent 4; kind=voice; sleep $dismiss ;;")
+            appendLine("    $panelCase) input keyevent 4; kind=voice; sleep $dismiss ;;")
             appendLine("    *) kind=button ;;")
             appendLine("  esac")
             appendLine("  if dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then")
@@ -106,7 +108,7 @@ object WatchScript {
         "adb shell \"${startCommand()}\"",
     )
 
-    const val STOP_PATTERN = "[s]h /data/local/tmp/(akb-)?gemini\\.sh|[l]ogcat -b events -e CopilotPanelWindow"
+    const val STOP_PATTERN = "[s]h /data/local/tmp/(akb-)?gemini\\.sh|[l]ogcat -b events -e .*-m 1"
 
     /** Dòng "1793120047 voice" → (epoch ms, kind). */
     fun parseEvent(line: String): Pair<Long, String>? {

@@ -66,6 +66,7 @@ class WatchScriptTest {
         assertTrue(pattern.containsMatchIn(" 2031 sh /data/local/tmp/akb-gemini.sh"))
         assertTrue(pattern.containsMatchIn("29961 sh /data/local/tmp/gemini.sh"))
         assertTrue(pattern.containsMatchIn(" 1322 logcat -b events -e CopilotPanelWindow|ACTION_BUTTON_TO_START_FUNCTIONS -m 1"))
+        assertTrue(pattern.containsMatchIn(" 1450 logcat -b events -e com.miui.voiceassist -m 1"))
         // Dòng ps của chính "sh -c <stop>" và của grep không được khớp, nếu không lệnh sẽ tự giết mình.
         assertFalse(pattern.containsMatchIn("sh -c $stop"))
         assertFalse(pattern.containsMatchIn("grep -E ${WatchScript.STOP_PATTERN}"))
@@ -115,5 +116,13 @@ class WatchScriptTest {
         assertEquals(1_793_120_047_000L to "voice", WatchScript.parseEvent("1793120047 voice"))
         assertEquals(1_793_120_050_000L to "button", WatchScript.parseEvent(" 1793120050 button \n"))
         assertNull(WatchScript.parseEvent("garbage"))
+    }
+
+    @Test
+    fun multiPatternPanelFormatsValidShellCaseBranches() {
+        val multi = ShellWatch("com.heytap.speechassist|com.coloros.speechassist", null)
+        val script = WatchScript.content(multi, 231, log)
+
+        assertTrue(script.contains("*com.heytap.speechassist*|*com.coloros.speechassist*) input keyevent 4; kind=voice; sleep 0.5 ;;"))
     }
 }

@@ -6,6 +6,7 @@ import com.aikeybridge.model.LogTrigger
 import com.aikeybridge.model.OemProfile
 import com.aikeybridge.model.ProvisionStep
 import com.aikeybridge.model.RestoreStep
+import com.aikeybridge.model.ShellWatch
 import com.aikeybridge.model.TriggerSpec
 
 /** Cấu hình đang chạy: profile hãng + đích đến + trigger tự dò + tinh chỉnh của người dùng. */
@@ -21,6 +22,7 @@ data class ActiveConfig(
     val micTimeoutMs: Long,
     val cooldownMs: Long,
     val dedupe: Boolean,
+    val shellWatch: ShellWatch? = profile.shellWatch,
 ) {
     val provisioning: List<ProvisionStep> get() = target.provisioning + profile.provisioning
     val restore: List<RestoreStep> get() = target.restore + profile.restore
@@ -68,6 +70,28 @@ object ConfigResolver {
             )
         }
 
+        val customPanels = settings.customTriggers.map {
+            it.className.substringAfterLast('.').ifBlank { it.packageName }
+        }
+        val mergedPanels = (listOfNotNull(profile.shellWatch?.panel) + customPanels)
+            .flatMap { it.split('|') }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+        val mergedButtons = (listOfNotNull(profile.shellWatch?.button) + settings.customLogPatterns)
+            .flatMap { it.split('|') }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+        val resolvedShellWatch = if (mergedPanels.isNotEmpty()) {
+            ShellWatch(
+                panel = mergedPanels.joinToString("|"),
+                button = mergedButtons.takeIf { it.isNotEmpty() }?.joinToString("|"),
+            )
+        } else {
+            profile.shellWatch
+        }
+
         return ActiveConfig(
             profile = profile,
             detectedProfileId = detected?.id,
@@ -86,6 +110,7 @@ object ConfigResolver {
                 .coerceIn(MIN_MIC_TIMEOUT, MAX_MIC_TIMEOUT),
             cooldownMs = profile.cooldownMs,
             dedupe = settings.dedupe,
+            shellWatch = resolvedShellWatch,
         )
     }
 

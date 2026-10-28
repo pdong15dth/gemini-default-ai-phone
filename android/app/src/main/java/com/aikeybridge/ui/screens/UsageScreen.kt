@@ -59,16 +59,10 @@ fun UsageScreen(
     onConfirm: (UsageMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scriptAvailable = config.profile.shellWatch != null && config.target.shellKeyevent != null
-    // Chưa chọn lần nào thì gợi ý Script nền; máy không chạy được script thì về Đầy đủ.
+    val scriptAvailable = config.shellWatch != null && config.target.shellKeyevent != null
+    // Bản thuần Script nền: mặc định luôn chọn Script nền.
     var selected by rememberSaveable {
-        mutableStateOf(
-            when {
-                !chosen && scriptAvailable -> UsageMode.SCRIPT
-                current == UsageMode.SCRIPT && !scriptAvailable -> UsageMode.FULL
-                else -> current
-            },
-        )
+        mutableStateOf(if (current == UsageMode.ONE_TIME && chosen) UsageMode.ONE_TIME else UsageMode.SCRIPT)
     }
     val assistant = config.profile.assistantName
     val target = config.target.displayName
@@ -93,32 +87,17 @@ fun UsageScreen(
                 lineHeight = 20.sp,
             )
             Gap(22.dp)
-            if (scriptAvailable) {
-                ModeCard(
-                    title = "Script nền",
-                    tag = "khuyên dùng",
-                    selected = selected == UsageMode.SCRIPT,
-                    points = listOf(
-                        "$wake → $target, Micro bật sẵn",
-                        "Không cần Trợ năng · chạy bằng Shizuku",
-                        "Mất khi khởi động lại máy · bấm Bật script lại",
-                    ),
-                    cost = "Cần Shizuku (hoặc ADB) sau mỗi lần khởi động máy",
-                    onClick = { selected = UsageMode.SCRIPT },
-                )
-                Gap(12.dp)
-            }
             ModeCard(
-                title = "Đầy đủ",
-                tag = if (scriptAvailable) null else "khuyên dùng",
-                selected = selected == UsageMode.FULL,
+                title = "Script nền (Bank-Safe)",
+                tag = "khuyên dùng",
+                selected = selected == UsageMode.SCRIPT,
                 points = listOf(
-                    "$wake → $target, $assistant không còn trả lời",
-                    "Phím tắt / nút AI → $target",
-                    "Tự bấm Micro sau khi $target mở",
+                    "$wake → $target, Micro bật sẵn",
+                    "Không dùng Trợ năng · Tương thích 100% mọi app ngân hàng",
+                    "Bật xong có thể tắt luôn Gỡ lỗi / Developer Mode",
                 ),
-                cost = "Cần Trợ năng · app chạy nền nhẹ",
-                onClick = { selected = UsageMode.FULL },
+                cost = "Chạy ngầm trong RAM · bật lại sau khi khởi động lại máy",
+                onClick = { selected = UsageMode.SCRIPT },
             )
             Gap(12.dp)
             ModeCard(

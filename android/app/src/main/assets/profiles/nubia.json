@@ -21,6 +21,9 @@
       "class_regex": ".*(Activity|Window|Float|Panel).*"
     }
   ],
+  "shell_watch": {
+    "panel": "cn.nubia.voiceassist"
+  },
   "provisioning": [],
   "restore": []
 }

@@ -173,7 +173,7 @@ fun TriggersScreen(
         ) {
             if (!accessibilityOn) {
                 MonoText(
-                    "Cần bật Trợ năng để dò.",
+                    "Cần cấp quyền Shizuku để dò cửa sổ trợ lý.",
                     9.5.sp,
                     TextDim,
                     Modifier.padding(start = 2.dp, bottom = 10.dp),

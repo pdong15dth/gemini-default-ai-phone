@@ -270,14 +270,15 @@ fun HardwareScreen(
                 .navigationBarsPadding()
                 .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp),
         ) {
-            if (!permissions.readLogs) {
-                MonoText("Cần READ_LOGS để dò log.", 9.5.sp, TextDim, Modifier.padding(start = 2.dp, bottom = 10.dp))
+            val canSniff = permissions.shizukuGranted || permissions.readLogs
+            if (!canSniff) {
+                MonoText("Cần cấp quyền Shizuku hoặc READ_LOGS để dò log.", 9.5.sp, TextDim, Modifier.padding(start = 2.dp, bottom = 10.dp))
             }
             PrimaryCta(
                 text = if (sniff.active) "Dừng dò" else "Dò log trong ${AppViewModel.SNIFF_WINDOW_MS / 1000} giây",
                 onClick = if (sniff.active) onStopSniff else onStartSniff,
                 leadingIcon = if (sniff.active) R.drawable.lc_x else R.drawable.lc_scan_search,
-                enabled = permissions.readLogs || sniff.active,
+                enabled = canSniff || sniff.active,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

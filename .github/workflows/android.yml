@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, script-only]
     paths:
       - "android/**"
       - ".github/workflows/android.yml"
@@ -85,4 +85,5 @@ jobs:
             android/ai-key-bridge.apk
             android/ai-key-bridge.apk.sha256
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref, '-') }}
           fail_on_unmatched_files: true

@@ -292,7 +292,7 @@ fun ModesScreen(
     if (confirmUsage) {
         UsageModeDialog(
             current = settings.usageMode,
-            scriptAvailable = config.profile.shellWatch != null && config.target.shellKeyevent != null,
+            scriptAvailable = config.shellWatch != null && config.target.shellKeyevent != null,
             onConfirm = {
                 confirmUsage = false
                 if (it != settings.usageMode) onSetUsageMode(it)
@@ -386,9 +386,8 @@ private fun UsageModeDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 listOfNotNull(
-                    Triple(UsageMode.SCRIPT, "Script nền", "Khuyên dùng · Shizuku · không Trợ năng").takeIf { scriptAvailable },
-                    Triple(UsageMode.FULL, "Đầy đủ", "Cần Trợ năng · thay khẩu lệnh, tự bật Micro"),
-                    Triple(UsageMode.ONE_TIME, "Cấu hình một lần", "Không Trợ năng · gán phím vào lối tắt Gọi AI"),
+                    Triple(UsageMode.SCRIPT, "Script nền (Bank-Safe)", "Khuyên dùng · Shizuku · tương thích mọi app ngân hàng").takeIf { scriptAvailable },
+                    Triple(UsageMode.ONE_TIME, "Cấu hình một lần", "Không chạy nền · gán phím vào lối tắt Gọi AI"),
                 ).forEach { (mode, title, sub) ->
                     Row(
                         Modifier

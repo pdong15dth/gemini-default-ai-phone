@@ -21,6 +21,9 @@
       "class_regex": ".*(VoiceAssist|FloatWindow|FloatView|Floating|Panel).*"
     }
   ],
+  "shell_watch": {
+    "panel": "com.miui.voiceassist"
+  },
   "provisioning": [
     {
       "id": "xiaomi_bg_popup",

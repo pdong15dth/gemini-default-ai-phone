@@ -28,6 +28,9 @@
       "class_regex": ".*(SpeechAssist|FloatWindow|Floating|Breeno).*"
     }
   ],
+  "shell_watch": {
+    "panel": "com.heytap.speechassist|com.coloros.speechassist"
+  },
   "provisioning": [],
   "restore": []
 }

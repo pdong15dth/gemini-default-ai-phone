@@ -40,7 +40,7 @@ data class AppSettings(
     val dedupe: Boolean = true,
     val customTriggers: List<CustomTrigger> = emptyList(),
     val hardwareMode: HardwareMode = HardwareMode.WINDOW,
-    val usageMode: UsageMode = UsageMode.FULL,
+    val usageMode: UsageMode = UsageMode.SCRIPT,
     /** false = người dùng chưa chọn cách dùng lần nào; onboarding sẽ gợi ý Script nền nếu máy hỗ trợ. */
     val usageModeChosen: Boolean = false,
     val scriptStartedAt: Long = 0,
@@ -158,7 +158,8 @@ class SettingsRepository(context: Context) {
             ?: HardwareMode.WINDOW,
         usageMode = prefs.getString(KEY_USAGE_MODE, null)
             ?.let { name -> UsageMode.entries.firstOrNull { it.name == name } }
-            ?: UsageMode.FULL,
+            ?.let { if (it == UsageMode.FULL) UsageMode.SCRIPT else it }
+            ?: UsageMode.SCRIPT,
         usageModeChosen = prefs.contains(KEY_USAGE_MODE),
         scriptStartedAt = prefs.getLong(KEY_SCRIPT_STARTED, 0),
         customLogPatterns = prefs.getString(KEY_LOG_PATTERNS, null).orEmpty()

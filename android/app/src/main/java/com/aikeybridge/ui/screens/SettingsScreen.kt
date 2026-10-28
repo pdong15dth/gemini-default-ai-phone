@@ -169,7 +169,7 @@ fun SettingsScreen(
                     trailing = "dò",
                     onClick = onOpenTriggers,
                 )
-                if (config.profile.shellWatch != null) {
+                if (config.shellWatch != null) {
                     LaunchedEffect(Unit) { onCheckScript() }
                     val state = scriptState(scriptStatus, scriptStartedThisBoot)
                     NavRow(

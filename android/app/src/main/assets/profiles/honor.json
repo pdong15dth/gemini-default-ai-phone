@@ -28,6 +28,9 @@
       "class_regex": ".*(VAssistant|VoiceAssistant|FloatWindow|Panel).*"
     }
   ],
+  "shell_watch": {
+    "panel": "com.hihonor.magicvoice|com.huawei.vassistant"
+  },
   "provisioning": [],
   "restore": []
 }
