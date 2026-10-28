@@ -74,12 +74,25 @@ data class AssistantTarget(
     val voiceUi: VoiceUiSpec?,
     val provisioning: List<ProvisionStep>,
     val restore: List<RestoreStep>,
+    val overlayMic: OverlayMic? = null,
 ) {
     companion object {
         const val GEMINI = "gemini"
         const val CUSTOM = "custom"
     }
 }
+
+/**
+ * Nút Micro của lớp phủ mở bằng [AssistantTarget.shellKeyevent], toạ độ theo tỉ lệ màn hình dọc.
+ * Phím trợ lý 219 mở lớp phủ khoanh tròn được nhưng chưa nghe: script chạm nút này khi cửa sổ [window] có focus.
+ */
+data class OverlayMic(
+    val window: String,
+    val x: Float,
+    val y: Float,
+    /** Gói hiện lớp phủ; script dừng hẳn gói này khi nó kẹt, từ chối mọi lời gọi trợ lý. */
+    val owner: String? = null,
+)
 
 data class VoiceUiSpec(
     val windowWaitMs: Long,

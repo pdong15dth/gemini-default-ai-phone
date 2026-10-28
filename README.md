@@ -70,7 +70,7 @@ App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi tr�
 
 App biết trợ lý gốc vừa mở bằng một trong hai cách, tuỳ chế độ:
 
-- **Script nền** (khuyên dùng, không cần Trợ năng): script shell chạy bằng quyền shell của Shizuku, đọc kênh `events` của logcat và lọc đúng sự kiện `CopilotPanelWindow` / nút lối tắt. Gặp sự kiện thì bấm Back, đánh thức màn hình rồi gửi `keyevent 231` — Gemini mở thẳng chế độ nghe. Giống hệt cách trong [hướng dẫn script ADB](HUONG-DAN-SCRIPT-ADB.md), nhưng không cần máy tính.
+- **Script nền** (khuyên dùng, không cần Trợ năng): script shell chạy bằng quyền shell của Shizuku, đọc kênh `events` của logcat và lọc đúng sự kiện `CopilotPanelWindow` / nút lối tắt. Gặp sự kiện thì bấm Back, đánh thức màn hình rồi gửi `keyevent 219` — lớp phủ Gemini hiện lên như khi giữ nút nguồn, khoanh tròn để hỏi được. Giống hệt cách trong [hướng dẫn script ADB](HUONG-DAN-SCRIPT-ADB.md), nhưng không cần máy tính. Script chạy riêng bằng quyền shell nên tắt Tuỳ chọn nhà phát triển, Gỡ lỗi USB, dừng Shizuku hay vuốt tắt app đều không làm script dừng; chỉ mất khi khởi động lại máy.
 - **Đầy đủ**: **AccessibilityService** đọc *tên gói* và *tên lớp cửa sổ* vừa hiện. Khi Gemini mở, service đọc thêm tên và mô tả của các nút để tìm nút Micro rồi chạm.
 
 Cả hai đều không đọc văn bản trên màn hình, không chụp màn hình, không ghi âm. App không có quyền Internet.

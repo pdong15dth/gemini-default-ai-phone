@@ -1,7 +1,8 @@
 #!/system/bin/sh
 # "Hi Jovi" -> CopilotPanelWindow: dong panel bang Back (khong force-stop de giu service nghe).
 # Nut loi tat -> ACTION_BUTTON_TO_START_FUNCTIONS: mo Gemini truc tiep.
-# keyevent 231 (KEYCODE_VOICE_ASSIST) mo thang che do voice; 219 chi mo panel cho.
+# keyevent 219 (KEYCODE_ASSIST) nhu giu nut nguon: lop phu Gemini kem anh chup man hinh nen khoanh tron de hoi duoc.
+# 231 (KEYCODE_VOICE_ASSIST) bat Micro ngay nhung khong khoanh duoc, cham man hinh la lop phu tat.
 # sleep 0.5 de Tieu V nha han Micro (audio focus) truoc khi Gemini bat mic.
 # keyevent 224 (KEYCODE_WAKEUP) bat man hinh (khong mo khoa) de Gemini hien duoc khi dang khoa may.
 # trap: bo qua HUP/INT/TERM de rut cap USB khong giet script (xem docs/rut-cap-usb.md).
@@ -13,6 +14,6 @@ while true; do
   sleep 0.5
   input keyevent 224
   sleep 0.5
-  input keyevent 231
+  input keyevent 219
   sleep 1.5
 done

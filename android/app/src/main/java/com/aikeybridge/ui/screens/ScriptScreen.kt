@@ -29,6 +29,7 @@ import com.aikeybridge.R
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.PermissionSnapshot
 import com.aikeybridge.shell.WatchScript
+import com.aikeybridge.ui.Intents
 import com.aikeybridge.ui.ScriptStatus
 import com.aikeybridge.ui.components.BodyText
 import com.aikeybridge.ui.components.Gap
@@ -68,6 +69,8 @@ fun ScriptScreen(
     onStop: () -> Unit,
     onFinish: () -> Unit,
     onOpenSetup: () -> Unit,
+    onOpenTriggers: () -> Unit = {},
+    onRequestShizuku: () -> Unit = {},
     onMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -89,9 +92,8 @@ fun ScriptScreen(
             ScreenTitle("Script nền", size = 26.sp)
             Gap(10.dp)
             BodyText(
-                "Giống cách trong README: một script shell đọc event log, thấy ${config.profile.assistantName} " +
-                    "thì bấm Back rồi gọi ${config.target.displayName} bằng phím trợ lý. " +
-                    "Không cần Trợ năng — Shizuku thay cho máy tính.",
+                "Bản thuần Script nền — hoàn toàn không có dịch vụ Trợ năng trong APK nên dùng được mọi app ngân hàng. " +
+                    "Bấm bật một lần: app tự chạy các lệnh kích hoạt + chạy script ngầm trong RAM. Xong tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB, script vẫn chạy.",
                 13.5.sp,
                 Muted,
                 lineHeight = 20.sp,
@@ -100,10 +102,16 @@ fun ScriptScreen(
             if (scriptContent == null) {
                 Gap(16.dp)
                 BodyText(
-                    "${config.profile.displayName} chưa có script nền. Dùng chế độ Đầy đủ hoặc Một lần.",
+                    "${config.profile.displayName} chưa có mẫu cửa sổ mặc định. Bấm “Dò cửa sổ trợ lý” bên dưới để tự bắt cửa sổ bằng Shizuku.",
                     12.sp,
                     Warn,
                     lineHeight = 17.sp,
+                )
+                Gap(12.dp)
+                OutlineCta(
+                    text = "Dò cửa sổ trợ lý",
+                    onClick = onOpenTriggers,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             } else {
                 SectionLabel("Trạng thái", Modifier.padding(top = 12.dp))
@@ -127,10 +135,10 @@ fun ScriptScreen(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             BodyText(
                                 when {
-                                    status.busy -> "Đang xử lý…"
-                                    status.running == true -> "Đang chạy"
+                                    status.busy -> "Đang kích hoạt & bật script…"
+                                    status.running == true -> "Đang chạy ngầm trong RAM"
                                     status.running == false -> "Đã dừng"
-                                    startedThisBoot -> "Có lẽ đang chạy"
+                                    startedThisBoot -> "Đang chạy (đã tắt Shizuku / Gỡ lỗi)"
                                     else -> "Chưa bật từ lần khởi động máy này"
                                 },
                                 14.sp,
@@ -138,12 +146,15 @@ fun ScriptScreen(
                             )
                             MonoText(
                                 when {
+                                    status.running == true && status.detachedFromAdbd == true ->
+                                        "pid ${status.pid} · đã tách khỏi adbd · tắt Gỡ lỗi không chết"
                                     status.running == true -> "pid ${status.pid} · ${WatchScript.PATH}"
-                                    status.running == null -> "cần Shizuku để kiểm tra chính xác"
+                                    startedThisBoot -> "đã bật trong phiên khởi động này · gọi $wake để thử"
+                                    status.running == null -> "bật Shizuku để kích hoạt & khởi chạy"
                                     else -> "hô $wake sẽ vẫn mở ${config.profile.assistantName}"
                                 },
                                 9.sp,
-                                TextFaint,
+                                if (status.running == true || startedThisBoot) Accent else TextFaint,
                             )
                         }
                         if (permissions.shizukuGranted) {
@@ -160,31 +171,69 @@ fun ScriptScreen(
                     }
                 }
 
-                SectionLabel("Cần có", Modifier.padding(top = 12.dp))
+                if (status.running == true || startedThisBoot) {
+                    SectionLabel("Bước cuối · dùng app ngân hàng", Modifier.padding(top = 12.dp))
+                    Panel {
+                        NavRow(
+                            title = "Tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB",
+                            subtitle = "bắt buộc để dùng app ngân hàng · script vẫn chạy, chỉ mất khi khởi động lại máy",
+                            subColor = Warn,
+                            trailing = "mở",
+                            onClick = { Intents.openDeveloperSettings(context) },
+                            divider = false,
+                        )
+                    }
+                }
+
+                SectionLabel("Cấu hình & Cửa sổ bắt", Modifier.padding(top = 12.dp))
                 Panel {
                     NavRow(
                         title = "Google là trợ lý mặc định",
-                        subtitle = if (permissions.assistantDefault) "đã đặt" else "chưa đặt · phím trợ lý sẽ mở ${config.profile.assistantName}",
-                        subColor = if (permissions.assistantDefault) Accent else Danger,
-                        trailing = if (permissions.assistantDefault) null else "kích hoạt",
-                        onClick = if (permissions.assistantDefault) null else onOpenSetup,
+                        subtitle = if (permissions.assistantDefault) {
+                            "đã đặt"
+                        } else {
+                            "tự động đặt khi bấm Bật script nền"
+                        },
+                        subColor = if (permissions.assistantDefault) Accent else Warn,
+                        trailing = if (permissions.assistantDefault) null else "chi tiết",
+                        onClick = onOpenSetup,
+                    )
+                    // Vivo giấu trang trợ lý số khỏi Cài đặt → Ứng dụng mặc định: chỉ mở được bằng intent hệ thống.
+                    NavRow(
+                        title = "Cho ${config.target.displayName} xem màn hình",
+                        subtitle = "bật \"Dùng dữ liệu của màn hình và ứng dụng\" để khoanh tròn để hỏi",
+                        subColor = TextFaint,
+                        trailing = "mở",
+                        onClick = { Intents.openAssistantSettings(context) },
                     )
                     NavRow(
                         title = "Shizuku",
                         subtitle = when {
                             permissions.shizukuGranted -> "đã cấp quyền"
-                            permissions.shizukuRunning -> "đang chạy · chưa cấp quyền"
-                            permissions.shizukuInstalled -> "đã cài · chưa chạy"
-                            else -> "chưa cài · dùng lệnh ADB bên dưới"
+                            permissions.shizukuRunning -> "đang chạy · chạm để cấp quyền"
+                            permissions.shizukuInstalled -> "đã cài · chạm để mở Shizuku"
+                            else -> "chưa cài · chạm để tải hoặc dùng ADB bên dưới"
                         },
                         subColor = if (permissions.shizukuGranted) Accent else Warn,
-                        onClick = if (permissions.shizukuGranted) null else onOpenSetup,
+                        onClick = when {
+                            permissions.shizukuGranted -> null
+                            permissions.shizukuRunning -> onRequestShizuku
+                            else -> { { Intents.openShizuku(context) } }
+                        },
+                    )
+                    NavRow(
+                        title = "Mẫu cửa sổ (${config.profile.assistantName})",
+                        subtitle = config.shellWatch?.panel ?: "chưa có",
+                        subColor = TextFaint,
+                        trailing = "dò thêm",
+                        onClick = onOpenTriggers,
                         divider = false,
                     )
                 }
                 Gap(10.dp)
                 BodyText(
-                    "Script mất khi khởi động lại máy (Shizuku không root cũng vậy). Sau mỗi lần khởi động: bật Shizuku, mở app, bấm Bật script.",
+                    "Lưu ý: Script chạy riêng bằng quyền shell, không phụ thuộc app: tắt Tuỳ chọn nhà phát triển, Gỡ lỗi USB, dừng Shizuku, " +
+                        "vuốt tắt app hay dọn đa nhiệm đều không làm script dừng. Khởi động lại máy thì phải bật lại (cần Shizuku).",
                     11.sp,
                     TextFaint,
                     Modifier.padding(horizontal = 2.dp),
@@ -223,15 +272,29 @@ fun ScriptScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (scriptContent != null) {
+                val ctaText = when {
+                    status.busy -> "Đang kích hoạt & bật script…"
+                    !permissions.shizukuInstalled -> "Tải Shizuku"
+                    !permissions.shizukuRunning -> "Mở Shizuku"
+                    !permissions.shizukuGranted -> "Cấp quyền Shizuku"
+                    status.running == true -> "Kích hoạt & Bật lại script"
+                    else -> "Kích hoạt & Bật script nền"
+                }
+                val ctaAction: () -> Unit = when {
+                    !permissions.shizukuInstalled || !permissions.shizukuRunning -> {
+                        { Intents.openShizuku(context) }
+                    }
+                    !permissions.shizukuGranted -> onRequestShizuku
+                    else -> onStart
+                }
                 PrimaryCta(
-                    text = if (status.running == true) "Bật lại script" else "Bật script nền",
-                    onClick = onStart,
+                    text = ctaText,
+                    onClick = ctaAction,
                     modifier = Modifier.fillMaxWidth(),
                     leadingIcon = R.drawable.lc_terminal,
-                    enabled = permissions.shizukuGranted,
                     loading = status.busy,
                 )
-                if (status.running == true) {
+                if (status.running == true && permissions.shizukuGranted) {
                     OutlineCta(text = "Tắt script", onClick = onStop, modifier = Modifier.fillMaxWidth())
                 }
             }

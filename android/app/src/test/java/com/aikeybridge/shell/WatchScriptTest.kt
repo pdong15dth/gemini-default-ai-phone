@@ -19,6 +19,8 @@ class WatchScriptTest {
 
         assertTrue(script.contains("trap \"\" HUP INT TERM"))
         assertTrue(script.contains("logcat -b events -e 'CopilotPanelWindow|ACTION_BUTTON_TO_START_FUNCTIONS' -m 1"))
+        // Trợ lý gốc tự đóng cũng sinh dòng có tên cửa sổ: không được coi là vừa gọi.
+        assertTrue(script.indexOf("*\"Focus leaving\"*) continue ;;") in 0 until script.indexOf("*CopilotPanelWindow*)"))
         assertTrue(script.contains("*CopilotPanelWindow*) input keyevent 4; kind=voice; sleep 0.5 ;;"))
         assertTrue(script.contains("*) kind=button ;;"))
         assertTrue(script.contains("grep -q 'mWakefulness=Awake'"))
@@ -39,6 +41,33 @@ class WatchScriptTest {
         assertEquals("input keyevent 231", lines[esac + 2])
         // Khẩu lệnh dùng độ trễ của cấu hình.
         assertTrue(script.contains("kind=voice; sleep 0.7 ;;"))
+    }
+
+    @Test
+    fun micTapOnlyWhenOverlayHasFocus() {
+        val mic = com.aikeybridge.model.OverlayMic("FloatyActivity", 0.642f, 0.939f)
+        val script = WatchScript.content(watch, 219, log, mic = mic)
+
+        assertTrue(script.contains("set -- \$(wm size | tail -1 | sed 's/.*: //; s/x/ /')"))
+        assertTrue(script.contains("MX=\$((\$1 * 642 / 1000)); MY=\$((\$2 * 939 / 1000))"))
+        // Chạm khi lớp phủ chưa hiện là chạm vào app bên dưới (có thể là app ngân hàng); chạm lúc nó còn trượt lên
+        // là trúng ô nhập chữ. Mọi lệnh có timeout để script không kẹt rồi bỏ lỡ lần gọi sau.
+        val focused = "timeout 2 dumpsys window displays 2>/dev/null | grep -q 'mCurrentFocus=.*FloatyActivity'"
+        assertTrue(script.contains("    if $focused; then\n      sleep 0.6\n      $focused && timeout 2 input tap \$MX \$MY"))
+        // Dọn đa nhiệm giết dịch vụ trợ lý của Google: chưa thấy lớp phủ thì gửi lại phím một lần.
+        assertTrue(script.contains("[ \$i -eq 7 ] && timeout 2 input keyevent 219"))
+        // Không khai báo gói trợ lý thì không dừng app nào.
+        assertFalse(script.contains("am force-stop"))
+
+        // App Google kẹt ("Invocation source … is not enabled"): gửi lại vẫn không lên thì khởi động lại nó.
+        val owned = WatchScript.content(watch, 219, log, mic = mic.copy(owner = "com.google.android.googlequicksearchbox"))
+        assertTrue(
+            owned.contains(
+                "[ \$i -eq 14 ] && timeout 3 am force-stop com.google.android.googlequicksearchbox && sleep 1 && timeout 2 input keyevent 219",
+            ),
+        )
+        assertTrue(script.indexOf("input tap") > script.indexOf("    input keyevent 219\n  fi"))
+        assertFalse(WatchScript.content(watch, 219, log).contains("input tap"))
     }
 
     @Test
@@ -66,6 +95,7 @@ class WatchScriptTest {
         assertTrue(pattern.containsMatchIn(" 2031 sh /data/local/tmp/akb-gemini.sh"))
         assertTrue(pattern.containsMatchIn("29961 sh /data/local/tmp/gemini.sh"))
         assertTrue(pattern.containsMatchIn(" 1322 logcat -b events -e CopilotPanelWindow|ACTION_BUTTON_TO_START_FUNCTIONS -m 1"))
+        assertTrue(pattern.containsMatchIn(" 1450 logcat -b events -e com.miui.voiceassist -m 1"))
         // Dòng ps của chính "sh -c <stop>" và của grep không được khớp, nếu không lệnh sẽ tự giết mình.
         assertFalse(pattern.containsMatchIn("sh -c $stop"))
         assertFalse(pattern.containsMatchIn("grep -E ${WatchScript.STOP_PATTERN}"))
@@ -115,5 +145,13 @@ class WatchScriptTest {
         assertEquals(1_793_120_047_000L to "voice", WatchScript.parseEvent("1793120047 voice"))
         assertEquals(1_793_120_050_000L to "button", WatchScript.parseEvent(" 1793120050 button \n"))
         assertNull(WatchScript.parseEvent("garbage"))
+    }
+
+    @Test
+    fun multiPatternPanelFormatsValidShellCaseBranches() {
+        val multi = ShellWatch("com.heytap.speechassist|com.coloros.speechassist", null)
+        val script = WatchScript.content(multi, 231, log)
+
+        assertTrue(script.contains("*com.heytap.speechassist*|*com.coloros.speechassist*) input keyevent 4; kind=voice; sleep 0.5 ;;"))
     }
 }

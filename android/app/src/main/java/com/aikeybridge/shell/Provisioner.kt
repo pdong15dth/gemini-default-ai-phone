@@ -23,6 +23,13 @@ class Provisioner(
         var passed = 0
         for (step in provisioning) {
             onStep(step, StepPhase.RUNNING, "Đang chạy…")
+            // Đã đúng thì bỏ qua: chạy lại lệnh đặt vai trò trợ lý làm hệ thống giết tiến trình Google và trợ lý gốc.
+            val before = shell.exec(step.verify)
+            if (before.ok && verifyOutput(step.expect, before.stdout)) {
+                passed++
+                onStep(step, StepPhase.OK, "Đã đúng sẵn: ${before.stdout.trim().ifBlank { step.expect }}")
+                continue
+            }
             val run = shell.exec(step.command)
             if (!run.ok) {
                 val detail = run.output.ifBlank { "Lệnh trả về ${run.exitCode}" }

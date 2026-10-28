@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -48,6 +49,7 @@ import com.aikeybridge.data.UsageMode
 import com.aikeybridge.diagnostics.AttemptSummary
 import com.aikeybridge.service.RedirectState
 import com.aikeybridge.ui.Format
+import com.aikeybridge.ui.Intents
 import com.aikeybridge.ui.ScriptStatus
 import com.aikeybridge.ui.components.PrimaryCta
 import com.aikeybridge.ui.components.StatusDot
@@ -94,28 +96,22 @@ fun OverviewScreen(
     onCheckScript: () -> Unit,
     onStartScript: () -> Unit,
     onStopScript: () -> Unit,
+    onRequestShizuku: () -> Unit = {},
     onToggleRedirect: (Boolean) -> Unit,
     onToggleAutoMic: (Boolean) -> Unit,
     onToggleLockScreen: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val oneTime = settings.usageMode == UsageMode.ONE_TIME
-    val script = settings.usageMode == UsageMode.SCRIPT
+    val script = !oneTime
     val scriptOn = scriptStatus.running ?: scriptStartedThisBoot
-    if (config.profile.shellWatch != null) {
+    if (config.shellWatch != null) {
         LaunchedEffect(permissions.shizukuGranted) { onCheckScript() }
     }
     val health = when {
-        script && !permissions.assistantDefault -> Health.NEEDS_SETUP
         script -> if (scriptOn) Health.READY else Health.SCRIPT_STOPPED
         oneTime && !permissions.targetInstalled -> Health.NEEDS_PERMISSION
-        oneTime -> if (romChanged) Health.ROM_CHANGED else Health.READY
-        !settings.redirectEnabled -> Health.OFF
-        !permissions.accessibility || !permissions.targetInstalled -> Health.NEEDS_PERMISSION
-        config.triggers.isEmpty() -> Health.NO_TRIGGER
-        !permissions.assistantOk -> Health.NEEDS_SETUP
-        romChanged -> Health.ROM_CHANGED
-        else -> Health.READY
+        else -> if (romChanged) Health.ROM_CHANGED else Health.READY
     }
     val (stateText, stateColor) = when (health) {
         Health.OFF -> "Đang tắt" to TextFaint
@@ -176,7 +172,7 @@ fun OverviewScreen(
                 ) {
                     BodyText(
                         "${config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName} vẫn mở ${config.profile.assistantName} " +
-                            "ở chế độ một lần. Chuyển sang Đầy đủ để thay bằng ${config.target.displayName}.",
+                            "ở chế độ một lần. Chuyển sang Script nền để thay bằng ${config.target.displayName}.",
                         12.sp,
                         Warn,
                         Modifier.weight(1f),
@@ -216,15 +212,16 @@ fun OverviewScreen(
                 )
             }
 
-            if (config.profile.shellWatch != null) {
+            if (config.shellWatch != null) {
                 ScriptCard(
                     status = scriptStatus,
                     startedThisBoot = scriptStartedThisBoot,
-                    canControl = permissions.shizukuGranted,
+                    permissions = permissions,
                     activeMode = script,
                     onOpen = onOpenScript,
                     onStart = onStartScript,
                     onStop = onStopScript,
+                    onRequestShizuku = onRequestShizuku,
                 )
             }
 
@@ -354,13 +351,16 @@ private fun StatusRing(
 private fun ScriptCard(
     status: ScriptStatus,
     startedThisBoot: Boolean,
-    canControl: Boolean,
+    permissions: PermissionSnapshot,
     activeMode: Boolean,
     onOpen: () -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onRequestShizuku: () -> Unit,
 ) {
+    val context = LocalContext.current
     val state = scriptState(status, startedThisBoot)
+    val runningOrBoot = status.running == true || startedThisBoot
     Column(
         Modifier
             .fillMaxWidth()
@@ -368,7 +368,7 @@ private fun ScriptCard(
             .padding(bottom = 18.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(Surface)
-            .border(1.dp, if (status.running == true) Accent.copy(alpha = 0.35f) else Hairline, RoundedCornerShape(18.dp))
+            .border(1.dp, if (runningOrBoot) Accent.copy(alpha = 0.35f) else Hairline, RoundedCornerShape(18.dp))
             .clickable(role = Role.Button, onClick = onOpen)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -377,14 +377,14 @@ private fun ScriptCard(
             StatusDot(state.color, 8.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    BodyText("Script nền", 14.sp, TextMain, weight = FontWeight.Medium)
+                    BodyText("Script nền (Bank-Safe)", 14.sp, TextMain, weight = FontWeight.Medium)
                     MonoText(state.label, 9.5.sp, state.color)
                 }
                 MonoText(
                     when {
                         activeMode -> state.detail
-                        status.running == true -> "đang thay “Hi Jovi” dù chế độ đang chọn khác · ${state.detail}"
-                        else -> "như README · không cần Trợ năng · chọn trong Chế độ"
+                        status.running == true -> "đang chạy ngầm trong RAM · ${state.detail}"
+                        else -> "không cần Trợ năng · tương thích mọi app ngân hàng"
                     },
                     9.sp,
                     TextFaint,
@@ -393,10 +393,10 @@ private fun ScriptCard(
             }
             LucideIcon(R.drawable.lc_chevron_right, TextGhost, 14.dp)
         }
-        if (canControl) {
+        if (permissions.shizukuGranted) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PrimaryCta(
-                    text = if (status.running == true) "Bật lại" else "Bật script",
+                    text = if (status.running == true) "Kích hoạt & Bật lại" else "Kích hoạt & Bật script",
                     onClick = onStart,
                     modifier = Modifier.weight(1f),
                     leadingIcon = R.drawable.lc_terminal,
@@ -408,14 +408,35 @@ private fun ScriptCard(
                     OutlineCta(
                         text = "Tắt",
                         onClick = onStop,
-                        modifier = Modifier.weight(0.6f),
+                        modifier = Modifier.weight(0.5f),
                         height = 42.dp,
                         radius = 12.dp,
                     )
                 }
             }
-        } else {
-            MonoText("cần Shizuku để bật / tắt · chạm để xem lệnh ADB", 9.sp, Warn, maxLines = 2)
+        } else if (!runningOrBoot) {
+            PrimaryCta(
+                text = when {
+                    !permissions.shizukuInstalled -> "Tải Shizuku để bật Script"
+                    !permissions.shizukuRunning -> "Mở Shizuku để bật Script"
+                    else -> "Cấp quyền Shizuku"
+                },
+                onClick = {
+                    if (permissions.shizukuRunning) onRequestShizuku() else Intents.openShizuku(context)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = R.drawable.lc_terminal,
+                height = 42.dp,
+                radius = 12.dp,
+            )
+        }
+        if (runningOrBoot) {
+            MonoText(
+                "Script chạy riêng, không phụ thuộc app. Tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB để dùng app ngân hàng vẫn chạy.",
+                9.sp,
+                TextFaint,
+                maxLines = 2,
+            )
         }
     }
 }

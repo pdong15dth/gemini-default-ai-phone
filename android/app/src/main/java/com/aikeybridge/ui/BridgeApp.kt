@@ -217,6 +217,8 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onStop = viewModel::stopScript,
                         onFinish = ::finishOnboarding,
                         onOpenSetup = { onboardingStep = 3 },
+                        onOpenTriggers = { push(Overlay.TRIGGERS) },
+                        onRequestShizuku = viewModel::requestShizukuPermission,
                         onMessage = viewModel::showMessage,
                     )
                     Overlay.SCRIPT.name -> ScriptScreen(
@@ -232,6 +234,8 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onStop = viewModel::stopScript,
                         onFinish = ::pop,
                         onOpenSetup = { push(Overlay.SETUP) },
+                        onOpenTriggers = { push(Overlay.TRIGGERS) },
+                        onRequestShizuku = viewModel::requestShizukuPermission,
                         onMessage = viewModel::showMessage,
                     )
                     "onboarding:4:ONE_TIME" -> ShortcutsScreen(
@@ -285,7 +289,7 @@ fun BridgeApp(viewModel: AppViewModel) {
                         config = config,
                         customTriggers = settings.customTriggers,
                         sniffer = sniffer,
-                        accessibilityOn = permissions.accessibility,
+                        accessibilityOn = permissions.shizukuGranted || permissions.accessibility,
                         onBack = ::pop,
                         onStart = viewModel::startSniffer,
                         onStop = viewModel::stopSniffer,
@@ -388,6 +392,7 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onCheckScript = viewModel::checkScript,
                         onStartScript = viewModel::startScript,
                         onStopScript = viewModel::stopScript,
+                        onRequestShizuku = viewModel::requestShizukuPermission,
                         onToggleRedirect = viewModel::setRedirectEnabled,
                         onToggleAutoMic = viewModel::setAutoMic,
                         onToggleLockScreen = viewModel::setLockScreen,
