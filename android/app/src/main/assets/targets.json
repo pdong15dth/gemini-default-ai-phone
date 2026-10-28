@@ -50,10 +50,10 @@
         {
           "id": "screen_context",
           "title": "Cho Gemini xem màn hình",
-          "detail": "Bật \"Dùng dữ liệu của màn hình và ứng dụng\" của trợ lý mặc định — tắt thì lớp phủ Gemini không khoanh tròn để hỏi được.",
+          "detail": "Bật \"Dùng dữ liệu của màn hình và ứng dụng\" của trợ lý mặc định — tắt thì lớp phủ Gemini không khoanh tròn để hỏi được. Chưa từng đặt (null) nghĩa là đang bật theo mặc định.",
           "command": "settings put secure assist_structure_enabled 1; settings put secure assist_screenshot_enabled 1",
-          "verify": "echo $(settings get secure assist_structure_enabled)$(settings get secure assist_screenshot_enabled)",
-          "expect": "11",
+          "verify": "case \"$(settings get secure assist_structure_enabled) $(settings get secure assist_screenshot_enabled)\" in *0*) echo off ;; *) echo on ;; esac",
+          "expect": "on",
           "hint": "Muốn tắt lại: Cài đặt → Ứng dụng mặc định → Trợ lý số → Dùng dữ liệu của màn hình và ứng dụng."
         },
         {

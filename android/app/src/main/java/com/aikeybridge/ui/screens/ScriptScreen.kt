@@ -198,6 +198,14 @@ fun ScriptScreen(
                         trailing = if (permissions.assistantDefault) null else "chi tiết",
                         onClick = onOpenSetup,
                     )
+                    // Vivo giấu trang trợ lý số khỏi Cài đặt → Ứng dụng mặc định: chỉ mở được bằng intent hệ thống.
+                    NavRow(
+                        title = "Cho ${config.target.displayName} xem màn hình",
+                        subtitle = "bật \"Dùng dữ liệu của màn hình và ứng dụng\" để khoanh tròn để hỏi",
+                        subColor = TextFaint,
+                        trailing = "mở",
+                        onClick = { Intents.openAssistantSettings(context) },
+                    )
                     NavRow(
                         title = "Shizuku",
                         subtitle = when {
