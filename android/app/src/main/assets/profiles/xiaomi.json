@@ -12,7 +12,7 @@
   ],
   "cooldown_ms": 1600,
   "dismiss_delay_ms": 550,
-  "autostart_hint": "Bảo mật → Ứng dụng → Quyền → Tự khởi chạy → bật AI Key Bridge, rồi khóa app trong đa nhiệm.",
+  "autostart_hint": "Bảo mật → Ứng dụng → Quyền → Tự khởi chạy → bật AI Key Bridge. Vào thêm Quyền khác của AI Key Bridge → bật “Mở cửa sổ mới khi chạy trong nền” và “Hiển thị trên Màn hình khóa”.",
   "triggers": [
     {
       "id": "xiaoai_panel",
@@ -21,6 +21,23 @@
       "class_regex": ".*(VoiceAssist|FloatWindow|FloatView|Floating|Panel).*"
     }
   ],
-  "provisioning": [],
-  "restore": []
+  "provisioning": [
+    {
+      "id": "xiaomi_bg_popup",
+      "title": "Cho AI Key Bridge mở cửa sổ từ nền (HyperOS)",
+      "detail": "Cấp quyền mở cửa sổ mới khi chạy nền (op 10021), hiển thị trên màn hình khóa (op 10020) và SYSTEM_ALERT_WINDOW trên MIUI/HyperOS.",
+      "command": "appops set com.aikeybridge 10020 allow 2>/dev/null; appops set com.aikeybridge 10021 allow 2>/dev/null; appops set com.google.android.apps.bard 10020 allow 2>/dev/null; appops set com.google.android.apps.bard 10021 allow 2>/dev/null; cmd appops set com.aikeybridge SYSTEM_ALERT_WINDOW allow",
+      "verify": "cmd appops get com.aikeybridge SYSTEM_ALERT_WINDOW",
+      "expect": "allow",
+      "hint": "Trên HyperOS: vào Cài đặt → Ứng dụng → AI Key Bridge → Quyền khác → bật “Mở cửa sổ mới khi chạy trong nền” và “Hiển thị trên Màn hình khóa”."
+    }
+  ],
+  "restore": [
+    {
+      "id": "restore_xiaomi_bg_popup",
+      "title": "Trả quyền overlay của AI Key Bridge",
+      "command": "cmd appops reset com.aikeybridge SYSTEM_ALERT_WINDOW",
+      "hint": "Bỏ qua nếu chưa cấp."
+    }
+  ]
 }

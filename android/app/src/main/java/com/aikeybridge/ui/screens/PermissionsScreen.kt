@@ -177,6 +177,18 @@ fun PermissionsScreen(
                 )
                 Gap(10.dp)
             }
+            if (config.profile.oem == "xiaomi") {
+                MonoText(
+                    "Trên HyperOS: chạm vào đây để mở Quyền khác của AI Key Bridge → bật “Mở cửa sổ mới khi chạy trong nền” và “Hiển thị trên Màn hình khóa” (bắt buộc để mở ${config.target.displayName}).",
+                    9.5.sp,
+                    Accent,
+                    maxLines = 4,
+                    modifier = Modifier
+                        .clickable(role = Role.Button) { Intents.openMiuiOtherPermissions(context) }
+                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                )
+                Gap(10.dp)
+            }
             if (!permissions.accessibility) {
                 MonoText(
                     "Nút Trợ năng bị mờ? Thông tin ứng dụng → ⋮ → Cho phép cài đặt bị hạn chế, rồi bật lại.",

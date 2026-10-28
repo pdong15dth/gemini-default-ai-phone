@@ -691,10 +691,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         exporting = true
         refreshPermissions()
         val snapshot = _permissions.value
-        if (snapshot.shizukuGranted) _message.value = "Đang gom log hệ thống qua Shizuku…"
+        _message.value = if (snapshot.shizukuGranted) {
+            "Đang gom log hệ thống qua Shizuku…"
+        } else {
+            "Đang đóng gói log chẩn đoán…"
+        }
         viewModelScope.launch {
             try {
-                val report = if (snapshot.shizukuGranted) collectShellReport() else null
+                val report = if (snapshot.shizukuGranted) {
+                    runCatching { collectShellReport() }.getOrNull()
+                } else {
+                    null
+                }
                 val file = withContext(Dispatchers.IO) {
                     Diagnostics.export(
                         context = app,
@@ -706,6 +714,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 _exportFile.value = file
+            } catch (throwable: Throwable) {
+                Diagnostics.error("export", "Xuất log lỗi: ${throwable.message ?: throwable}")
+                _message.value = "Không tạo được file log: ${throwable.message ?: throwable.javaClass.simpleName}"
             } finally {
                 exporting = false
             }
@@ -716,6 +727,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Trạng thái hệ thống và logcat toàn máy, đọc bằng quyền shell của Shizuku. */
     private suspend fun collectShellReport(): Diagnostics.ShellReport {
+        val probe = shell.exec("id")
+        if (probe.exitCode == -1) {
+            Diagnostics.warn("export", "Bỏ qua log hệ thống vì Shizuku lỗi: ${probe.output}")
+            return Diagnostics.ShellReport(
+                sections = listOf("Shizuku shell" to "Không chạy được lệnh qua Shizuku: ${probe.output}"),
+                logcatGz = null,
+                logcatText = null,
+            )
+        }
         val pkg = app.packageName
         val active = config.value
         val commands = buildList {
@@ -757,15 +777,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 add("settings $ns" to "settings list $ns | grep -viE '$SETTINGS_PRIVATE'")
             }
         }
-        val sections = commands.map { (title, command) ->
+        val sections = mutableListOf<Pair<String, String>>()
+        for ((title, command) in commands) {
             val result = shell.exec(command)
-            title to "$ $command\n${result.output.ifBlank { "(trống, exit ${result.exitCode})" }}"
+            sections += title to "$ $command\n${result.output.ifBlank { "(trống, exit ${result.exitCode})" }}"
+            if (result.exitCode == -1) break
         }
         // Log toàn máy ~2MB vượt giới hạn binder, nên nén gzip + base64 bên shell rồi giải nén ở đây.
         val buffers = "-b main -b system -b crash -b events"
         val gz = shell.exec("logcat -d -v threadtime $buffers | gzip -c | base64 -w 0")
         val logcatGz = if (gz.ok) runCatching { android.util.Base64.decode(gz.stdout.trim(), android.util.Base64.DEFAULT) }.getOrNull()?.takeIf { it.isNotEmpty() } else null
-        val logcatText = if (logcatGz == null) {
+        val logcatText = if (logcatGz == null && gz.exitCode != -1) {
             shell.exec("logcat -d -v threadtime $buffers -t 3000").takeIf { it.ok }?.stdout
         } else {
             null

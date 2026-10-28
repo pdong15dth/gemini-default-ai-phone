@@ -3,11 +3,14 @@ package com.aikeybridge.shell
 import android.content.ComponentName
 import android.content.Context
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.IBinder
 import com.aikeybridge.BuildConfig
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -37,6 +40,9 @@ class ShizukuShell(private val context: Context) : ShellRunner {
     @Volatile
     private var service: IShellService? = null
 
+    @Volatile
+    private var userServiceBlocked: Boolean = false
+
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             service = if (binder != null && binder.pingBinder()) {
@@ -44,6 +50,7 @@ class ShizukuShell(private val context: Context) : ShellRunner {
             } else {
                 null
             }
+            if (service != null) userServiceBlocked = false
             pending.getAndSet(null)?.let { continuation ->
                 if (continuation.isActive) continuation.resume(service != null)
             }
@@ -63,22 +70,73 @@ class ShizukuShell(private val context: Context) : ShellRunner {
         .version(BuildConfig.VERSION_CODE)
 
     override suspend fun exec(command: String): ShellResult = withContext(Dispatchers.IO) {
-        try {
-            if (!ensureBound()) {
-                return@withContext ShellResult(-1, "", "Chưa kết nối được Shizuku.")
+        if (!isShizukuReady()) {
+            return@withContext ShellResult(-1, "", "Chưa kết nối được Shizuku.")
+        }
+        // Trên Vivo OriginOS: dùng UserService như cũ.
+        // Trên Xiaomi HyperOS (hoặc ROM chặn app_process callback của UserService): khi bind thất bại
+        // sẽ tự chuyển sang IShizukuService.newProcess và nhớ trạng thái này cho các lệnh kế tiếp.
+        if (!userServiceBlocked) {
+            try {
+                if (ensureBound()) {
+                    val raw = withTimeoutOrNull(COMMAND_TIMEOUT_MS) {
+                        service?.exec(command)
+                    }
+                    if (raw != null) return@withContext parse(raw)
+                    return@withContext ShellResult(-1, "", "Lệnh quá thời gian (${COMMAND_TIMEOUT_MS / 1000}s).")
+                } else {
+                    userServiceBlocked = true
+                }
+            } catch (_: Throwable) {
+                service = null
+                userServiceBlocked = true
             }
-            val raw = service?.exec(command)
-                ?: return@withContext ShellResult(-1, "", "UserService đã ngắt kết nối.")
-            parse(raw)
+        }
+
+        execViaNewProcess(command)
+            ?: ShellResult(-1, "", "Chưa kết nối được Shizuku.")
+    }
+
+    private fun isShizukuReady(): Boolean = runCatching {
+        !Shizuku.isPreV11() &&
+            Shizuku.pingBinder() &&
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+    }.getOrDefault(false)
+
+    private suspend fun execViaNewProcess(command: String): ShellResult? {
+        val method = newProcessMethod ?: return null
+        val process = try {
+            method.invoke(null, arrayOf("sh", "-c", command), null, null) as? Process
+        } catch (_: Throwable) {
+            null
+        } ?: return null
+
+        return try {
+            runCatching { process.outputStream.close() }
+            withTimeoutOrNull(COMMAND_TIMEOUT_MS) {
+                coroutineScope {
+                    val outDeferred = async(Dispatchers.IO) {
+                        runCatching { process.inputStream.bufferedReader().use { it.readText() } }.getOrDefault("")
+                    }
+                    val errDeferred = async(Dispatchers.IO) {
+                        runCatching { process.errorStream.bufferedReader().use { it.readText() } }.getOrDefault("")
+                    }
+                    val exit = process.waitFor()
+                    ShellResult(exit, outDeferred.await(), errDeferred.await())
+                }
+            } ?: run {
+                runCatching { process.destroy() }
+                ShellResult(-1, "", "Lệnh quá thời gian (${COMMAND_TIMEOUT_MS / 1000}s).")
+            }
         } catch (throwable: Throwable) {
-            service = null
+            runCatching { process.destroy() }
             ShellResult(-1, "", throwable.message ?: throwable.toString())
         }
     }
 
     suspend fun ensureBound(): Boolean = mutex.withLock {
         if (service != null) return@withLock true
-        withTimeoutOrNull(TIMEOUT_MS) {
+        withTimeoutOrNull(BIND_TIMEOUT_MS) {
             suspendCancellableCoroutine { continuation ->
                 pending.set(continuation)
                 continuation.invokeOnCancellation {
@@ -98,6 +156,7 @@ class ShizukuShell(private val context: Context) : ShellRunner {
 
     fun close() {
         service = null
+        userServiceBlocked = false
         runCatching { Shizuku.unbindUserService(args, connection, true) }
     }
 
@@ -113,6 +172,18 @@ class ShizukuShell(private val context: Context) : ShellRunner {
     }
 
     private companion object {
-        const val TIMEOUT_MS = 6_000L
+        const val BIND_TIMEOUT_MS = 3_500L
+        const val COMMAND_TIMEOUT_MS = 8_000L
+
+        val newProcessMethod by lazy {
+            runCatching {
+                Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java,
+                ).apply { isAccessible = true }
+            }.getOrNull()
+        }
     }
 }
