@@ -3,6 +3,7 @@ package com.aikeybridge.diagnostics
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
+import android.provider.Settings
 import com.aikeybridge.BuildConfig
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.AppSettings
@@ -88,6 +89,9 @@ object Diagnostics {
         }
     }
 
+    private fun globalSetting(context: Context, name: String): String =
+        runCatching { Settings.Global.getString(context.contentResolver, name) }.getOrNull() ?: "null"
+
     private fun fullTime(at: Long): String =
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date(at))
 
@@ -168,6 +172,8 @@ object Diagnostics {
                 "settings.txt",
                 buildString {
                     appendLine("redirectEnabled=${settings.redirectEnabled}")
+                    appendLine("usageMode=${settings.usageMode}")
+                    appendLine("hardwareMode=${settings.hardwareMode}")
                     appendLine("autoMic=${settings.autoMic}")
                     appendLine("lockScreen=${settings.lockScreen}")
                     appendLine("manualAutostart=${settings.manualAutostart}")
@@ -185,6 +191,11 @@ object Diagnostics {
                     appendLine("nativeAssistantInstalled=${permissions.nativeAssistantInstalled}")
                     appendLine("shizuku=installed:${permissions.shizukuInstalled} running:${permissions.shizukuRunning} granted:${permissions.shizukuGranted}")
                     appendLine("readLogs=${permissions.readLogs}")
+                    appendLine()
+                    // Đọc thẳng Settings.Global, không cần Shizuku — vẫn có khi Gỡ lỗi đã tắt và Shizuku đã chết.
+                    appendLine("developerOptions=${globalSetting(context, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED)}")
+                    appendLine("adbEnabled=${globalSetting(context, Settings.Global.ADB_ENABLED)}")
+                    appendLine("adbWifiEnabled=${globalSetting(context, "adb_wifi_enabled")}")
                 },
             )
             historyDir?.let { dir ->

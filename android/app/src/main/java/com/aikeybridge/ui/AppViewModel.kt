@@ -209,21 +209,41 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val status = shell.exec(WatchScript.statusCommand())
             val running = status.stdout.isNotBlank()
             if (running) settingsRepository.setScriptStartedAt(System.currentTimeMillis())
+            val pid = status.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty()
             _script.value = ScriptStatus(
                 running = running,
                 busy = false,
-                pid = status.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty(),
+                pid = pid,
             )
             Diagnostics.log(
                 if (running) Diagnostics.Level.SUCCESS else Diagnostics.Level.ERROR,
                 "script",
                 if (running) "Script nền đang chạy (${WatchScript.PATH})." else "Script nền không chạy được.",
             )
+            if (running && pid.isNotEmpty()) logScriptCgroup(pid)
             _message.value = if (running) {
                 "Script nền đang chạy. Hô “${config.value.profile.wakePhrase ?: config.value.profile.assistantName}” để thử."
             } else {
                 "Script không chạy được — xem Nhật ký."
             }
+        }
+    }
+
+    /** Script còn trong nhóm tiến trình của adbd thì tắt Gỡ lỗi sẽ giết nó — ghi lại để đọc log biết ngay. */
+    private suspend fun logScriptCgroup(pid: String) {
+        val result = shell.exec(WatchScript.cgroupCommand(pid))
+        if (!result.ok || result.stdout.isBlank()) {
+            Diagnostics.warn("script", "Không đọc được cgroup của script (pid $pid): ${result.output}")
+            return
+        }
+        val groups = WatchScript.processGroups(result.stdout)
+        if (groups.isEmpty()) {
+            Diagnostics.success("script", "Script đã ra nhóm gốc · tắt Gỡ lỗi không làm script dừng.")
+        } else {
+            Diagnostics.warn(
+                "script",
+                "Script vẫn trong nhóm tiến trình ${groups.joinToString()} · tắt Gỡ lỗi có thể làm script dừng.",
+            )
         }
     }
 
@@ -705,6 +725,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             add("Appops $pkg" to "cmd appops get $pkg")
             add("Whitelist pin" to "dumpsys deviceidle whitelist | grep -iE '$pkg|vivo.agent|copilot|googlequicksearchbox|bard'")
             add("Tiến trình liên quan" to "ps -A -o PID,USER,NAME | grep -iE 'aikeybridge|shizuku|vivo.agent|copilot|bard|googlequicksearch'")
+            add(
+                "Gỡ lỗi" to "echo dev=\$(settings get global development_settings_enabled) " +
+                    "adb=\$(settings get global adb_enabled) adb_wifi=\$(settings get global adb_wifi_enabled) " +
+                    "adbd=\$(getprop init.svc.adbd)",
+            )
+            // Tiến trình còn trong nhóm uid_X/pid_Y của adbd sẽ chết khi tắt Gỡ lỗi.
+            add(
+                "Cgroup script nền / Shizuku" to "ps -A -o PID,ARGS | grep -E '[a]kb-gemini.sh|[s]hizuku_server' | " +
+                    "while read pid rest; do echo \"== \$pid \$rest\"; cat /proc/\$pid/cgroup; done; " +
+                    "ls -l ${WatchScript.ESCAPE_CGROUPS.split(' ').joinToString(" ") { "$it/cgroup.procs" }}",
+            )
             active.provisioning.forEach { add("Kiểm tra: ${it.title}" to it.verify) }
             add("dumpsys accessibility" to "dumpsys accessibility")
         }
