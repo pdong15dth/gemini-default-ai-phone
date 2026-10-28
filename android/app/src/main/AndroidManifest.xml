@@ -3,6 +3,13 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Script nền chạy trong app: foreground service đọc event log, tự bật lại sau khi khởi động máy. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Mở trợ lý từ nền; cấp bằng appops qua Shizuku/ADB, không hiện lớp phủ nào. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Chế độ nút cứng B: chỉ có hiệu lực khi cấp qua `pm grant` bằng Shizuku/ADB. -->
     <uses-permission
         android:name="android.permission.READ_LOGS"
@@ -27,6 +34,9 @@
         </intent>
         <intent>
             <action android:name="android.intent.action.ASSIST" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VOICE_COMMAND" />
         </intent>
     </queries>
 
@@ -86,6 +96,24 @@
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@style/Theme.AIKeyBridge.Trigger" />
+
+        <service
+            android:name=".service.WatchService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Đọc event log để thay trợ lý gốc bằng trợ lý người dùng chọn khi gọi bằng giọng nói hoặc nút cứng." />
+        </service>
+
+        <receiver
+            android:name=".service.WatchBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"

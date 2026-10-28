@@ -31,6 +31,22 @@ object AssistantLauncher {
         return launchPackage(context, target)
     }
 
+    /**
+     * Mở thẳng chế độ nghe (VOICE_COMMAND) của đích nếu app đó nhận, không thì như [launch].
+     * Dùng khi không có Shizuku để gửi phím trợ lý.
+     */
+    fun launchVoice(context: Context, target: AssistantTarget): LaunchOutcome {
+        for (pkg in target.packages) {
+            val voice = Intent(Intent.ACTION_VOICE_COMMAND)
+                .setPackage(pkg)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (voice.resolveActivity(context.packageManager) == null) continue
+            val started = runCatching { context.startActivity(voice) }.isSuccess
+            if (started) return LaunchOutcome(true, "VOICE_COMMAND → $pkg")
+        }
+        return launch(context, target)
+    }
+
     private fun launchPackage(context: Context, target: AssistantTarget): LaunchOutcome {
         for (pkg in target.packages) {
             val intent = context.packageManager.getLaunchIntentForPackage(pkg) ?: continue

@@ -43,17 +43,22 @@ object WatchScript {
             appendLine("    $panelCase) input keyevent 4; kind=voice; sleep $dismiss ;;")
             appendLine("    *) kind=button ;;")
             appendLine("  esac")
-            appendLine("  if dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then")
-            appendLine("    input keyevent $keyevent")
-            appendLine("  else")
-            appendLine("    input keyevent 224")
-            appendLine("    sleep 0.5")
-            appendLine("    input keyevent $keyevent")
-            appendLine("  fi")
+            appendLine("  ${assistCommand(keyevent)}")
             appendLine("  echo \"\$(date +%s) \$kind\" >> \"\$LOG\" 2>/dev/null")
             appendLine("  sleep 1.5")
             appendLine("done")
         }
+    }
+
+    /** Đánh thức màn hình nếu đang tắt (224) rồi gửi phím trợ lý; giống hệt thân vòng lặp của script. */
+    fun assistCommand(keyevent: Int): String =
+        "if dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then input keyevent $keyevent; " +
+            "else input keyevent 224; sleep 0.5; input keyevent $keyevent; fi"
+
+    /** Một lượt của script, để app gọi qua Shizuku khi tự nghe event log: khẩu lệnh thì Back đóng trợ lý gốc trước. */
+    fun fireCommand(voice: Boolean, keyevent: Int, dismissDelayMs: Long): String {
+        val dismiss = if (voice) "input keyevent 4; sleep ${seconds(dismissDelayMs)}; " else ""
+        return dismiss + assistCommand(keyevent)
     }
 
     /** 500 → "0.5" cho lệnh sleep của toybox. */

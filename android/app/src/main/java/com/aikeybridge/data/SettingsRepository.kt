@@ -17,7 +17,8 @@ enum class HardwareMode { WINDOW, LOGCAT }
 
 /**
  * FULL: Trợ năng chạy nền để thay "Hi Jovi".
- * SCRIPT: script shell nền qua Shizuku (như README), không cần Trợ năng, mất sau khi khởi động lại máy.
+ * SCRIPT: app tự đọc event log (READ_LOGS cấp một lần qua Shizuku/ADB), không cần Trợ năng,
+ *   vẫn chạy khi tắt Gỡ lỗi và tự bật lại sau khi khởi động máy.
  * ONE_TIME: chỉ cấu hình một lần + gán phím/lối tắt.
  */
 enum class UsageMode { FULL, SCRIPT, ONE_TIME }
@@ -43,7 +44,7 @@ data class AppSettings(
     val usageMode: UsageMode = UsageMode.SCRIPT,
     /** false = người dùng chưa chọn cách dùng lần nào; onboarding sẽ gợi ý Script nền nếu máy hỗ trợ. */
     val usageModeChosen: Boolean = false,
-    val scriptStartedAt: Long = 0,
+    val watchEnabled: Boolean = false,
     val customLogPatterns: List<String> = emptyList(),
     val provisionedFingerprint: String? = null,
     val lastRomCheckAt: Long = 0,
@@ -108,7 +109,7 @@ class SettingsRepository(context: Context) {
 
     fun setUsageMode(mode: UsageMode) = edit { putString(KEY_USAGE_MODE, mode.name) }
 
-    fun setScriptStartedAt(at: Long) = edit { putLong(KEY_SCRIPT_STARTED, at) }
+    fun setWatchEnabled(value: Boolean) = edit { putBoolean(KEY_WATCH_ENABLED, value) }
 
     fun addLogPattern(pattern: String) {
         val current = _state.value.customLogPatterns
@@ -161,7 +162,7 @@ class SettingsRepository(context: Context) {
             ?.let { if (it == UsageMode.FULL) UsageMode.SCRIPT else it }
             ?: UsageMode.SCRIPT,
         usageModeChosen = prefs.contains(KEY_USAGE_MODE),
-        scriptStartedAt = prefs.getLong(KEY_SCRIPT_STARTED, 0),
+        watchEnabled = prefs.getBoolean(KEY_WATCH_ENABLED, false),
         customLogPatterns = prefs.getString(KEY_LOG_PATTERNS, null).orEmpty()
             .lines()
             .filter { it.isNotBlank() },
@@ -200,7 +201,7 @@ class SettingsRepository(context: Context) {
         const val KEY_CUSTOM_TRIGGERS = "custom_triggers"
         const val KEY_HARDWARE_MODE = "hardware_mode"
         const val KEY_USAGE_MODE = "usage_mode"
-        const val KEY_SCRIPT_STARTED = "script_started_at"
+        const val KEY_WATCH_ENABLED = "watch_enabled"
         const val KEY_LOG_PATTERNS = "custom_log_patterns"
         const val KEY_FINGERPRINT = "provisioned_fingerprint"
         const val KEY_ROM_CHECK = "last_rom_check"
