@@ -24,6 +24,9 @@ object WatchScript {
             appendLine("#!/system/bin/sh")
             appendLine("# AI Key Bridge — script nền (Shizuku/ADB). Bỏ qua HUP/INT/TERM để rút cáp không chết.")
             appendLine("trap \"\" HUP INT TERM")
+            appendLine("# Tắt Gỡ lỗi / Tuỳ chọn nhà phát triển thì init dừng adbd và giết cả nhóm tiến trình (cgroup) của nó.")
+            appendLine("# Chuyển sang nhóm gốc như Shizuku, logcat/input sinh ra sau đó cũng nằm ngoài nhóm của adbd.")
+            appendLine("for cg in $ESCAPE_CGROUPS; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
             appendLine("LOG='$eventLog'")
             appendLine("while true; do")
             appendLine("  logcat -b events -c")
@@ -70,6 +73,20 @@ object WatchScript {
 
     /** In ra "pid args" nếu script đang chạy; rỗng nếu không. */
     fun statusCommand(): String = "ps -A -o PID,ARGS | grep '[a]kb-gemini.sh'"
+
+    /** Cây cgroup gốc mà script thử chuyển vào, cùng danh sách với starter của Shizuku. */
+    const val ESCAPE_CGROUPS = "/sys/fs/cgroup /acct /dev/cg2_bpf"
+
+    fun cgroupCommand(pid: String): String = "cat /proc/$pid/cgroup"
+
+    /**
+     * Các dòng /proc/<pid>/cgroup còn nằm trong nhóm tiến trình "uid_X/pid_Y" — nhóm init giết cả cụm
+     * khi dừng adbd. Rỗng nghĩa là đã ra nhóm gốc, tắt Gỡ lỗi không kéo script chết theo.
+     */
+    fun processGroups(cgroup: String): List<String> =
+        cgroup.lines().map { it.trim() }.filter { PROCESS_GROUP.containsMatchIn(it) }
+
+    private val PROCESS_GROUP = Regex("/uid_\\d+/pid_\\d+")
 
     fun adbCommands(script: String): List<String> = listOf(
         "adb shell \"${installCommand(script)}\"",

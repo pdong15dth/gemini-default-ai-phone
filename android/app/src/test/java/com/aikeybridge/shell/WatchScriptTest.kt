@@ -80,6 +80,28 @@ class WatchScriptTest {
     }
 
     @Test
+    fun scriptLeavesAdbdProcessGroupBeforeSpawningChildren() {
+        val lines = WatchScript.content(watch, 231, log).lines().map { it.trim() }
+        val escape = lines.indexOf(
+            "for cg in /sys/fs/cgroup /acct /dev/cg2_bpf; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done",
+        )
+
+        assertTrue(escape > 0)
+        assertTrue(escape < lines.indexOf("while true; do"))
+    }
+
+    @Test
+    fun detectsProcessGroupOfAdbd() {
+        assertEquals(listOf("0::/uid_0/pid_1834"), WatchScript.processGroups("0::/uid_0/pid_1834\n"))
+        assertEquals(
+            listOf("1:cpuacct:/uid_2000/pid_771"),
+            WatchScript.processGroups("1:cpuacct:/uid_2000/pid_771\n0::/\n"),
+        )
+        assertTrue(WatchScript.processGroups("0::/\n").isEmpty())
+        assertTrue(WatchScript.processGroups("0::/system\n").isEmpty())
+    }
+
+    @Test
     fun parsesEventLines() {
         assertEquals(1_793_120_047_000L to "voice", WatchScript.parseEvent("1793120047 voice"))
         assertEquals(1_793_120_050_000L to "button", WatchScript.parseEvent(" 1793120050 button \n"))
