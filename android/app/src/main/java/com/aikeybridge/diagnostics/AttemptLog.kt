@@ -126,13 +126,24 @@ object AttemptLog {
                 val loaded = runCatching {
                     if (target.exists()) target.readLines().mapNotNull(::decode) else emptyList()
                 }.getOrDefault(emptyList())
-                _attempts.update { current -> (loaded + current).takeLast(MAX_ATTEMPTS) }
+                _attempts.update { current ->
+                    (loaded + current)
+                        .distinctBy { Triple(it.at, it.flow, it.detail) }
+                        .takeLast(MAX_ATTEMPTS)
+                }
+                persist()
             }
         }
     }
 
     fun record(attempt: Attempt) {
-        _attempts.update { (it + attempt).takeLast(MAX_ATTEMPTS) }
+        _attempts.update { current ->
+            if (current.lastOrNull()?.let { it.at == attempt.at && it.flow == attempt.flow && it.detail == attempt.detail } == true) {
+                current
+            } else {
+                (current + attempt).takeLast(MAX_ATTEMPTS)
+            }
+        }
         persist()
     }
 

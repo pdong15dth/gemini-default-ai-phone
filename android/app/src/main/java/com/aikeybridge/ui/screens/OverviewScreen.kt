@@ -225,6 +225,46 @@ fun OverviewScreen(
                 )
             }
 
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 18.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Surface)
+                    .border(
+                        1.dp,
+                        if (permissions.ready) Hairline else Warn.copy(alpha = 0.45f),
+                        RoundedCornerShape(16.dp),
+                    )
+                    .clickable(role = Role.Button, onClick = onOpenPermissions)
+                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusDot(if (permissions.ready) Accent else Warn, 7.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    BodyText(
+                        "Quyền & Hướng dẫn bằng ảnh",
+                        13.5.sp,
+                        TextMain,
+                        weight = FontWeight.Medium,
+                    )
+                    MonoText(
+                        if (permissions.ready) {
+                            "đạt ${permissions.coreGrantedCount}/${permissions.coreTotalCount} mục cốt lõi · chạm để mở cài đặt hoặc xem ảnh"
+                        } else {
+                            "đạt ${permissions.coreGrantedCount}/${permissions.coreTotalCount} mục · chạm để mở thẳng cài đặt & xem ảnh hướng dẫn"
+                        },
+                        9.sp,
+                        if (permissions.ready) TextFaint else Warn,
+                        maxLines = 2,
+                    )
+                }
+                MonoText("ảnh HD", 9.5.sp, Accent)
+                LucideIcon(R.drawable.lc_chevron_right, TextGhost, 14.dp)
+            }
+
             SectionLabel(
                 "Chế độ",
                 Modifier.padding(horizontal = 24.dp),
@@ -315,6 +355,8 @@ private fun StatusRing(
                 .semantics { contentDescription = "Trạng thái: $stateText" },
             contentAlignment = Alignment.Center,
         ) {
+            val ringBase = RingBase
+            val ink = Ink
             Canvas(Modifier.size(262.dp)) {
                 drawCircle(
                     Brush.radialGradient(
@@ -325,10 +367,10 @@ private fun StatusRing(
                     ),
                 )
                 val ringRadius = 116.dp.toPx()
-                drawCircle(RingBase, radius = ringRadius, style = Stroke(width = 1.5.dp.toPx()))
+                drawCircle(ringBase, radius = ringRadius, style = Stroke(width = 1.5.dp.toPx()))
                 rotate(angle) {
                     val dot = Offset(center.x, center.y - ringRadius)
-                    drawCircle(Ink, radius = 13.dp.toPx(), center = dot)
+                    drawCircle(ink, radius = 13.dp.toPx(), center = dot)
                     drawCircle(stateColor, radius = 5.dp.toPx(), center = dot)
                 }
             }

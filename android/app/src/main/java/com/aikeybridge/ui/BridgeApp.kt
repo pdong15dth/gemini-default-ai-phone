@@ -121,14 +121,14 @@ fun BridgeApp(viewModel: AppViewModel) {
         }
     }
 
-    BackHandler(enabled = !onboarding && stack.isNotEmpty()) { pop() }
-    BackHandler(enabled = onboarding && onboardingStep > 0) { onboardingStep-- }
+    BackHandler(enabled = stack.isNotEmpty()) { pop() }
+    BackHandler(enabled = onboarding && stack.isEmpty() && onboardingStep > 0) { onboardingStep-- }
     BackHandler(enabled = !onboarding && stack.isEmpty() && tab != TAB_OVERVIEW) { tab = TAB_OVERVIEW }
 
     val screen = when {
+        stack.isNotEmpty() -> stack.last()
         onboarding && onboardingStep >= 3 -> "onboarding:$onboardingStep:${settings.usageMode.name}"
         onboarding -> "onboarding:$onboardingStep"
-        stack.isNotEmpty() -> stack.last()
         else -> "tab:$tab"
     }
 
@@ -177,7 +177,7 @@ fun BridgeApp(viewModel: AppViewModel) {
                             onboardingStep = 3
                         },
                     )
-                    "onboarding:3:FULL" -> PermissionsScreen(
+                    "onboarding:3:FULL", "onboarding:3:ONE_TIME", "onboarding:3:SCRIPT" -> PermissionsScreen(
                         config = config,
                         permissions = permissions,
                         settings = settings,
@@ -188,35 +188,37 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onToggleAutostart = viewModel::setManualAutostart,
                         onRequestShizuku = viewModel::requestShizukuPermission,
                     )
-                    "onboarding:4:FULL", "onboarding:3:ONE_TIME", "onboarding:3:SCRIPT" -> {
-                        val oneTime = settings.usageMode != UsageMode.FULL
+                    "onboarding:4:FULL", "onboarding:4:ONE_TIME", "onboarding:4:SCRIPT" -> {
+                        val hasStep5 = settings.usageMode != UsageMode.FULL
                         SetupScreen(
                             config = config,
                             permissions = permissions,
                             setup = setup,
                             onboarding = true,
-                            stepLabel = if (oneTime) "BƯỚC 3 / 4" else "BƯỚC 4 / 4",
-                            onBack = { onboardingStep = if (oneTime) 2 else 3 },
+                            stepLabel = if (hasStep5) "BƯỚC 4 / 5" else "BƯỚC 4 / 4",
+                            onBack = { onboardingStep = 3 },
                             onRun = viewModel::runProvisioning,
                             shizukuStartCommand = viewModel.shizukuStartCommand,
                             onRequestShizuku = viewModel::requestShizukuPermission,
-                            onFinish = { if (oneTime) onboardingStep = 4 else finishOnboarding() },
+                            onFinish = { if (hasStep5) onboardingStep = 5 else finishOnboarding() },
                             onMessage = viewModel::showMessage,
+                            onOpenPermissions = { onboardingStep = 3 },
                         )
                     }
-                    "onboarding:4:SCRIPT" -> ScriptScreen(
+                    "onboarding:5:SCRIPT" -> ScriptScreen(
                         config = config,
                         permissions = permissions,
                         status = scriptStatus,
                         startedThisBoot = viewModel.scriptStartedThisBoot,
                         scriptContent = viewModel.scriptContent(),
                         onboarding = true,
-                        onBack = { onboardingStep = 3 },
+                        onBack = { onboardingStep = 4 },
                         onCheck = viewModel::checkScript,
                         onStart = viewModel::startScript,
                         onStop = viewModel::stopScript,
                         onFinish = ::finishOnboarding,
-                        onOpenSetup = { onboardingStep = 3 },
+                        onOpenSetup = { onboardingStep = 4 },
+                        onOpenPermissions = { push(Overlay.PERMISSIONS) },
                         onOpenTriggers = { push(Overlay.TRIGGERS) },
                         onRequestShizuku = viewModel::requestShizukuPermission,
                         onMessage = viewModel::showMessage,
@@ -234,16 +236,17 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onStop = viewModel::stopScript,
                         onFinish = ::pop,
                         onOpenSetup = { push(Overlay.SETUP) },
+                        onOpenPermissions = { push(Overlay.PERMISSIONS) },
                         onOpenTriggers = { push(Overlay.TRIGGERS) },
                         onRequestShizuku = viewModel::requestShizukuPermission,
                         onMessage = viewModel::showMessage,
                     )
-                    "onboarding:4:ONE_TIME" -> ShortcutsScreen(
+                    "onboarding:5:ONE_TIME" -> ShortcutsScreen(
                         config = config,
                         usageMode = settings.usageMode,
                         accessibilityOn = permissions.accessibility,
                         onboarding = true,
-                        onBack = { onboardingStep = 3 },
+                        onBack = { onboardingStep = 4 },
                         onFinish = ::finishOnboarding,
                     )
                     Overlay.SHORTCUTS.name -> ShortcutsScreen(
@@ -276,6 +279,7 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onRequestShizuku = viewModel::requestShizukuPermission,
                         onFinish = ::pop,
                         onMessage = viewModel::showMessage,
+                        onOpenPermissions = { push(Overlay.PERMISSIONS) },
                     )
                     Overlay.PROFILES.name -> ProfilesScreen(
                         config = config,
@@ -372,6 +376,7 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onExport = viewModel::exportLogs,
                         onClear = viewModel::clearLogs,
                         onRestore = viewModel::restoreDefaults,
+                        onSetThemeMode = viewModel::setThemeMode,
                     )
                     else -> OverviewScreen(
                         config = config,

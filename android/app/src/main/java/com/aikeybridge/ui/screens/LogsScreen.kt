@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -85,12 +85,12 @@ fun LogsScreen(
             }
             if (raw) {
                 if (recentEntries.isEmpty()) item(key = "empty") { EmptyRow("Chưa có dòng log nào.") }
-                items(recentEntries, key = { "e${it.id}" }) { EntryRow(it) }
+                itemsIndexed(recentEntries, key = { index, it -> "e_${index}_${it.id}" }) { _, it -> EntryRow(it) }
             } else {
                 if (recentAttempts.isEmpty()) {
                     item(key = "empty") { EmptyRow("Chưa có lượt chuyển hướng nào. Gọi trợ lý gốc để thử.") }
                 }
-                items(recentAttempts, key = { "a${it.at}" }) { AttemptRow(it) }
+                itemsIndexed(recentAttempts, key = { index, it -> "a_${index}_${it.at}" }) { _, it -> AttemptRow(it) }
             }
         }
         OutlineCta(

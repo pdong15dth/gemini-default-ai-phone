@@ -130,9 +130,40 @@ Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phon
     <td width="33%"><img src="docs/images/10-overview.webp" alt="Tổng quan: Sẵn sàng"></td>
   </tr>
   <tr>
-    <td><b>Bước 3 — Cấp quyền.</b> Chạm từng dòng để mở đúng màn hình cài đặt. Script nền cần <b>Shizuku</b>; chế độ Đầy đủ cần thêm <b>Trợ năng</b>, <b>Tự khởi chạy</b>, <b>Pin không hạn chế</b>.</td>
-    <td><b>Bước 4 — Kích hoạt & vá lỗi.</b> Có Shizuku thì bấm <b>Chạy 7 lệnh</b>; không có thì bấm nút copy và dán lệnh ADB vào máy tính một lần.</td>
+    <td><b>Bước 3 — Quyền & Hướng dẫn bằng ảnh.</b> Chạm vào từng mục để mở thẳng màn hình cài đặt đó, hoặc bấm <b>Ảnh HD</b> để xem ảnh chụp màn hình khoanh vùng từng bước.</td>
+    <td><b>Bước 4 — Kích hoạt & vá lỗi.</b> Có Shizuku thì bấm <b>Kích hoạt & Bật script nền</b>; không có thì bấm nút copy và dán lệnh ADB vào máy tính một lần.</td>
     <td>Trạng thái chuyển sang <b>Sẵn sàng</b>. Hô <b>"Hi Jovi"</b> để thử.</td>
+  </tr>
+</table>
+
+#### Hướng dẫn trực quan các quyền cần bật (đã tích hợp sẵn trong app)
+
+Ngay trong app (**Tổng quan → Quyền & Hướng dẫn bằng ảnh**), bạn có thể bấm để nhảy thẳng tới từng màn hình bên dưới mà không cần tự tìm trong Cài đặt:
+
+<table>
+  <tr>
+    <td width="25%"><img src="docs/images/guides/guide_vivo_perm_google.webp" alt="Quyền của Google"></td>
+    <td width="25%"><img src="docs/images/guides/guide_vivo_perm_gemini.webp" alt="Quyền của Gemini"></td>
+    <td width="25%"><img src="docs/images/guides/guide_battery_bg.webp" alt="Kiểm soát pin dưới nền"></td>
+    <td width="25%"><img src="docs/images/guides/guide_default_assistant.webp" alt="Trợ lý kỹ thuật số mặc định"></td>
+  </tr>
+  <tr>
+    <td><b>1. Quyền của Google:</b> bật <i>Tự động khởi động</i>, <i>Cửa sổ nổi</i>, <i>Hiển thị trên màn hình khóa</i>.</td>
+    <td><b>2. Quyền của Gemini:</b> bật đủ 5 mục <i>Tự động khởi động</i>, <i>Khởi động liên kết</i>, <i>Cửa sổ nổi</i>, <i>Màn hình khóa</i>, <i>Cửa sổ bật lên dưới nền</i>.</td>
+    <td><b>3. Pin dưới nền:</b> bấm chữ <b>G</b> bên phải → chọn <b>Cho phép sử dụng pin ngầm</b> cho cả <b>Gemini</b> và <b>Google</b>.</td>
+    <td><b>4. Trợ lý mặc định:</b> chọn <b>Google</b> và bật <b>Dùng dữ liệu của màn hình và ứng dụng</b>.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/guides/guide_gemini_lockscreen.webp" alt="Gemini trên màn hình khoá"></td>
+    <td><img src="docs/images/guides/guide_voice_wakeup.webp" alt="Đánh thức bằng giọng nói Hi Jovi"></td>
+    <td><img src="docs/images/guides/guide_shizuku.webp" alt="Shizuku Gỡ lỗi không dây"></td>
+    <td><img src="docs/images/guides/guide_dev_options.webp" alt="Tắt Tùy chọn nhà phát triển"></td>
+  </tr>
+  <tr>
+    <td><b>5. Gemini trên màn khóa:</b> <i>Avatar Gemini → Cài đặt → Điều khiển thiết bị → Gemini trên màn hình khoá</i> → bật.</td>
+    <td><b>6. Khẩu lệnh "Hi Jovi":</b> bật <i>Đánh thức bằng giọng nói</i> trong cài đặt Tiểu V / BlueLM.</td>
+    <td><b>7. Shizuku:</b> <i>Ghép nối</i> & <i>Bắt đầu</i> qua Gỡ lỗi không dây để bật Script nền.</td>
+    <td><b>8. Dùng app ngân hàng:</b> sau khi bật Script nền, tắt công tắc <i>Tùy chọn nhà phát triển</i>.</td>
   </tr>
 </table>
 

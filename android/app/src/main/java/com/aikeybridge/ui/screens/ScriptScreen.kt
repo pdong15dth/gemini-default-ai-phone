@@ -69,6 +69,7 @@ fun ScriptScreen(
     onStop: () -> Unit,
     onFinish: () -> Unit,
     onOpenSetup: () -> Unit,
+    onOpenPermissions: () -> Unit = {},
     onOpenTriggers: () -> Unit = {},
     onRequestShizuku: () -> Unit = {},
     onMessage: (String) -> Unit,
@@ -188,6 +189,18 @@ fun ScriptScreen(
                 SectionLabel("Cấu hình & Cửa sổ bắt", Modifier.padding(top = 12.dp))
                 Panel {
                     NavRow(
+                        title = "Quyền bắt buộc & Ảnh hướng dẫn",
+                        subtitle = if (permissions.ready) {
+                            "đã đủ ${permissions.coreGrantedCount}/${permissions.coreTotalCount} mục · xem ảnh hoặc mở cài đặt"
+                        } else {
+                            "đạt ${permissions.coreGrantedCount}/${permissions.coreTotalCount} · mở thẳng quyền Google, Gemini, Pin, Khóa màn"
+                        },
+                        subColor = if (permissions.ready) Accent else Warn,
+                        trailing = "ảnh HD",
+                        trailingColor = Accent,
+                        onClick = onOpenPermissions,
+                    )
+                    NavRow(
                         title = "Google là trợ lý mặc định",
                         subtitle = if (permissions.assistantDefault) {
                             "đã đặt"
@@ -204,7 +217,7 @@ fun ScriptScreen(
                         subtitle = "bật \"Dùng dữ liệu của màn hình và ứng dụng\" để khoanh tròn để hỏi",
                         subColor = TextFaint,
                         trailing = "mở",
-                        onClick = { Intents.openAssistantSettings(context) },
+                        onClick = { Intents.openAssistantSettings(context, assistantAlreadySelected = true) },
                     )
                     NavRow(
                         title = "Shizuku",
@@ -308,6 +321,7 @@ fun ScriptScreen(
 /** Nhãn ngắn cho trạng thái script nền, dùng ở Cài đặt và Chế độ. */
 internal data class ScriptStateUi(val label: String, val detail: String, val color: androidx.compose.ui.graphics.Color)
 
+@Composable
 internal fun scriptState(status: ScriptStatus, startedThisBoot: Boolean): ScriptStateUi = when {
     status.busy -> ScriptStateUi("…", "đang xử lý", TextDim)
     status.running == true -> ScriptStateUi("đang chạy", "pid ${status.pid} · không cần Trợ năng", Accent)

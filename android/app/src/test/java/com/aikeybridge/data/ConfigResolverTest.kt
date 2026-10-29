@@ -131,6 +131,11 @@ class ConfigResolverTest {
         assertEquals(AssistantTarget.GEMINI, config.target.id)
     }
 
+    @Test
+    fun defaultThemeModeFollowsSystem() {
+        assertEquals(ThemeMode.SYSTEM, AppSettings().themeMode)
+    }
+
     private fun profile(id: String, match: List<String>, verified: Boolean = false) = OemProfile(
         schema = 3,
         id = id,

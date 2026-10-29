@@ -143,6 +143,7 @@ fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color = TextGhos
 // ---------- Khung ----------
 
 /** Viền dưới 1dp kiểu "hairline" của thiết kế, dùng cho hàng trong panel. */
+@Composable
 fun Modifier.hairlineBottom(show: Boolean = true, color: Color = Hairline): Modifier =
     if (!show) this else drawBehind {
         val y = size.height - 0.5.dp.toPx()
@@ -599,12 +600,13 @@ val BridgeTabs = listOf(
 
 @Composable
 fun BottomNav(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val hairline = Hairline
     Row(
         modifier
             .fillMaxWidth()
             .background(Ink)
             .drawBehind {
-                drawLine(Hairline, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1.dp.toPx())
+                drawLine(hairline, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1.dp.toPx())
             }
             .navigationBarsPadding()
             .padding(horizontal = 22.dp, vertical = 6.dp),
