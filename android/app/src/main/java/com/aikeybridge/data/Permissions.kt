@@ -8,6 +8,8 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import com.aikeybridge.service.AssistantAccessibilityService
+import com.aikeybridge.shell.BuiltInWirelessAdb
+import com.aikeybridge.shell.EngineBinderProvider
 import rikka.shizuku.Shizuku
 
 data class VivoAppPerms(
@@ -90,12 +92,15 @@ data class PermissionSnapshot(
     val shizukuInstalled: Boolean = false,
     val shizukuRunning: Boolean = false,
     val shizukuGranted: Boolean = false,
+    val engineDaemonRunning: Boolean = false,
     val targetInstalled: Boolean = false,
     val assistantRequired: Boolean = true,
     val nativeAssistantInstalled: Boolean = false,
     val readLogs: Boolean = false,
     val devOptionsEnabled: Boolean = false,
     val adbEnabled: Boolean = false,
+    val adbWifiEnabled: Boolean = false,
+    val wirelessAdbPaired: Boolean = false,
 ) {
     val assistantOk: Boolean get() = assistantDefault || !assistantRequired
     val bothBatteryUnrestricted: Boolean get() = googleBatteryUnrestricted && geminiBatteryUnrestricted
@@ -247,6 +252,14 @@ object PermissionsReader {
         val adb = runCatching {
             Settings.Global.getInt(resolver, Settings.Global.ADB_ENABLED, 0) == 1
         }.getOrDefault(false)
+        val adbWifi = runCatching {
+            Settings.Global.getInt(resolver, "adb_wifi_enabled", 0) == 1
+        }.getOrDefault(false)
+
+        val engineAlive = EngineBinderProvider.isAlive()
+        if (!engineAlive) {
+            EngineBinderProvider.requestDaemonReconnect(context)
+        }
 
         return PermissionSnapshot(
             accessibility = accessibilityEnabled(context),
@@ -263,9 +276,10 @@ object PermissionsReader {
             autostartConfirmed = autostartOk,
             googleInstalled = isInstalled(context, GOOGLE_PACKAGE),
             geminiInstalled = isInstalled(context, GEMINI_PACKAGE),
-            shizukuInstalled = isInstalled(context, SHIZUKU_PACKAGE),
-            shizukuRunning = shizukuRunning(),
-            shizukuGranted = shizukuGranted(),
+            shizukuInstalled = engineAlive || isInstalled(context, SHIZUKU_PACKAGE),
+            shizukuRunning = engineAlive || shizukuRunning(),
+            shizukuGranted = engineAlive || shizukuGranted(),
+            engineDaemonRunning = engineAlive,
             targetInstalled = targetPackages.any { isInstalled(context, it) },
             assistantRequired = assistantRequired,
             nativeAssistantInstalled = nativeAssistantPackages.any { isInstalled(context, it) },
@@ -273,6 +287,8 @@ object PermissionsReader {
                 PackageManager.PERMISSION_GRANTED,
             devOptionsEnabled = devOpts,
             adbEnabled = adb,
+            adbWifiEnabled = adbWifi,
+            wirelessAdbPaired = BuiltInWirelessAdb.isPaired(context),
         )
     }
 

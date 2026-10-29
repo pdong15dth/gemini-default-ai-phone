@@ -26,6 +26,9 @@ import com.aikeybridge.service.LogStatus
 import com.aikeybridge.service.RedirectState
 import com.aikeybridge.service.RuntimeStatus
 import com.aikeybridge.service.Sniffer
+import com.aikeybridge.shell.BuiltInWirelessAdb
+import com.aikeybridge.shell.EngineBinderProvider
+import com.aikeybridge.shell.EngineDaemonMain
 import com.aikeybridge.shell.ProvisionReport
 import com.aikeybridge.shell.Provisioner
 import com.aikeybridge.shell.ShizukuShell
@@ -96,6 +99,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val sniffer = Sniffer.state
     val logSniffer = LogSniffer.state
     val logAccess = LogStatus.access
+    val wirelessAdb = BuiltInWirelessAdb.state
     val readLogsCommand: String = "adb shell pm grant ${application.packageName} android.permission.READ_LOGS"
 
     private val minuteTicker = flow {
@@ -213,20 +217,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun startScript() {
+    fun startScript(autoLockDevMode: Boolean = false) {
         val content = scriptContent() ?: run {
             _message.value = "${config.value.profile.displayName} chưa có mẫu cửa sổ cho script nền. Hãy bấm Dò trợ lý."
-            return
-        }
-        refreshPermissions()
-        if (!_permissions.value.shizukuGranted) {
-            _message.value = "Cần Shizuku đã cấp quyền. Không có Shizuku thì copy lệnh ADB bên dưới."
             return
         }
         if (_script.value.busy) return
         scriptEventLog?.parentFile?.mkdirs()
         viewModelScope.launch {
             _script.update { it.copy(busy = true) }
+            refreshPermissions()
+            if (!_permissions.value.shizukuGranted) {
+                val connected = BuiltInWirelessAdb.connectAndBootstrapDaemon(app)
+                refreshPermissions()
+                if (!connected && !_permissions.value.shizukuGranted) {
+                    _script.update { it.copy(busy = false) }
+                    _message.value = "Chưa kết nối được Engine nội bộ. Hãy bật Gỡ lỗi không dây để ghép nối 1 lần hoặc chạy lệnh ADB bên dưới."
+                    return@launch
+                }
+            }
+            // Đảm bảo EngineDaemonMain (UID 2000) đã chạy trong RAM và thoát cgroup adbd
+            if (!EngineBinderProvider.isAlive()) {
+                shell.exec(EngineDaemonMain.bootstrapCommand(app))
+            }
             val active = config.value
             if (active.provisioning.isNotEmpty()) {
                 _setup.value = SetupUiState.from(active.provisioning, active.restore).copy(running = true)
@@ -258,6 +271,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (running) settingsRepository.setScriptStartedAt(System.currentTimeMillis())
             val pid = status.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty()
             val detached = if (running && pid.isNotEmpty()) logScriptCgroup(pid) else null
+
+            // Đọc lại bảng quyền Vivo vào bộ nhớ đệm trước khi khóa Gỡ lỗi
+            val vivoRes = shell.exec(PermissionsReader.VIVO_QUERY_CMD)
+            if (vivoRes.ok) {
+                PermissionsReader.updateFromVivoShell(app, vivoRes.stdout)
+            }
+
+            if (running && autoLockDevMode) {
+                shell.exec(EngineDaemonMain.LOCK_DEV_MODE_CMD)
+                Diagnostics.success("script", "Đã tự động tắt Tùy chọn nhà phát triển & Gỡ lỗi để dùng app ngân hàng / VNeID.")
+            }
+
             _script.value = ScriptStatus(
                 running = running,
                 busy = false,
@@ -270,16 +295,80 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 "script",
                 if (running) "Script nền đang chạy (${WatchScript.PATH})." else "Script nền không chạy được.",
             )
-            _message.value = if (running) {
-                "Script nền đang chạy. Hô “${config.value.profile.wakePhrase ?: config.value.profile.assistantName}” để thử, " +
-                    "rồi tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB để dùng app ngân hàng — script vẫn chạy."
-            } else {
-                "Script không chạy được — xem Nhật ký."
+            _message.value = when {
+                running && autoLockDevMode ->
+                    "Đã bật Script nền & tự tắt Gỡ lỗi / Tùy chọn nhà phát triển! Máy sạch 100% cho app ngân hàng & VNeID."
+                running ->
+                    "Script nền đang chạy. Bấm “Tắt ngay Gỡ lỗi & Tùy chọn nhà phát triển” bên dưới để dùng app ngân hàng — script vẫn chạy."
+                else ->
+                    "Script không chạy được — xem Nhật ký."
             }
         }
     }
 
-    /** Script còn trong nhóm tiến trình của adbd thì tắt Gỡ lỗi sẽ giết nó — ghi lại để đọc log biết ngay. */
+    /**
+     * Tắt sạch Gỡ lỗi không dây, Gỡ lỗi USB và Tùy chọn nhà phát triển bằng 1 chạm qua Engine nội bộ.
+     * Cả [WatchScript] và [EngineDaemonMain] đều đã tách khỏi cgroup của `adbd` nên vẫn tiếp tục chạy ngầm.
+     */
+    fun lockDeveloperMode() {
+        viewModelScope.launch {
+            if (!EngineBinderProvider.isAlive()) {
+                shell.exec(EngineDaemonMain.bootstrapCommand(app))
+                delay(250)
+            }
+            val res = shell.exec(EngineDaemonMain.LOCK_DEV_MODE_CMD)
+            delay(200)
+            refreshPermissions()
+            if (res.ok || (!_permissions.value.devOptionsEnabled && !_permissions.value.adbEnabled)) {
+                Diagnostics.success("security", "Đã tắt Tùy chọn nhà phát triển & Gỡ lỗi — an toàn 100% cho app ngân hàng & VNeID.")
+                _message.value = "Đã tắt sạch Tùy chọn nhà phát triển & Gỡ lỗi! Dùng app ngân hàng & VNeID bình thường."
+            } else {
+                Intents.openDeveloperSettings(app)
+                _message.value = "Hãy gạt tắt công tắc Tùy chọn nhà phát triển ở đầu trang."
+            }
+        }
+    }
+
+    /** Kết nối Engine nội bộ qua Gỡ lỗi không dây (hoặc đánh thức daemon sẵn có trong RAM). */
+    fun connectBuiltInEngine() {
+        viewModelScope.launch {
+            EngineBinderProvider.requestDaemonReconnect(app)
+            delay(180)
+            if (EngineBinderProvider.isAlive()) {
+                refreshPermissions()
+                _message.value = "Đã kết nối Engine nội bộ (UID 2000) trong RAM!"
+                return@launch
+            }
+            val ok = BuiltInWirelessAdb.connectAndBootstrapDaemon(app)
+            refreshPermissions()
+            if (ok) {
+                _message.value = "Đã kết nối Engine nội bộ qua Gỡ lỗi không dây — không cần Shizuku!"
+            } else {
+                startWirelessPairing()
+            }
+        }
+    }
+
+    fun startWirelessPairing() {
+        BuiltInWirelessAdb.startPairingFlow(app)
+        Intents.openWirelessDebuggingSettings(app)
+        _message.value = "Mở Gỡ lỗi không dây → Ghép nối thiết bị bằng mã ghép nối, rồi nhập 6 số vào thanh thông báo."
+    }
+
+    fun stopWirelessPairing() {
+        BuiltInWirelessAdb.stopPairingFlow(app)
+    }
+
+    fun submitWirelessPairingCode(code: String) {
+        BuiltInWirelessAdb.submitPairingCode(app, code) { ok, msg ->
+            viewModelScope.launch {
+                refreshPermissions()
+                _message.value = msg
+            }
+        }
+    }
+
+    /** Script còn trong nhóm tiến trình của adbd (như Android 16) thì neo giữ adbd qua adb_wifi_enabled=1. */
     private suspend fun logScriptCgroup(pid: String): Boolean? {
         val result = shell.exec(WatchScript.cgroupCommand(pid))
         if (!result.ok || result.stdout.isBlank()) {
@@ -291,9 +380,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             Diagnostics.success("script", "Script đã ra nhóm gốc · tắt Gỡ lỗi không làm script dừng.")
             true
         } else {
-            Diagnostics.warn(
+            Diagnostics.info(
                 "script",
-                "Script vẫn trong nhóm tiến trình ${groups.joinToString()} · tắt Gỡ lỗi có thể làm script dừng.",
+                "Script trong nhóm ${groups.joinToString()} (Android 16) · đã neo giữ adbd (adb_wifi=1) để tắt Gỡ lỗi USB / Nhà phát triển không làm script dừng.",
             )
             false
         }
@@ -307,6 +396,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             _script.update { it.copy(busy = true) }
+            runCatching {
+                scriptEventLog?.parentFile?.let { File(it, WatchScript.ENABLED_FILE).delete() }
+            }
             shell.exec(WatchScript.stopCommand())
             settingsRepository.setScriptStartedAt(0)
             delay(300)
@@ -320,11 +412,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val binderReceived = Shizuku.OnBinderReceivedListener { refreshPermissions() }
     private val binderDead = Shizuku.OnBinderDeadListener { refreshPermissions() }
+    private val engineListener: () -> Unit = {
+        viewModelScope.launch { refreshPermissions() }
+    }
 
     init {
         Diagnostics.init(app)
         AttemptLog.init(app)
+        BuiltInWirelessAdb.init(app)
         refreshPermissions()
+        EngineBinderProvider.addListener(engineListener)
         runCatching { Shizuku.addBinderReceivedListenerSticky(binderReceived) }
         runCatching { Shizuku.addBinderDeadListener(binderDead) }
 
@@ -385,14 +482,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Lệnh khởi động Shizuku qua ADB cho đúng máy này (Shizuku 13.6+ dùng libshizuku.so trong thư mục lib của app).
-     * Null nếu chưa cài Shizuku.
+     * Lệnh khởi động Engine nội bộ (UID 2000) qua ADB cho máy này — hoàn toàn không cần cài Shizuku.
      */
-    val shizukuStartCommand: String?
-        get() = runCatching {
-            val info = app.packageManager.getApplicationInfo(PermissionsReader.SHIZUKU_PACKAGE, 0)
-            "adb shell ${info.nativeLibraryDir}/libshizuku.so"
-        }.getOrNull()
+    val shizukuStartCommand: String
+        get() = "adb shell \"${EngineDaemonMain.bootstrapCommand(app)}\""
 
     fun setAutoMic(value: Boolean) = settingsRepository.setAutoMic(value)
 
@@ -617,29 +710,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun requestShizukuPermission() {
         val snapshot = _permissions.value
-        if (!snapshot.shizukuRunning) {
-            _message.value = "Shizuku chưa chạy. Mở Shizuku rồi thử lại."
+        if (snapshot.engineDaemonRunning) {
+            _message.value = "Engine nội bộ (UID 2000) đã kết nối sẵn sàng!"
             return
         }
-        runCatching { Shizuku.requestPermission(SHIZUKU_REQUEST_CODE) }
-            .onFailure { _message.value = "Không gửi được yêu cầu quyền: ${it.message}" }
+        val shizukuRawRunning = runCatching { !Shizuku.isPreV11() && Shizuku.pingBinder() }.getOrDefault(false)
+        if (shizukuRawRunning) {
+            runCatching { Shizuku.requestPermission(SHIZUKU_REQUEST_CODE) }
+                .onFailure { _message.value = "Không gửi được yêu cầu quyền: ${it.message}" }
+            return
+        }
+        connectBuiltInEngine()
     }
 
     fun onShizukuPermissionResult(granted: Boolean) {
         refreshPermissions()
-        _message.value = if (granted) {
-            "Đã cấp quyền Shizuku. Có thể chạy ${_setup.value.steps.size} lệnh."
+        if (granted) {
+            viewModelScope.launch {
+                shell.exec(EngineDaemonMain.bootstrapCommand(app))
+                refreshPermissions()
+            }
+            _message.value = "Đã cấp quyền & khởi chạy Engine nội bộ. Có thể chạy ${_setup.value.steps.size} lệnh."
         } else {
-            "Bạn đã từ chối quyền Shizuku."
+            _message.value = "Bạn đã từ chối quyền Shizuku."
         }
     }
 
     fun runProvisioning() {
         if (_setup.value.running) return
-        if (!_permissions.value.shizukuGranted) {
-            _message.value = "Cần cấp quyền Shizuku trước khi chạy lệnh."
-            return
-        }
         val active = config.value
         if (active.provisioning.isEmpty()) {
             settingsRepository.setProvisionedFingerprint(device.fingerprint)
@@ -649,6 +747,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             _setup.value = SetupUiState.from(active.provisioning, active.restore).copy(running = true)
+            if (!_permissions.value.shizukuGranted) {
+                BuiltInWirelessAdb.connectAndBootstrapDaemon(app)
+                refreshPermissions()
+                if (!_permissions.value.shizukuGranted) {
+                    _setup.update { it.copy(running = false) }
+                    _message.value = "Chưa kết nối được Engine nội bộ. Hãy bật Gỡ lỗi không dây hoặc ghép nối 6 số."
+                    return@launch
+                }
+            }
+            if (!EngineBinderProvider.isAlive()) {
+                shell.exec(EngineDaemonMain.bootstrapCommand(app))
+            }
             Diagnostics.info("setup", "Bắt đầu chạy ${active.provisioning.size} lệnh · ${active.flowLabel}.")
 
             val report = Provisioner(shell, active.provisioning, active.restore).runProvisioning { step, phase, detail ->
@@ -919,6 +1029,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        EngineBinderProvider.removeListener(engineListener)
         runCatching { Shizuku.removeBinderReceivedListener(binderReceived) }
         runCatching { Shizuku.removeBinderDeadListener(binderDead) }
         Sniffer.stop()

@@ -72,6 +72,9 @@ fun ScriptScreen(
     onOpenPermissions: () -> Unit = {},
     onOpenTriggers: () -> Unit = {},
     onRequestShizuku: () -> Unit = {},
+    onStartAndLock: () -> Unit = onStart,
+    onLockDevMode: () -> Unit = {},
+    onStartWirelessPairing: () -> Unit = {},
     onMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -149,6 +152,8 @@ fun ScriptScreen(
                                 when {
                                     status.running == true && status.detachedFromAdbd == true ->
                                         "pid ${status.pid} · đã tách khỏi adbd · tắt Gỡ lỗi không chết"
+                                    status.running == true && status.detachedFromAdbd == false ->
+                                        "pid ${status.pid} · đã neo giữ adbd · tắt Gỡ lỗi USB không chết"
                                     status.running == true -> "pid ${status.pid} · ${WatchScript.PATH}"
                                     startedThisBoot -> "đã bật trong phiên khởi động này · gọi $wake để thử"
                                     status.running == null -> "bật Shizuku để kích hoạt & khởi chạy"
@@ -173,14 +178,37 @@ fun ScriptScreen(
                 }
 
                 if (status.running == true || startedThisBoot) {
-                    SectionLabel("Bước cuối · dùng app ngân hàng", Modifier.padding(top = 12.dp))
+                    val bankSafe = !permissions.devOptionsEnabled && !permissions.adbEnabled
+                    SectionLabel("Bước cuối · dùng app ngân hàng & VNeID", Modifier.padding(top = 12.dp))
                     Panel {
                         NavRow(
-                            title = "Tắt Tuỳ chọn nhà phát triển & Gỡ lỗi USB",
-                            subtitle = "bắt buộc để dùng app ngân hàng · script vẫn chạy, chỉ mất khi khởi động lại máy",
-                            subColor = Warn,
-                            trailing = "mở",
-                            onClick = { Intents.openDeveloperSettings(context) },
+                            title = if (bankSafe) {
+                                "Đã tắt Tùy chọn nhà phát triển & Gỡ lỗi ✓"
+                            } else {
+                                "Tắt ngay Tùy chọn nhà phát triển & Gỡ lỗi"
+                            },
+                            subtitle = when {
+                                bankSafe ->
+                                    "an toàn 100% cho mọi app ngân hàng & VNeID · script vẫn chạy ngầm"
+                                permissions.shizukuGranted ->
+                                    "chạm để Engine tự tắt sạch trong 1 giây · script và Engine vẫn chạy ngầm"
+                                else ->
+                                    "bắt buộc để dùng app ngân hàng · script vẫn chạy, chỉ mất khi khởi động lại máy"
+                            },
+                            subColor = if (bankSafe) Accent else Warn,
+                            trailing = when {
+                                bankSafe -> "an toàn"
+                                permissions.shizukuGranted -> "tắt ngay"
+                                else -> "mở"
+                            },
+                            trailingColor = if (bankSafe) Accent else Warn,
+                            onClick = if (bankSafe) {
+                                null
+                            } else if (permissions.shizukuGranted) {
+                                onLockDevMode
+                            } else {
+                                { Intents.openDeveloperSettings(context) }
+                            },
                             divider = false,
                         )
                     }
@@ -220,18 +248,21 @@ fun ScriptScreen(
                         onClick = { Intents.openAssistantSettings(context, assistantAlreadySelected = true) },
                     )
                     NavRow(
-                        title = "Shizuku",
+                        title = "Engine nội bộ (Gỡ lỗi không dây)",
                         subtitle = when {
+                            permissions.engineDaemonRunning && !permissions.devOptionsEnabled && !permissions.adbEnabled ->
+                                "đang chạy ngầm · đã tắt Gỡ lỗi (Bank-Safe)"
+                            permissions.engineDaemonRunning -> "đã kết nối (không cần Shizuku)"
                             permissions.shizukuGranted -> "đã cấp quyền"
                             permissions.shizukuRunning -> "đang chạy · chạm để cấp quyền"
-                            permissions.shizukuInstalled -> "đã cài · chạm để mở Shizuku"
-                            else -> "chưa cài · chạm để tải hoặc dùng ADB bên dưới"
+                            else -> "chạm để ghép nối 6 số Gỡ lỗi không dây (không cần Shizuku)"
                         },
                         subColor = if (permissions.shizukuGranted) Accent else Warn,
+                        trailing = if (permissions.shizukuGranted) null else "ghép nối",
                         onClick = when {
                             permissions.shizukuGranted -> null
                             permissions.shizukuRunning -> onRequestShizuku
-                            else -> { { Intents.openShizuku(context) } }
+                            else -> onStartWirelessPairing
                         },
                     )
                     NavRow(
@@ -285,19 +316,22 @@ fun ScriptScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (scriptContent != null) {
+                val devStillOn = permissions.devOptionsEnabled || permissions.adbEnabled
+                val canAutoConnectWireless = permissions.adbWifiEnabled && permissions.wirelessAdbPaired
                 val ctaText = when {
                     status.busy -> "Đang kích hoạt & bật script…"
-                    !permissions.shizukuInstalled -> "Tải Shizuku"
-                    !permissions.shizukuRunning -> "Mở Shizuku"
-                    !permissions.shizukuGranted -> "Cấp quyền Shizuku"
+                    !permissions.shizukuGranted && permissions.shizukuRunning -> "Cấp quyền Engine"
+                    !permissions.shizukuGranted && canAutoConnectWireless -> "Kết nối Engine (Gỡ lỗi không dây)"
+                    !permissions.shizukuGranted -> "Ghép nối Gỡ lỗi không dây (6 số)"
+                    status.running == true && devStillOn -> "Bật lại Script & Tắt ngay Gỡ lỗi"
                     status.running == true -> "Kích hoạt & Bật lại script"
+                    devStillOn -> "Kích hoạt, Bật Script & Tắt Gỡ lỗi"
                     else -> "Kích hoạt & Bật script nền"
                 }
                 val ctaAction: () -> Unit = when {
-                    !permissions.shizukuInstalled || !permissions.shizukuRunning -> {
-                        { Intents.openShizuku(context) }
-                    }
-                    !permissions.shizukuGranted -> onRequestShizuku
+                    !permissions.shizukuGranted && (permissions.shizukuRunning || canAutoConnectWireless) -> onRequestShizuku
+                    !permissions.shizukuGranted -> onStartWirelessPairing
+                    devStillOn -> onStartAndLock
                     else -> onStart
                 }
                 PrimaryCta(
@@ -308,7 +342,20 @@ fun ScriptScreen(
                     loading = status.busy,
                 )
                 if (status.running == true && permissions.shizukuGranted) {
-                    OutlineCta(text = "Tắt script", onClick = onStop, modifier = Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (devStillOn) {
+                            OutlineCta(
+                                text = "Tắt ngay Gỡ lỗi",
+                                onClick = onLockDevMode,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        OutlineCta(
+                            text = "Tắt script",
+                            onClick = onStop,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
             if (onboarding) {

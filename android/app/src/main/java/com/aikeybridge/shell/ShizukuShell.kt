@@ -6,11 +6,13 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
 import com.aikeybridge.BuildConfig
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -32,10 +34,20 @@ interface ShellRunner {
     suspend fun exec(command: String): ShellResult
 }
 
+/**
+ * Bộ thực thi lệnh Shell đa tầng (Multi-Engine):
+ * 1. **Engine nội bộ ([EngineBinderProvider] / [EngineDaemonMain])**: Chạy ngầm trong RAM dưới quyền `UID 2000`
+ *    và đã tách khỏi nhóm cgroup của `adbd` — hoạt động ngay cả khi đã TẮT Tùy chọn nhà phát triển, TẮT Gỡ lỗi USB/Không dây
+ *    và không cài Shizuku.
+ * 2. **Engine Gỡ lỗi không dây nội bộ ([BuiltInWirelessAdb])**: Tự kết nối TLS `127.0.0.1` khi bật Gỡ lỗi không dây
+ *    và tự khởi chạy [EngineDaemonMain] mà không cần app Shizuku.
+ * 3. **Shizuku (Dự phòng)**: Nếu máy có sẵn Shizuku đang chạy thì tận dụng luôn và tự nâng cấp lên [EngineDaemonMain].
+ */
 class ShizukuShell(private val context: Context) : ShellRunner {
 
     private val mutex = Mutex()
     private val pending = AtomicReference<kotlinx.coroutines.CancellableContinuation<Boolean>?>(null)
+    private val bootstrappedFromShizuku = AtomicBoolean(false)
 
     @Volatile
     private var service: IShellService? = null
@@ -70,20 +82,57 @@ class ShizukuShell(private val context: Context) : ShellRunner {
         .version(BuildConfig.VERSION_CODE)
 
     override suspend fun exec(command: String): ShellResult = withContext(Dispatchers.IO) {
-        if (!isShizukuReady()) {
-            return@withContext ShellResult(-1, "", "Chưa kết nối được Shizuku.")
+        // 1. Ưu tiên cao nhất: EngineDaemonMain (UID 2000 nội bộ của app, sống cả khi đã tắt Gỡ lỗi)
+        execViaEngineDaemon(command)?.let { return@withContext it }
+
+        // Thử đánh thức EngineDaemonMain nếu tiến trình app vừa mới mở lại
+        EngineBinderProvider.requestDaemonReconnect(context)
+        repeat(4) {
+            delay(45)
+            execViaEngineDaemon(command)?.let { return@withContext it }
         }
-        // Trên Vivo OriginOS: dùng UserService như cũ.
-        // Trên Xiaomi HyperOS (hoặc ROM chặn app_process callback của UserService): khi bind thất bại
-        // sẽ tự chuyển sang IShizukuService.newProcess và nhớ trạng thái này cho các lệnh kế tiếp.
+
+        // 2. Nếu chưa có EngineDaemon nhưng có Shizuku đang chạy -> chạy lệnh và tự dựng luôn EngineDaemonMain
+        if (isShizukuReady()) {
+            val res = execViaShizukuInternal(command)
+            if (res != null) {
+                if (bootstrappedFromShizuku.compareAndSet(false, true)) {
+                    runCatching { execViaShizukuInternal(EngineDaemonMain.bootstrapCommand(context)) }
+                }
+                return@withContext res
+            }
+        }
+
+        // 3. Thử tự kết nối qua Built-in Wireless ADB (nếu người dùng đã ghép nối và đang bật Gỡ lỗi không dây)
+        if (BuiltInWirelessAdb.connectAndBootstrapDaemon(context)) {
+            execViaEngineDaemon(command)?.let { return@withContext it }
+        }
+        BuiltInWirelessAdb.execViaWirelessAdb(context, command)?.let { return@withContext it }
+
+        ShellResult(-1, "", "Chưa kết nối được Engine nội bộ hoặc Gỡ lỗi không dây.")
+    }
+
+    private suspend fun execViaEngineDaemon(command: String): ShellResult? {
+        val daemon = EngineBinderProvider.service() ?: return null
+        return try {
+            val raw = withTimeoutOrNull(COMMAND_TIMEOUT_MS) {
+                daemon.exec(command)
+            } ?: return ShellResult(-1, "", "Lệnh quá thời gian (${COMMAND_TIMEOUT_MS / 1000}s).")
+            parse(raw)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private suspend fun execViaShizukuInternal(command: String): ShellResult? {
         if (!userServiceBlocked) {
             try {
                 if (ensureBound()) {
                     val raw = withTimeoutOrNull(COMMAND_TIMEOUT_MS) {
                         service?.exec(command)
                     }
-                    if (raw != null) return@withContext parse(raw)
-                    return@withContext ShellResult(-1, "", "Lệnh quá thời gian (${COMMAND_TIMEOUT_MS / 1000}s).")
+                    if (raw != null) return parse(raw)
+                    return ShellResult(-1, "", "Lệnh quá thời gian (${COMMAND_TIMEOUT_MS / 1000}s).")
                 } else {
                     userServiceBlocked = true
                 }
@@ -92,9 +141,7 @@ class ShizukuShell(private val context: Context) : ShellRunner {
                 userServiceBlocked = true
             }
         }
-
-        execViaNewProcess(command)
-            ?: ShellResult(-1, "", "Chưa kết nối được Shizuku.")
+        return execViaNewProcess(command)
     }
 
     private fun isShizukuReady(): Boolean = runCatching {
@@ -171,9 +218,18 @@ class ShizukuShell(private val context: Context) : ShellRunner {
         ShellResult(-1, raw, "Không đọc được kết quả: ${throwable.message}")
     }
 
-    private companion object {
+    companion object {
         const val BIND_TIMEOUT_MS = 3_500L
         const val COMMAND_TIMEOUT_MS = 8_000L
+
+        fun isEngineOrShizukuReady(): Boolean {
+            if (EngineBinderProvider.isAlive()) return true
+            return runCatching {
+                !Shizuku.isPreV11() &&
+                    Shizuku.pingBinder() &&
+                    Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+            }.getOrDefault(false)
+        }
 
         val newProcessMethod by lazy {
             runCatching {

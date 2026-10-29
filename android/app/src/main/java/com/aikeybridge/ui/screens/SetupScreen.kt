@@ -96,6 +96,7 @@ fun SetupScreen(
     stepLabel: String? = null,
     shizukuStartCommand: String? = null,
     onRequestShizuku: () -> Unit,
+    onStartWirelessPairing: () -> Unit = {},
     onFinish: () -> Unit,
     onMessage: (String) -> Unit,
     onOpenPermissions: (() -> Unit)? = null,
@@ -168,10 +169,13 @@ fun SetupScreen(
     Column(modifier.fillMaxSize()) {
         SubHeader(onBack = onBack) {
             val (label, color) = when {
+                permissions.engineDaemonRunning && !permissions.devOptionsEnabled && !permissions.adbEnabled ->
+                    "engine · chạy ngầm (bank-safe)" to Accent
+                permissions.engineDaemonRunning -> "engine · kết nối" to Accent
                 permissions.shizukuGranted -> "shizuku · kết nối" to Accent
-                permissions.shizukuRunning -> "shizuku · chưa cấp quyền" to Warn
-                permissions.shizukuInstalled -> "shizuku · chưa chạy" to Warn
-                else -> "shizuku · chưa cài" to TextFaint
+                permissions.shizukuRunning -> "engine · chờ cấp quyền" to Warn
+                permissions.adbWifiEnabled -> "gỡ lỗi không dây · sẵn sàng" to Warn
+                else -> "engine · chưa kết nối" to TextFaint
             }
             Chip(label, dot = color)
         }
@@ -302,10 +306,11 @@ fun SetupScreen(
                         startCommand = shizukuStartCommand,
                         onShowAdb = { showAdb = true },
                         onCopyStart = { command ->
-                            copyToClipboard(context, "Khởi động Shizuku", command)
-                            onMessage("Đã copy lệnh khởi động Shizuku.")
+                            copyToClipboard(context, "Khởi động Engine nội bộ", command)
+                            onMessage("Đã copy lệnh khởi động Engine nội bộ.")
                         },
-                        onReconnect = { restartApp(context) },
+                        onPairWireless = onStartWirelessPairing,
+                        onReconnect = onRequestShizuku,
                     )
                 }
 
@@ -327,16 +332,14 @@ fun SetupScreen(
                 .padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val canAutoConnectWireless = permissions.adbWifiEnabled && permissions.wirelessAdbPaired
                 val action: Triple<String, Int?, () -> Unit> = when {
                     total == 0 -> Triple(if (onboarding) "Vào app" else "Xong", R.drawable.lc_check, onFinish)
                     setup.running -> Triple("Đang chạy…", null, {})
-                    !permissions.shizukuInstalled -> Triple("Tải Shizuku", R.drawable.lc_arrow_up_right) {
-                        Intents.openShizuku(context)
-                    }
-                    !permissions.shizukuRunning -> Triple("Mở Shizuku", R.drawable.lc_arrow_up_right) {
-                        Intents.openShizuku(context)
-                    }
-                    !permissions.shizukuGranted -> Triple("Cấp quyền Shizuku", R.drawable.lc_terminal, onRequestShizuku)
+                    !permissions.shizukuGranted && (permissions.shizukuRunning || canAutoConnectWireless) ->
+                        Triple("Kết nối Engine", R.drawable.lc_terminal, onRequestShizuku)
+                    !permissions.shizukuGranted ->
+                        Triple("Ghép nối Gỡ lỗi không dây (6 số)", R.drawable.lc_terminal, onStartWirelessPairing)
                     setup.provisioningReport?.ok == true && onboarding -> Triple("Vào app", R.drawable.lc_check, onFinish)
                     ran -> Triple("Chạy lại từ đầu", R.drawable.lc_rotate_ccw, onRun)
                     else -> Triple("Chạy $total lệnh", R.drawable.lc_terminal, onRun)
@@ -548,6 +551,7 @@ private fun ShizukuCard(
     startCommand: String?,
     onShowAdb: () -> Unit,
     onCopyStart: (String) -> Unit,
+    onPairWireless: () -> Unit,
     onReconnect: () -> Unit,
 ) {
     Column(
@@ -559,12 +563,11 @@ private fun ShizukuCard(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        val notRunning = permissions.shizukuInstalled && !permissions.shizukuRunning
         BodyText(
             when {
-                notRunning -> "Shizuku đã cài nhưng chưa chạy"
-                permissions.shizukuRunning -> "Shizuku đang chạy · cần cấp quyền"
-                else -> "Chạy qua Shizuku hoặc ADB"
+                permissions.shizukuRunning -> "Engine / Shizuku đang chạy · cần cấp quyền"
+                permissions.adbWifiEnabled -> "Gỡ lỗi không dây đang bật · chạm Kết nối Engine"
+                else -> "Engine nội bộ (Không cần cài Shizuku)"
             },
             13.sp,
             TextMain,
@@ -572,23 +575,25 @@ private fun ShizukuCard(
         )
         BodyText(
             when {
-                notRunning ->
-                    "Mở Shizuku → Khởi động qua Gỡ lỗi không dây. Có máy tính thì cắm cáp và chạy lệnh dưới đây. " +
-                        "Bật xong mà app vẫn báo chưa chạy, bấm Kết nối lại."
-                permissions.shizukuRunning -> "Bấm Cấp quyền Shizuku rồi chọn Cho phép trong hộp thoại."
-                else -> "Shizuku chạy lệnh ngay trên máy qua Gỡ lỗi không dây. Không có Shizuku thì copy lệnh ADB và dán trên máy tính một lần."
+                permissions.shizukuRunning -> "Bấm Kết nối Engine ở dưới để cấp quyền chạy lệnh."
+                permissions.adbWifiEnabled ->
+                    "Bấm Kết nối Engine nếu đã ghép nối từ trước, hoặc bấm Ghép nối 6 số nếu là lần đầu tiên."
+                else ->
+                    "Bấm “Ghép nối 6 số” để kết nối trực tiếp qua Gỡ lỗi không dây ngay trên máy (không cần cài Shizuku), " +
+                        "hoặc copy lệnh ADB bên dưới để chạy 1 lần từ máy tính."
             },
             11.5.sp,
             TextDim,
             lineHeight = 16.sp,
         )
-        if (notRunning && startCommand != null) {
+        if (startCommand != null) {
             Text(
                 startCommand,
                 color = TextBody,
                 fontFamily = com.aikeybridge.ui.theme.MonoFont,
                 fontSize = 9.sp,
                 lineHeight = 13.sp,
+                maxLines = 3,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
@@ -598,7 +603,8 @@ private fun ShizukuCard(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            if (notRunning) LinkAction("Kết nối lại", onReconnect)
+            LinkAction("Ghép nối 6 số", onPairWireless)
+            LinkAction("Kết nối lại", onReconnect)
             LinkAction("Xem lệnh ADB", onShowAdb)
         }
     }

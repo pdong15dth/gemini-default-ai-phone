@@ -37,14 +37,23 @@ object WatchScript {
             appendLine("# Tắt Gỡ lỗi / Tuỳ chọn nhà phát triển thì init dừng adbd và giết cả nhóm tiến trình (cgroup) của nó.")
             appendLine("# Chuyển sang nhóm gốc như Shizuku, logcat/input sinh ra sau đó cũng nằm ngoài nhóm của adbd.")
             appendLine("for cg in $ESCAPE_CGROUPS; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
+            appendLine("# Trên Android 16 (như vivo X200 Ultra), /sys/fs/cgroup thuộc system:system (0775) nên UID 2000")
+            appendLine("# vẫn nằm trong 0::/system/uid_0/pid_<adbd>. Giữ adb_wifi_enabled=1 để khi tắt Gỡ lỗi USB (adb_enabled=0)")
+            appendLine("# hoặc tắt Tùy chọn nhà phát triển, AdbService không dừng adbd và init không giết script.")
+            appendLine("settings put global adb_wifi_enabled 1 2>/dev/null")
             appendLine("LOG='$eventLog'")
             appendLine("DIR=\"\${LOG%/*}\"")
+            appendLine("echo 1 > \"\$DIR/$ENABLED_FILE\" 2>/dev/null")
+            appendLine("if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb_engine'; then")
+            appendLine("  APK=\$(pm path com.aikeybridge 2>/dev/null | head -n 1 | cut -d: -f2)")
+            appendLine("  [ -n \"\$APK\" ] && CLASSPATH=\"\$APK\" /system/bin/app_process /system/bin --nice-name=akb_engine com.aikeybridge.shell.EngineDaemonMain \"\$DIR\" </dev/null >/dev/null 2>&1 &")
+            appendLine("fi")
             appendLine("# Chẩn đoán đọc được cả khi Shizuku đã chết: trạng thái lúc khởi động + nhịp còn sống mỗi ${ALIVE_INTERVAL_S}s.")
             appendLine(
                 "{ echo \"start \$(date '+%F %T') pid=\$\$ ppid=\$PPID uid=\$(id -u) ctx=\$(cat /proc/self/attr/current 2>/dev/null)\"; " +
                     "cat /proc/\$\$/cgroup; } > \"\$DIR/$STATE_FILE\" 2>/dev/null",
             )
-            appendLine("( while true; do date '+%F %T' > \"\$DIR/$ALIVE_FILE\" 2>/dev/null; sleep $ALIVE_INTERVAL_S; done ) &")
+            appendLine("( while true; do [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && settings put global adb_wifi_enabled 1 2>/dev/null; date '+%F %T' > \"\$DIR/$ALIVE_FILE\" 2>/dev/null; sleep $ALIVE_INTERVAL_S; done ) &")
             if (mic != null) {
                 appendLine("# Toạ độ nút Micro của lớp phủ theo tỉ lệ màn hình, tính một lần (wm size in kích thước dọc).")
                 appendLine("set -- \$(wm size | tail -1 | sed 's/.*: //; s/x/ /')")
@@ -124,7 +133,7 @@ object WatchScript {
     }
 
     /** Chạy script bằng setsid. Gọi [stopCommand] ở một lệnh riêng trước đó. */
-    fun startCommand(): String = "setsid sh $PATH </dev/null >/dev/null 2>&1 &"
+    fun startCommand(): String = "setsid sh $PATH </dev/null >/dev/null 2>&1 & sleep 0.1"
 
     /**
      * Dừng mọi bản đang chạy (cả gemini.sh của README) và logcat con của chúng.
@@ -140,6 +149,7 @@ object WatchScript {
     /** Hai file script ghi cạnh file sự kiện (thư mục riêng của app, app tự đọc được). */
     const val STATE_FILE = "script-state.log"
     const val ALIVE_FILE = "script-alive"
+    const val ENABLED_FILE = "script-enabled"
 
     /** Các bước của lần gọi gần nhất kèm giờ, để biết script kẹt ở đâu. */
     const val TRACE_FILE = "script-trace.log"

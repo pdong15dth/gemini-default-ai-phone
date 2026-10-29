@@ -34,6 +34,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         runCatching { Shizuku.addRequestPermissionResultListener(permissionListener) }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                runCatching {
+                    requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2001)
+                }
+            }
+        }
         setContent {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
             val darkTheme = when (settings.themeMode) {

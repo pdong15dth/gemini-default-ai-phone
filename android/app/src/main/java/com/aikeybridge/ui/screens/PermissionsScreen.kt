@@ -133,6 +133,8 @@ fun PermissionsScreen(
     onSkip: () -> Unit,
     onToggleAutostart: (Boolean) -> Unit,
     onRequestShizuku: () -> Unit,
+    onStartWirelessPairing: () -> Unit = {},
+    onLockDevMode: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -389,34 +391,42 @@ fun PermissionsScreen(
             PermissionGuideItem(
                 id = "shizuku",
                 section = "3. Công cụ kích hoạt & Bảo mật ngân hàng",
-                title = "Shizuku (Gỡ lỗi không dây)",
+                title = "Engine nội bộ (Gỡ lỗi không dây)",
                 subtitle = when {
+                    permissions.engineDaemonRunning && !permissions.devOptionsEnabled && !permissions.adbEnabled ->
+                        "Engine đang chạy ngầm · đã tắt Gỡ lỗi (Bank-Safe) ✓"
+                    permissions.engineDaemonRunning ->
+                        "Engine nội bộ đã kết nối (không cần Shizuku) ✓"
                     permissions.shizukuGranted -> "Đã kết nối ✓"
                     permissions.shizukuRunning -> "Đang chạy — chạm để cấp quyền"
-                    else -> "Chỉ cần bật 1 lần sau khi khởi động lại máy"
+                    else -> "Kết nối trực tiếp qua Gỡ lỗi không dây (không cần Shizuku)"
                 },
                 granted = permissions.shizukuGranted,
                 required = false,
-                pathSummary = "App Shizuku → Bắt đầu thông qua Gỡ lỗi không dây",
+                pathSummary = "Gỡ lỗi không dây → Ghép nối 6 số trực tiếp trên thông báo của AI Key Bridge",
                 steps = listOf(
-                    "Mở Shizuku → bấm “Ghép nối” (lần đầu) rồi bấm “Bắt đầu”.",
-                    "Quay lại AI Key Bridge để chạy lệnh và bật Script nền.",
+                    "Bấm nút bên dưới để bật thông báo nhập mã 6 số và mở thẳng trang Tùy chọn nhà phát triển → Gỡ lỗi không dây.",
+                    "Bật Gỡ lỗi không dây → chạm “Ghép nối thiết bị bằng mã ghép nối” → nhập 6 số vào thanh thông báo của AI Key Bridge.",
                 ),
                 images = listOf(
                     GuideImage(
                         resId = R.drawable.guide_shizuku,
-                        label = "Shizuku Gỡ lỗi không dây",
+                        label = "Engine Gỡ lỗi không dây",
                         spotlights = listOf(
                             SpotlightRect(85, 2440, 585, 2790),
                         ),
                     ),
                 ),
-                openButtonLabel = if (permissions.shizukuRunning && !permissions.shizukuGranted) "Cấp quyền Shizuku" else "Mở Shizuku",
+                openButtonLabel = when {
+                    permissions.shizukuGranted -> "Kiểm tra kết nối Engine"
+                    permissions.shizukuRunning -> "Cấp quyền Engine"
+                    else -> "Ghép nối Gỡ lỗi không dây (6 số)"
+                },
                 onOpenSettings = {
-                    if (permissions.shizukuRunning && !permissions.shizukuGranted) {
+                    if (permissions.shizukuRunning || permissions.shizukuGranted) {
                         onRequestShizuku()
                     } else {
-                        Intents.openShizuku(context)
+                        onStartWirelessPairing()
                     }
                 },
             ),
@@ -424,17 +434,20 @@ fun PermissionsScreen(
                 id = "dev_options",
                 section = "3. Công cụ kích hoạt & Bảo mật ngân hàng",
                 title = "Tắt Tùy chọn nhà phát triển",
-                subtitle = if (!permissions.devOptionsEnabled && !permissions.adbEnabled) {
-                    "Đã tắt — an toàn 100% cho app ngân hàng & VNeID ✓"
-                } else {
-                    "Đang bật — tắt sau khi đã bật Script nền để dùng ngân hàng"
+                subtitle = when {
+                    !permissions.devOptionsEnabled && !permissions.adbEnabled ->
+                        "Đã tắt — an toàn 100% cho app ngân hàng & VNeID ✓"
+                    permissions.shizukuGranted ->
+                        "Đang bật — bấm để Engine tự tắt sạch trong 1 giây (Script vẫn chạy)"
+                    else ->
+                        "Đang bật — tắt sau khi đã bật Script nền để dùng ngân hàng"
                 },
                 granted = !permissions.devOptionsEnabled && !permissions.adbEnabled,
                 required = false,
-                pathSummary = "Cài đặt → Quản lý hệ thống → Tùy chọn nhà phát triển",
+                pathSummary = "Tự động tắt bằng Engine nội bộ hoặc Cài đặt → Tùy chọn nhà phát triển",
                 steps = listOf(
-                    "Sau khi Script nền đã báo “Đang chạy”, bấm mở Tùy chọn nhà phát triển.",
-                    "Gạt TẮT công tắc tổng ở đầu trang để mọi app ngân hàng & VNeID hoạt động bình thường.",
+                    "Nếu Engine nội bộ đang chạy, chỉ cần bấm nút bên dưới — app sẽ tự động tắt sạch Gỡ lỗi không dây, Gỡ lỗi USB và Tùy chọn nhà phát triển ngay lập tức.",
+                    "Hoặc mở Tùy chọn nhà phát triển và gạt TẮT công tắc tổng ở đầu trang để dùng mọi app ngân hàng & VNeID.",
                 ),
                 images = listOf(
                     GuideImage(
@@ -446,8 +459,18 @@ fun PermissionsScreen(
                         warmGlow = true,
                     ),
                 ),
-                openButtonLabel = "Mở Tùy chọn nhà phát triển",
-                onOpenSettings = { Intents.openDeveloperSettings(context) },
+                openButtonLabel = if (permissions.shizukuGranted && (permissions.devOptionsEnabled || permissions.adbEnabled)) {
+                    "Tắt ngay Tùy chọn nhà phát triển (1 chạm)"
+                } else {
+                    "Mở Tùy chọn nhà phát triển"
+                },
+                onOpenSettings = {
+                    if (permissions.shizukuGranted && (permissions.devOptionsEnabled || permissions.adbEnabled)) {
+                        onLockDevMode()
+                    } else {
+                        Intents.openDeveloperSettings(context)
+                    }
+                },
             ),
         )
     }
