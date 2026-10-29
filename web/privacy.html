@@ -34,16 +34,16 @@
       <p class="callout"><strong>Không có server.</strong> AI Key Bridge chạy hoàn toàn trên máy bạn. Không có tài khoản, không có telemetry, không có SDK quảng cáo hay phân tích của bên thứ ba.</p>
 
       <h2>App đọc gì</h2>
-      <p>Cách app biết trợ lý gốc vừa mở tuỳ vào cách dùng bạn chọn:</p>
+      <p>Từ bản 1.0.10, app không dùng Trợ năng. Cách app biết trợ lý gốc vừa mở tuỳ vào cách dùng bạn chọn:</p>
       <ul>
-        <li><strong>Script nền</strong> (khuyên dùng, không cần Trợ năng): một script shell chạy qua Shizuku, chỉ đọc kênh <code>events</code> của logcat và lọc đúng tên sự kiện của trợ lý gốc (ví dụ <code>CopilotPanelWindow</code>). Thấy sự kiện thì bấm Back, đánh thức màn hình và gọi trợ lý bằng phím <code>231</code>. Script không đọc nội dung màn hình và không lưu dòng log nào.</li>
-        <li><strong>Đầy đủ</strong>: dùng quyền Trợ năng (AccessibilityService) và chỉ đọc hai trường của sự kiện cửa sổ — tên gói (ví dụ <code>com.vivo.ai.copilot</code>) và tên lớp cửa sổ (ví dụ <code>CopilotPanelWindow</code>).</li>
+        <li><strong>Script nền</strong> (Bank-Safe, khuyên dùng): một script shell khởi chạy qua Shizuku, chỉ đọc kênh <code>events</code> của logcat và lọc đúng tên sự kiện của trợ lý gốc (ví dụ <code>CopilotPanelWindow</code>). Thấy sự kiện thì bấm Back, đánh thức màn hình và gọi lớp phủ trợ lý bằng phím <code>219</code>. Sau đó script xem tên cửa sổ đang có focus để biết lớp phủ Gemini đã hiện rồi mới chạm nút Micro. Script không đọc nội dung màn hình và không lưu dòng log nào.</li>
         <li><strong>Cấu hình một lần</strong>: không theo dõi gì; bạn gán phím vào lối tắt “Gọi AI”.</li>
       </ul>
-      <p>Riêng chế độ Đầy đủ, khi Gemini đã mở, app duyệt cây nút để tìm nút Micro. Bước này chỉ đọc <code>viewIdResourceName</code> và <code>contentDescription</code> (mô tả của nút), không đọc <code>text</code>, không đọc mật khẩu, không chụp màn hình và không lưu nội dung cửa sổ.</p>
+      <p>Nếu lớp phủ Gemini mãi không hiện vì ứng dụng Google bị kẹt, script dừng ứng dụng Google (<code>am force-stop</code>) rồi gọi lại. Ngoài ra script không đóng hay điều khiển app nào khác.</p>
+      <p>Bước kích hoạt bật “Dùng dữ liệu của màn hình và ứng dụng” của trợ lý mặc định để khoanh tròn để hỏi được. Ảnh màn hình khi đó do Gemini chụp và xử lý theo chính sách của Google; AI Key Bridge không nhận hay lưu ảnh nào.</p>
 
       <h2>Micro và âm thanh</h2>
-      <p>App không xin quyền <code>RECORD_AUDIO</code> và không có khả năng ghi âm. Khi Gemini mở, app chỉ mô phỏng một cú chạm vào nút Micro của Gemini. Âm thanh do Gemini xử lý theo chính sách của Google.</p>
+      <p>App không xin quyền <code>RECORD_AUDIO</code> và không có khả năng ghi âm. Khi lớp phủ Gemini mở, script chỉ mô phỏng một cú chạm vào nút Micro của Gemini. Âm thanh do Gemini xử lý theo chính sách của Google.</p>
 
       <h2>Dữ liệu lưu trên máy</h2>
       <ul>
@@ -59,7 +59,7 @@
       <ul>
         <li>Nhật ký của app: tên gói, tên lớp cửa sổ, kết quả lệnh và thời lượng — không có văn bản màn hình.</li>
         <li>Lý do các lần app bị tắt (vuốt khỏi đa nhiệm, ROM dọn RAM, crash…), do Android ghi lại.</li>
-        <li>Nếu có Shizuku: logcat toàn máy và trạng thái hệ thống (Trợ năng, trợ lý mặc định, quyền của app). Phần này <strong>không được che</strong> và có thể chứa tên app khác, tên Wi-Fi hay tài khoản.</li>
+        <li>Nếu có Shizuku: logcat toàn máy và trạng thái hệ thống (trợ lý mặc định, quyền của app, trạng thái script). Phần này <strong>không được che</strong> và có thể chứa tên app khác, tên Wi-Fi hay tài khoản.</li>
       </ul>
       <p>Vì vậy chỉ gửi file zip riêng cho người phát triển, không đăng công khai.</p>
 
@@ -68,10 +68,9 @@
 
       <h2>Quyền hệ thống được dùng</h2>
       <ul>
-        <li><strong>Shizuku</strong> — chạy script nền (chế độ khuyên dùng) và lệnh cấu hình. Không bắt buộc nếu bạn dùng chế độ Đầy đủ và dán lệnh ADB.</li>
-        <li><strong>Trợ năng</strong> (chỉ chế độ Đầy đủ) — bắt sự kiện cửa sổ trợ lý gốc, tìm nút Micro và thực hiện thao tác chạm.</li>
+        <li><strong>Shizuku</strong> — khởi chạy script nền và lệnh cấu hình. Không bắt buộc nếu bạn dán lệnh ADB từ máy tính. Script chạy tiếp cả khi Shizuku đã dừng và Gỡ lỗi USB đã tắt.</li>
         <li><strong>READ_LOGS</strong> (tuỳ chọn, cấp qua Shizuku/ADB) — chế độ nút cứng B đọc event log để biết bạn vừa bấm nút.</li>
-        <li><strong>Bỏ giới hạn pin</strong> (khuyến nghị) — giữ service sống sau khi reboot.</li>
+        <li><strong>Bỏ giới hạn pin</strong> (khuyến nghị) — để ROM không dọn app khi bạn mở lại nó.</li>
         <li><strong>Truy vấn gói</strong> — kiểm tra Gemini và trợ lý gốc đã cài hay chưa.</li>
       </ul>
       <p>App không xin quyền vị trí, danh bạ, tin nhắn, camera, bộ nhớ ngoài hay quyền INTERNET.</p>

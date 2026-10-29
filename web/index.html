@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Key Bridge — Hô “Hi Jovi”, Gemini trả lời</title>
-<meta name="description" content="Biến khẩu lệnh và nút AI của ROM nội địa thành cửa mở Gemini. Script nền qua Shizuku hoặc Trợ năng, không cần PC, không root. Mã nguồn mở MIT, Android 11+.">
+<meta name="description" content="Hô “Hi Jovi” là hiện lớp phủ Gemini đang nghe, khoanh tròn để hỏi được. Script nền qua Shizuku, dùng được cùng app ngân hàng, không cần PC, không root. Mã nguồn mở MIT, Android 11+.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0A0B0D">
 <link rel="canonical" href="https://pdong15dth.github.io/gemini-default-ai-phone/">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="vi_VN">
 <meta property="og:title" content="AI Key Bridge — Hô “Hi Jovi”, Gemini trả lời">
-<meta property="og:description" content="Cấu hình một lần. Chạy độc lập, không cần máy tính, không root. Mã nguồn mở MIT.">
+<meta property="og:description" content="Hô “Hi Jovi”, lớp phủ Gemini trả lời. Dùng được cùng app ngân hàng, không cần máy tính, không root. Mã nguồn mở MIT.">
 <meta property="og:image" content="https://pdong15dth.github.io/gemini-default-ai-phone/assets/shots/og-hero.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="635">
@@ -76,7 +76,7 @@
     </nav>
 
     <div class="nav__right">
-      <span class="version"><span class="dot" aria-hidden="true"></span>v1.0.4</span>
+      <span class="version"><span class="dot" aria-hidden="true"></span>v1.0.10</span>
       <a class="btn btn--light btn--sm" href="https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk">
         Tải APK <svg class="i" aria-hidden="true"><use href="#i-arrow-down-to-line"/></svg>
       </a>
@@ -99,7 +99,7 @@
           Hô “Hi Jovi”.<br><span class="accent">Gemini</span> trả lời.
         </h1>
         <p class="hero__sub" data-reveal data-delay="2">
-          Biến khẩu lệnh và nút AI của ROM nội địa thành cửa mở Gemini: bắt trợ lý gốc vừa mở, đóng nó, mở Gemini với Micro bật sẵn. Chạy bằng script nền qua Shizuku — không cần Trợ năng, không cần máy tính.
+          Biến khẩu lệnh và nút AI của ROM nội địa thành cửa mở Gemini: bắt trợ lý gốc vừa mở, đóng nó, hiện lớp phủ Gemini với Micro bật sẵn và khoanh tròn để hỏi được. Script nền chạy độc lập — tắt Gỡ lỗi USB để dùng app ngân hàng vẫn chạy.
         </p>
         <div class="hero__cta" data-reveal data-delay="3">
           <a class="btn btn--accent" href="https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk">
@@ -114,7 +114,7 @@
         <ul class="hero__trust" data-reveal data-delay="4">
           <li><svg class="i" aria-hidden="true"><use href="#i-shield-check"/></svg>Không root</li>
           <li><svg class="i" aria-hidden="true"><use href="#i-volume-off"/></svg>Không ghi âm</li>
-          <li><svg class="i" aria-hidden="true"><use href="#i-plug-zap"/></svg>Chạy offline</li>
+          <li><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Dùng cùng app ngân hàng</li>
         </ul>
       </div>
 
@@ -132,12 +132,12 @@
           <span class="chip__icon"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg></span>
           <span>
             <b>Chuyển hướng xong</b>
-            <small>Hi Jovi → Gemini · 0,9s</small>
+            <small>Hi Jovi → lớp phủ Gemini</small>
           </span>
         </div>
         <div class="chip chip--mic" aria-hidden="true">
           <span class="chip__dot"></span>
-          <span>Micro tự bật · 0.8s</span>
+          <span>Micro tự bật · khoanh tròn được</span>
         </div>
       </div>
     </div>
@@ -177,9 +177,10 @@
             <span class="compare__time compare__time--accent">≈ 3 phút</span>
           </div>
           <ul class="list-check">
-            <li>Chọn cách dùng: Script nền, Đầy đủ hoặc Cấu hình một lần</li>
+            <li>Chọn cách dùng: Script nền (Bank-Safe) hoặc Cấu hình một lần</li>
             <li>Chạm “Kích hoạt &amp; vá lỗi” — Shizuku chạy lệnh thay PC</li>
-            <li>Hô “Hi Jovi” → Gemini mở, Micro bật</li>
+            <li>Hô “Hi Jovi” → lớp phủ Gemini, Micro bật, khoanh tròn được</li>
+            <li>Tắt Tuỳ chọn nhà phát triển &amp; Gỡ lỗi USB để dùng app ngân hàng — script vẫn chạy</li>
             <li>Reboot: bật lại script bằng một chạm, không cần cáp</li>
             <li>Đổi đích đến: Gemini, ChatGPT Voice, Claude hoặc app khác</li>
           </ul>
@@ -195,10 +196,10 @@
       <header class="head head--split" data-reveal>
         <div>
           <p class="eyebrow">Luồng chạy thật</p>
-          <h2 class="h2" id="how-title">Từ tiếng gọi đến Micro:<br>dưới 1 giây.</h2>
+          <h2 class="h2" id="how-title">Từ tiếng gọi đến Micro:<br>chưa tới 2 giây.</h2>
         </div>
         <p class="head__aside">
-          Không đọc nội dung màn hình, không ghi âm. Script nền đọc sự kiện hệ thống qua Shizuku; chế độ Đầy đủ dùng Trợ năng để quan sát cửa sổ. Cả hai đều chỉ bấm Back rồi gọi Gemini.
+          Không dùng Trợ năng, không ghi âm. Script shell chỉ lọc tên sự kiện trong event log, bấm Back rồi gọi lớp phủ Gemini — giống hệt tự giữ nút nguồn.
         </p>
       </header>
 
@@ -206,7 +207,7 @@
         <li class="step" data-reveal>
           <span class="step__num">01 <span>/ ≈ 50 ms</span></span>
           <h3 class="step__title">Bắt trợ lý gốc</h3>
-          <p class="step__desc">Script thấy CopilotPanelWindow trong event log (Đầy đủ: Trợ năng thấy cửa sổ).</p>
+          <p class="step__desc">Script thấy CopilotPanelWindow trong event log.</p>
         </li>
         <li class="step" data-reveal data-delay="1">
           <span class="step__num">02 <span>/ ≈ 500 ms</span></span>
@@ -215,13 +216,13 @@
         </li>
         <li class="step" data-reveal data-delay="2">
           <span class="step__num">03 <span>/ ≈ 400 ms</span></span>
-          <h3 class="step__title">Mở Gemini</h3>
-          <p class="step__desc">Script: keyevent 231 (phím trợ lý giọng nói). Đầy đủ: intent tường minh tới Gemini.</p>
+          <h3 class="step__title">Mở lớp phủ Gemini</h3>
+          <p class="step__desc">Keyevent 219 (phím trợ lý, như giữ nút nguồn): lớp phủ có ảnh màn hình nên khoanh tròn được.</p>
         </li>
         <li class="step" data-reveal data-delay="3">
-          <span class="step__num">04 <span>/ ≈ 250 ms</span></span>
+          <span class="step__num">04 <span>/ ≈ 600 ms</span></span>
           <h3 class="step__title">Micro bật sẵn</h3>
-          <p class="step__desc">Keyevent 231 mở thẳng chế độ nghe. Đầy đủ: tìm nút Micro rồi chạm.</p>
+          <p class="step__desc">Chờ lớp phủ đứng yên rồi chạm Micro theo tỉ lệ màn hình. Google kẹt thì tự khởi động lại và gọi lần nữa.</p>
         </li>
       </ol>
 
@@ -240,14 +241,15 @@
 <span class="c"># 2 · vá crash locale Tiểu V</span>
 <span class="p">$</span> cmd locale set-app-locales com.vivo.ai.copilot --locales en-US
 <span class="ok">✓ en-US</span>
-<span class="c"># 3 · quyền overlay cho màn hình khóa</span>
-<span class="p">$</span> cmd appops set com.google.android.apps.bard SYSTEM_ALERT_WINDOW allow</code></pre>
+<span class="c"># 3 · cho Gemini xem màn hình (khoanh tròn)</span>
+<span class="p">$</span> settings put secure assist_screenshot_enabled 1
+<span class="ok">✓ on</span></code></pre>
         </div>
 
         <div class="provision__copy" data-reveal data-delay="1">
-          <h3 class="h3">Cấu hình 7 lệnh, hoặc dán tay nếu chưa có Shizuku.</h3>
-          <p>Provisioner chạy qua Shizuku hoặc in lệnh ADB cho bạn dán. Mỗi bước đều đọc lại giá trị để xác nhận — không tin exit code. Lệnh nào fail thì báo đúng lệnh đó, kèm gợi ý theo ROM.</p>
-          <p class="note"><svg class="i" aria-hidden="true"><use href="#i-triangle-alert"/></svg>Shizuku không root phải bật lại sau reboot, rồi bấm “Bật script” trong app. Chế độ Đầy đủ chạy bằng Trợ năng nên không cần Shizuku lúc chạy.</p>
+          <h3 class="h3">Cấu hình 8 lệnh, hoặc dán tay nếu chưa có Shizuku.</h3>
+          <p>Provisioner chạy qua Shizuku hoặc in lệnh ADB cho bạn dán. Mỗi bước đều đọc lại giá trị để xác nhận — không tin exit code; bước nào đã đúng thì bỏ qua, không làm Google và Tiểu V khởi động lại. Lệnh nào fail thì báo đúng lệnh đó, kèm gợi ý theo ROM.</p>
+          <p class="note"><svg class="i" aria-hidden="true"><use href="#i-triangle-alert"/></svg>Kích hoạt xong thì tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB — script vẫn chạy. Khởi động lại máy là script mất: bật lại Shizuku, mở app, bấm Kích hoạt.</p>
         </div>
       </div>
     </div>
@@ -287,7 +289,7 @@
           <figcaption>
             <span class="screen-card__num">02</span>
             <h3>Chọn cách dùng</h3>
-            <p>Script nền (khuyên dùng, không cần Trợ năng), Đầy đủ (Trợ năng) hoặc Cấu hình một lần.</p>
+            <p>Script nền (Bank-Safe, khuyên dùng) hoặc Cấu hình một lần. Không cái nào cần Trợ năng.</p>
           </figcaption>
         </figure>
 
@@ -301,7 +303,7 @@
           <figcaption>
             <span class="screen-card__num">03</span>
             <h3>Kích hoạt &amp; vá lỗi</h3>
-            <p>Bảy lệnh chạy một lần, đọc lại từng bước để xác nhận.</p>
+            <p>Các lệnh cấu hình chạy một lần, đọc lại từng bước để xác nhận.</p>
           </figcaption>
         </figure>
       </div>
@@ -323,12 +325,12 @@
         <li class="feature" data-reveal>
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-monitor-smartphone"/></svg>
           <h3>Không cần PC</h3>
-          <p>Shizuku chạy script ngay trên máy. Rút cáp, tắt laptop, đóng terminal — chuyển hướng vẫn hoạt động.</p>
+          <p>Shizuku khởi chạy script ngay trên máy. Rút cáp, tắt laptop, dừng Shizuku, vuốt tắt app — chuyển hướng vẫn hoạt động.</p>
         </li>
         <li class="feature" data-reveal data-delay="1">
-          <svg class="i feature__icon" aria-hidden="true"><use href="#i-refresh-cw"/></svg>
-          <h3>Ba cách dùng</h3>
-          <p>Script nền không cần Trợ năng; Đầy đủ dùng Trợ năng và tự chạy lại sau reboot; Cấu hình một lần chỉ gán phím, không chạy nền.</p>
+          <svg class="i feature__icon" aria-hidden="true"><use href="#i-lock"/></svg>
+          <h3>Dùng cùng app ngân hàng</h3>
+          <p>Không Trợ năng, không cần bật Gỡ lỗi USB lúc chạy. Tắt hẳn Tuỳ chọn nhà phát triển để app ngân hàng không chặn — script vẫn chạy.</p>
         </li>
         <li class="feature" data-reveal data-delay="2">
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-languages"/></svg>
@@ -337,13 +339,13 @@
         </li>
         <li class="feature" data-reveal>
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-mic"/></svg>
-          <h3>Tự bật Micro</h3>
-          <p>Script gọi keyevent 231 nên Gemini mở thẳng chế độ nghe. Chế độ Đầy đủ tìm nút Micro trong cửa sổ Gemini rồi chạm, không hard-code độ phân giải.</p>
+          <h3>Micro bật, khoanh tròn được</h3>
+          <p>Lớp phủ Gemini mở bằng phím trợ lý nên khoanh tròn để hỏi được; script chạm Micro khi lớp phủ đã hiện hẳn, theo tỉ lệ màn hình chứ không hard-code độ phân giải.</p>
         </li>
         <li class="feature" data-reveal data-delay="1">
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-power"/></svg>
           <h3>Nút cứng → AI</h3>
-          <p>Nhấn giữ nút lối tắt là mở Gemini. Chế độ A bắt cửa sổ Tiểu V; chế độ B đọc event log nên Tiểu V không nháy lên.</p>
+          <p>Bấm nút AI hay nút lối tắt là mở lớp phủ Gemini. Script đọc event log của nút nên Tiểu V không kịp hiện lên.</p>
         </li>
         <li class="feature" data-reveal data-delay="2">
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-layers"/></svg>
@@ -474,13 +476,13 @@
         <header class="head" data-reveal>
           <p class="eyebrow eyebrow--dark">Riêng tư &amp; câu hỏi</p>
           <h2 class="h2 h2--dark" id="privacy-title">Nó nhìn thấy cửa sổ, không nhìn thấy bạn.</h2>
-          <p class="lede">Script nền không cần Trợ năng. Nếu bạn chọn chế độ Đầy đủ, đây là chính xác những gì app đọc, và những gì nó không bao giờ chạm vào.</p>
+          <p class="lede">App không dùng Trợ năng. Đây là chính xác những gì script đọc, và những gì nó không bao giờ chạm vào.</p>
         </header>
 
         <ul class="privacy-list">
           <li data-reveal>
             <span class="privacy-list__icon"><svg class="i" aria-hidden="true"><use href="#i-shield-check"/></svg></span>
-            <div><h3>Không đọc nội dung màn hình</h3><p>Script nền chỉ lọc tên sự kiện trong event log. Chế độ Đầy đủ chỉ so khớp tên gói, tên cửa sổ; khi Gemini mở thì đọc tên nút và mô tả để tìm Micro — không đọc văn bản.</p></div>
+            <div><h3>Không đọc nội dung màn hình</h3><p>Script chỉ lọc tên sự kiện trong event log và xem tên cửa sổ đang mở để biết lớp phủ Gemini đã hiện — không đọc văn bản, không chụp màn hình.</p></div>
           </li>
           <li data-reveal data-delay="1">
             <span class="privacy-list__icon"><svg class="i" aria-hidden="true"><use href="#i-volume-off"/></svg></span>
@@ -500,16 +502,16 @@
             <svg class="i" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="faq__a" id="faq-a1" role="region" aria-labelledby="faq-q1"><div>
-            <p>Không. App không dùng root, không Xposed, không cài system app. Shizuku (không root) cho app quyền shell để chạy script nền và lệnh cấu hình. Không muốn dùng Shizuku thì chọn chế độ Đầy đủ (Trợ năng) và dán lệnh ADB một lần.</p>
+            <p>Không. App không dùng root, không Xposed, không cài system app. Shizuku (không root) cho app quyền shell để chạy script nền và lệnh cấu hình. Không muốn dùng Shizuku thì dán lệnh ADB từ máy tính một lần.</p>
           </div></div>
         </div>
         <div class="faq__item">
           <button class="faq__q" type="button" aria-expanded="false" aria-controls="faq-a2" id="faq-q2">
-            Có bắt buộc bật Trợ năng không?
+            Dùng được app ngân hàng không?
             <svg class="i" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="faq__a" id="faq-a2" role="region" aria-labelledby="faq-q2"><div>
-            <p>Không. Chế độ Script nền (khuyên dùng) chạy script shell qua Shizuku: đọc event log để biết trợ lý gốc vừa mở, bấm Back rồi gọi Gemini bằng keyevent 231 — không cần Trợ năng. Cấu hình một lần cũng không cần. Chỉ chế độ Đầy đủ dùng Trợ năng: service đọc tên gói, tên cửa sổ; khi Gemini mở thì đọc tên nút và mô tả để tìm Micro. Không đọc văn bản, không chụp màn hình và không lưu lại gì.</p>
+            <p>Được. Từ bản 1.0.10 app không còn dùng Trợ năng. Kích hoạt xong, bạn tắt công tắc tổng Tuỳ chọn nhà phát triển và Gỡ lỗi USB — hai cài đặt mà app ngân hàng chặn. Script nền chạy bằng quyền shell, tách khỏi app và Shizuku, nên vẫn chuyển “Hi Jovi” sang Gemini.</p>
           </div></div>
         </div>
         <div class="faq__item">
@@ -518,7 +520,7 @@
             <svg class="i" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="faq__a" id="faq-a3" role="region" aria-labelledby="faq-q3"><div>
-            <p>Không phụ thuộc PC: rút cáp vẫn chạy. Script nền chạy tách khỏi app nên kill app hay vuốt khỏi đa nhiệm vẫn dùng được; chỉ mất khi khởi động lại máy — bật lại Shizuku, mở app, bấm “Bật script”. Chế độ Đầy đủ được hệ thống bật lại sau reboot nếu Trợ năng còn bật và app không bị ROM chặn tự khởi chạy; riêng chế độ này, vuốt app khỏi đa nhiệm trên OriginOS là force-stop và làm tắt Trợ năng — hãy khóa app trong đa nhiệm.</p>
+            <p>Không phụ thuộc PC: rút cáp vẫn chạy. Script nền chạy tách khỏi app nên vuốt app khỏi đa nhiệm, dọn đa nhiệm, dừng Shizuku hay tắt Gỡ lỗi USB vẫn dùng được; chỉ mất khi khởi động lại máy — bật lại Shizuku, mở app, bấm Kích hoạt.</p>
           </div></div>
         </div>
         <div class="faq__item">
@@ -527,7 +529,7 @@
             <svg class="i" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
           <div class="faq__a" id="faq-a4" role="region" aria-labelledby="faq-q4"><div>
-            <p>Không. App can thiệp vào trợ lý hệ thống (qua Shizuku hoặc Trợ năng) nên không phù hợp chính sách Play. APK phát hành trực tiếp trên GitHub Releases, ký bằng một khoá cố định, kèm file SHA-256.</p>
+            <p>Không. App can thiệp vào trợ lý hệ thống qua quyền shell (Shizuku) nên không phù hợp chính sách Play. APK phát hành trực tiếp trên GitHub Releases, ký bằng một khoá cố định, kèm file SHA-256.</p>
           </div></div>
         </div>
         <div class="faq__item">
