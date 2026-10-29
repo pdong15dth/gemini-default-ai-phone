@@ -1,5 +1,12 @@
 # AI Key Bridge
 
+[![Phiên bản](https://img.shields.io/github/v/release/pdong15dth/gemini-default-ai-phone?label=Phi%C3%AAn%20b%E1%BA%A3n&logo=github&color=0969da)](https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest)
+[![Lượt tải](https://img.shields.io/github/downloads/pdong15dth/gemini-default-ai-phone/total?label=L%C6%B0%E1%BB%A3t%20t%E1%BA%A3i&logo=android&logoColor=white&color=2ea44f)](https://github.com/pdong15dth/gemini-default-ai-phone/releases)
+[![Stars](https://img.shields.io/github/stars/pdong15dth/gemini-default-ai-phone?label=Stars&logo=github&color=eab308)](https://github.com/pdong15dth/gemini-default-ai-phone/stargazers)
+[![Build APK](https://img.shields.io/github/actions/workflow/status/pdong15dth/gemini-default-ai-phone/android.yml?label=Build%20APK&logo=githubactions&logoColor=white)](https://github.com/pdong15dth/gemini-default-ai-phone/actions/workflows/android.yml)
+[![Android](https://img.shields.io/badge/Android-11%2B-3DDC84?logo=android&logoColor=white)](#cai-dat-va-thiet-lap)
+[![Giấy phép](https://img.shields.io/github/license/pdong15dth/gemini-default-ai-phone?label=Gi%E1%BA%A5y%20ph%C3%A9p&color=6e7781)](LICENSE)
+
 **Hô "Hi Jovi". Gemini trả lời.**
 
 App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi trên Vivo OriginOS và các hãng khác) bằng **Google Gemini** — cả câu lệnh giọng nói lẫn nút cứng, tự bật Micro. Không root, không bắt buộc Trợ năng, không cần máy tính sau khi cài.
