@@ -22,6 +22,9 @@ enum class HardwareMode { WINDOW, LOGCAT }
  */
 enum class UsageMode { FULL, SCRIPT, ONE_TIME }
 
+/** Giao diện: SYSTEM = theo cài đặt hệ thống (mặc định), LIGHT = sáng, DARK = tối. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
 data class AppSettings(
     val redirectEnabled: Boolean = true,
     val autoMic: Boolean = true,
@@ -47,6 +50,7 @@ data class AppSettings(
     val customLogPatterns: List<String> = emptyList(),
     val provisionedFingerprint: String? = null,
     val lastRomCheckAt: Long = 0,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
 )
 
 class SettingsRepository(context: Context) {
@@ -124,6 +128,8 @@ class SettingsRepository(context: Context) {
 
     fun setLastRomCheck(at: Long) = edit { putLong(KEY_ROM_CHECK, at) }
 
+    fun setThemeMode(mode: ThemeMode) = edit { putString(KEY_THEME_MODE, mode.name) }
+
     private fun writeTriggers(list: List<CustomTrigger>) = edit {
         putString(KEY_CUSTOM_TRIGGERS, list.joinToString("\n") { "${it.packageName}\t${it.className}" })
     }
@@ -167,6 +173,9 @@ class SettingsRepository(context: Context) {
             .filter { it.isNotBlank() },
         provisionedFingerprint = prefs.getString(KEY_FINGERPRINT, null),
         lastRomCheckAt = prefs.getLong(KEY_ROM_CHECK, 0),
+        themeMode = prefs.getString(KEY_THEME_MODE, null)
+            ?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } }
+            ?: ThemeMode.SYSTEM,
     )
 
     private fun edit(block: SharedPreferences.Editor.() -> Unit) {
@@ -204,6 +213,7 @@ class SettingsRepository(context: Context) {
         const val KEY_LOG_PATTERNS = "custom_log_patterns"
         const val KEY_FINGERPRINT = "provisioned_fingerprint"
         const val KEY_ROM_CHECK = "last_rom_check"
+        const val KEY_THEME_MODE = "theme_mode"
         const val MAX_CUSTOM_TRIGGERS = 10
     }
 }

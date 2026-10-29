@@ -10,6 +10,7 @@ import com.aikeybridge.data.ConfigResolver
 import com.aikeybridge.data.ConfigSource
 import com.aikeybridge.data.CustomTrigger
 import com.aikeybridge.data.HardwareMode
+import com.aikeybridge.data.ThemeMode
 import com.aikeybridge.data.UsageMode
 import com.aikeybridge.data.PermissionSnapshot
 import com.aikeybridge.data.PermissionsReader
@@ -161,13 +162,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private val scriptImportLock = Any()
+
     /** Đưa các lượt script nền đã ghi vào Nhật ký, rồi xoá file. */
     fun importScriptEvents() {
         val file = scriptEventLog ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            val lines = runCatching { if (file.exists()) file.readLines() else emptyList() }.getOrDefault(emptyList())
+            val lines = synchronized(scriptImportLock) {
+                val read = runCatching { if (file.exists()) file.readLines() else emptyList() }.getOrDefault(emptyList())
+                if (read.isNotEmpty()) {
+                    runCatching { file.writeText("") }
+                }
+                read
+            }
             if (lines.isEmpty()) return@launch
-            runCatching { file.writeText("") }
             val active = config.value
             lines.mapNotNull(WatchScript::parseEvent).forEach { (at, kind) ->
                 AttemptLog.record(
@@ -342,13 +350,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshPermissions() {
         importScriptEvents()
         val active = config.value
-        _permissions.value = PermissionsReader.read(
+        val snap = PermissionsReader.read(
             context = app,
             settings = settingsRepository.state.value,
             targetPackages = active.target.packages,
             assistantRequired = false,
             nativeAssistantPackages = active.profile.assistantPackages,
         )
+        _permissions.value = snap
+        if (snap.shizukuGranted) {
+            viewModelScope.launch {
+                val res = shell.exec(PermissionsReader.VIVO_QUERY_CMD)
+                if (res.ok && PermissionsReader.updateFromVivoShell(app, res.stdout)) {
+                    val latestActive = config.value
+                    _permissions.value = PermissionsReader.read(
+                        context = app,
+                        settings = settingsRepository.state.value,
+                        targetPackages = latestActive.target.packages,
+                        assistantRequired = false,
+                        nativeAssistantPackages = latestActive.profile.assistantPackages,
+                    )
+                }
+            }
+        }
     }
 
     fun markOnboardingDone() {
@@ -377,6 +401,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setRedirectEnabled(value: Boolean) = settingsRepository.setRedirectEnabled(value)
 
     fun setDedupe(value: Boolean) = settingsRepository.setDedupe(value)
+
+    fun setThemeMode(mode: ThemeMode) = settingsRepository.setThemeMode(mode)
 
     fun setManualAutostart(value: Boolean) {
         settingsRepository.setManualAutostart(value)

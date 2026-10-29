@@ -53,6 +53,7 @@ import com.aikeybridge.ui.StepStatus
 import com.aikeybridge.ui.components.BodyText
 import com.aikeybridge.ui.components.Chip
 import com.aikeybridge.ui.components.Gap
+import com.aikeybridge.ui.components.IconTile
 import com.aikeybridge.ui.components.LucideIcon
 import com.aikeybridge.ui.components.MonoText
 import com.aikeybridge.ui.components.PrimaryCta
@@ -61,6 +62,9 @@ import com.aikeybridge.ui.components.StatusDot
 import com.aikeybridge.ui.components.SubHeader
 import com.aikeybridge.ui.components.hairlineBottom
 import com.aikeybridge.ui.theme.Accent
+import com.aikeybridge.ui.theme.CommunityBg
+import com.aikeybridge.ui.theme.CommunityLine
+import com.aikeybridge.ui.theme.CommunityTitle
 import com.aikeybridge.ui.theme.Danger
 import com.aikeybridge.ui.theme.DangerBg
 import com.aikeybridge.ui.theme.DangerBody
@@ -94,6 +98,7 @@ fun SetupScreen(
     onRequestShizuku: () -> Unit,
     onFinish: () -> Unit,
     onMessage: (String) -> Unit,
+    onOpenPermissions: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -104,6 +109,60 @@ fun SetupScreen(
     val copyAdb = {
         copyToClipboard(context, "Lệnh ADB AI Key Bridge", setup.adbScript)
         onMessage("Đã copy ${setup.steps.size} lệnh ADB.")
+    }
+
+    fun liveStepStatus(stepId: String): Boolean? = when (stepId) {
+        "assistant" -> permissions.assistantDefault
+        "voice_interaction" -> permissions.voiceInteraction
+        "screen_context" -> permissions.screenContextEnabled
+        "overlay_google" -> permissions.googleVivoDetail.floating ?: permissions.googleVivoGranted
+        "overlay_gemini" -> permissions.geminiVivoDetail.floating ?: permissions.geminiVivoGranted
+        "battery_whitelist" -> permissions.bothBatteryUnrestricted
+        "gemini_bg" -> permissions.geminiBatteryUnrestricted &&
+            (permissions.geminiVivoDetail.bgPopup ?: permissions.geminiVivoGranted)
+        else -> null
+    }
+
+    fun manualStepAction(stepId: String): Pair<String, () -> Unit>? = when (stepId) {
+        "assistant", "voice_interaction" ->
+            "Mở Trợ lý mặc định" to {
+                Intents.openAssistantSettings(
+                    context,
+                    assistantAlreadySelected = permissions.assistantDefault && !permissions.screenContextEnabled,
+                )
+            }
+        "screen_context" ->
+            "Mở Trợ lý mặc định" to {
+                Intents.openAssistantSettings(context, assistantAlreadySelected = true)
+            }
+        "overlay_google" ->
+            "Mở Cửa sổ nổi Google" to {
+                Intents.openAppPermissions(context, Intents.GOOGLE_PACKAGE, perId = 10004)
+            }
+        "overlay_gemini" ->
+            "Mở Cửa sổ nổi Gemini" to {
+                Intents.openAppPermissions(context, Intents.GEMINI_PACKAGE, perId = 10004)
+            }
+        "gemini_bg" ->
+            "Mở Bật lên dưới nền Gemini" to {
+                Intents.openAppPermissions(context, Intents.GEMINI_PACKAGE, perId = 10007)
+            }
+        "battery_whitelist" ->
+            "Mở Pin dưới nền" to {
+                val targetPkg = when {
+                    !permissions.googleBatteryUnrestricted -> Intents.GOOGLE_PACKAGE
+                    !permissions.geminiBatteryUnrestricted -> Intents.GEMINI_PACKAGE
+                    else -> Intents.GOOGLE_PACKAGE
+                }
+                Intents.openBackgroundBatterySettings(context, targetPkg)
+            }
+        "vivo_agent_bg", "copilot_locale" ->
+            "Mở Đánh thức giọng nói" to { Intents.openVoiceWakeSettings(context) }
+        else -> null
+    }
+
+    val effectivePassed = setup.steps.count { step ->
+        step.status == StepStatus.OK || (step.status == StepStatus.PENDING && liveStepStatus(step.id) == true)
     }
 
     Column(modifier.fillMaxSize()) {
@@ -133,8 +192,7 @@ fun SetupScreen(
             if (total > 0) {
                 BodyText(
                     if (config.target.shellKeyevent != null) {
-                        "Không bắt buộc. Chưa chạy thì app mở ${config.target.displayName} toàn màn hình; " +
-                            "chạy xong (và có Shizuku) thì mở lớp phủ nổi, kèm vá lỗi cho ${config.profile.assistantName}."
+                        "Chạy tự động qua Shizuku hoặc bấm “Mở cài đặt” ở từng dòng để bật thủ công."
                     } else {
                         "Không bắt buộc — chỉ vá lỗi cho ${config.profile.assistantName}."
                     },
@@ -142,6 +200,44 @@ fun SetupScreen(
                     TextDim,
                     lineHeight = 17.sp,
                 )
+            }
+
+            if (onOpenPermissions != null) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(15.dp))
+                        .background(if (permissions.ready) CommunityBg else DangerBg)
+                        .border(
+                            1.dp,
+                            if (permissions.ready) CommunityLine else DangerLine,
+                            RoundedCornerShape(15.dp),
+                        )
+                        .clickable(role = Role.Button, onClick = onOpenPermissions)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconTile(R.drawable.lc_shield_check)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        BodyText(
+                            if (permissions.ready) {
+                                "Hướng dẫn cấp quyền từng bước (kèm ảnh)"
+                            } else {
+                                "Đang thiếu quyền — Mở hướng dẫn từng bước"
+                            },
+                            13.sp,
+                            if (permissions.ready) CommunityTitle else TextMain,
+                            weight = FontWeight.SemiBold,
+                        )
+                        MonoText(
+                            "${permissions.coreGrantedCount}/${permissions.coreTotalCount} nhóm đạt · kèm ảnh chụp màn hình & nút mở cài đặt",
+                            9.5.sp,
+                            if (permissions.ready) Accent else Warn,
+                        )
+                    }
+                    LucideIcon(R.drawable.lc_chevron_right, if (permissions.ready) Accent else Warn, 16.dp)
+                }
             }
 
             if (total == 0) {
@@ -162,12 +258,12 @@ fun SetupScreen(
                         Box(
                             Modifier
                                 .fillMaxHeight()
-                                .fillMaxWidth(setup.passed / total.toFloat())
+                                .fillMaxWidth(effectivePassed / total.toFloat())
                                 .clip(CircleShape)
                                 .background(Accent),
                         )
                     }
-                    MonoText("${setup.passed} / $total", 10.5.sp, TextLabel)
+                    MonoText("$effectivePassed / $total", 10.5.sp, TextLabel)
                 }
 
                 Column(
@@ -179,8 +275,13 @@ fun SetupScreen(
                         .padding(horizontal = 14.dp, vertical = 4.dp),
                 ) {
                     setup.steps.forEachIndexed { index, step ->
+                        val manual = manualStepAction(step.id)
                         CommandRow(
                             step = step,
+                            liveGranted = liveStepStatus(step.id),
+                            manualLabel = manual?.first,
+                            onOpenManual = manual?.second,
+                            onOpenGuide = onOpenPermissions,
                             expanded = expanded == step.id,
                             divider = index != setup.steps.lastIndex,
                             onClick = { expanded = if (expanded == step.id) null else step.id },
@@ -325,9 +426,20 @@ fun SetupScreen(
 }
 
 @Composable
-private fun CommandRow(step: SetupStepUi, expanded: Boolean, divider: Boolean, onClick: () -> Unit) {
+private fun CommandRow(
+    step: SetupStepUi,
+    liveGranted: Boolean?,
+    manualLabel: String?,
+    onOpenManual: (() -> Unit)?,
+    onOpenGuide: (() -> Unit)?,
+    expanded: Boolean,
+    divider: Boolean,
+    onClick: () -> Unit,
+) {
     val (name, value) = remember(step.command) { Format.shortCommand(step.command) }
     val failed = step.status == StepStatus.FAILED
+    val missingLive = step.status == StepStatus.PENDING && liveGranted == false
+    val okLive = step.status == StepStatus.OK || (step.status == StepStatus.PENDING && liveGranted == true)
     Column(
         Modifier
             .fillMaxWidth()
@@ -337,22 +449,53 @@ private fun CommandRow(step: SetupStepUi, expanded: Boolean, divider: Boolean, o
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(12.dp), contentAlignment = Alignment.Center) {
-                when (step.status) {
-                    StepStatus.OK -> LucideIcon(R.drawable.lc_check, Accent, 12.dp)
-                    StepStatus.FAILED -> LucideIcon(R.drawable.lc_x, Danger, 12.dp)
-                    StepStatus.RUNNING -> CircularProgressIndicator(Modifier.size(11.dp), color = Accent, strokeWidth = 1.5.dp)
-                    StepStatus.PENDING -> StatusDot(TextFaint, 5.dp)
+                when {
+                    okLive -> LucideIcon(R.drawable.lc_check, Accent, 12.dp)
+                    failed -> LucideIcon(R.drawable.lc_x, Danger, 12.dp)
+                    step.status == StepStatus.RUNNING -> CircularProgressIndicator(Modifier.size(11.dp), color = Accent, strokeWidth = 1.5.dp)
+                    missingLive -> StatusDot(Warn, 6.dp)
+                    else -> StatusDot(TextFaint, 5.dp)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                MonoText(name, 10.5.sp, if (failed) DangerText else TextBody)
+                BodyText(
+                    step.title,
+                    12.5.sp,
+                    when {
+                        failed -> DangerText
+                        missingLive -> Warn
+                        else -> TextMain
+                    },
+                    weight = FontWeight.Medium,
+                    maxLines = 1,
+                )
                 MonoText(
                     when {
-                        failed -> "$value · ${step.message.ifBlank { "lỗi" }}"
-                        else -> value
+                        failed -> "$name · ${step.message.ifBlank { "lỗi" }}"
+                        missingLive -> "$name · đang tắt — cần bật"
+                        okLive -> "$name · đã bật"
+                        else -> "$name · $value"
                     },
                     9.sp,
-                    if (failed) DangerMuted else TextFaint,
+                    when {
+                        failed -> DangerMuted
+                        missingLive -> Warn
+                        okLive -> Accent
+                        else -> TextFaint
+                    },
+                )
+            }
+            if (onOpenManual != null) {
+                MonoText(
+                    if (missingLive) "Bật ↗" else "Cài đặt ↗",
+                    9.sp,
+                    if (missingLive) Warn else Accent,
+                    Modifier
+                        .clip(CircleShape)
+                        .background((if (missingLive) Warn else Accent).copy(alpha = 0.12f))
+                        .border(1.dp, (if (missingLive) Warn else Accent).copy(alpha = 0.35f), CircleShape)
+                        .clickable(role = Role.Button, onClick = onOpenManual)
+                        .padding(horizontal = 9.dp, vertical = 5.dp),
                 )
             }
         }
@@ -361,14 +504,21 @@ private fun CommandRow(step: SetupStepUi, expanded: Boolean, divider: Boolean, o
                 Modifier.padding(start = 22.dp, top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                BodyText(step.title, 12.5.sp, TextMain, weight = FontWeight.Medium)
                 BodyText(step.detail, 11.5.sp, TextDim, lineHeight = 16.sp)
                 MonoText(step.command, 9.sp, TextFaint, maxLines = 4)
                 if (step.message.isNotBlank()) {
                     MonoText(step.message, 9.sp, if (failed) DangerText else Accent, maxLines = 4)
                 }
-                if (failed && step.hint.isNotBlank()) {
+                if ((failed || missingLive) && step.hint.isNotBlank()) {
                     BodyText(step.hint, 11.sp, Warn, lineHeight = 15.sp)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (onOpenManual != null && manualLabel != null) {
+                        LinkAction(manualLabel, onOpenManual)
+                    }
+                    if (onOpenGuide != null) {
+                        LinkAction("Xem ảnh hướng dẫn", onOpenGuide)
+                    }
                 }
             }
         }

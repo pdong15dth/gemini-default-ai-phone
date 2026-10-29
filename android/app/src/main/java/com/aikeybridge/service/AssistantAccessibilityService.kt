@@ -23,6 +23,7 @@ class AssistantAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        activeService = this
         Diagnostics.init(this)
         AttemptLog.init(this)
         val source = runCatching { ConfigSource(this) }
@@ -36,6 +37,7 @@ class AssistantAccessibilityService : AccessibilityService() {
         val newEngine = TriggerEngine(this, source)
         engine = newEngine
         activeEngine = newEngine
+        activeService = this
         RuntimeStatus.setConnected(true)
         val config = source.current()
         Diagnostics.info(
@@ -106,6 +108,8 @@ class AssistantAccessibilityService : AccessibilityService() {
         engine?.destroy()
         engine = null
         activeEngine = null
+        if (activeService === this) activeService = null
+        SettingsGuideHelper.dismiss()
         RuntimeStatus.setConnected(false)
     }
 
@@ -113,6 +117,10 @@ class AssistantAccessibilityService : AccessibilityService() {
         /** Engine của service đang chạy; lối tắt "Gọi AI" dùng để mở đích và bật Micro. */
         @Volatile
         var activeEngine: TriggerEngine? = null
+            private set
+
+        @Volatile
+        var activeService: AssistantAccessibilityService? = null
             private set
     }
 }

@@ -73,21 +73,40 @@ Ba quyết định quan trọng làm nên cách này:
 
 ## Bước 1 — Cài Google/Gemini và cấp quyền trên máy
 
-OriginOS kiểm soát chạy ngầm rất gắt. Thiếu quyền thì panel Gemini sẽ hiện lên rồi tự tắt.
+OriginOS kiểm soát chạy ngầm rất gắt. Thiếu quyền thì panel Gemini sẽ hiện lên rồi tự tắt hoặc không hiện khi khóa màn hình.
+
+> **Mẹo:** Trong app **AI Key Bridge** (mục **Quyền & Hướng dẫn bằng ảnh**), bạn chỉ cần chạm vào từng mục là app mở thẳng đúng màn hình cài đặt bên dưới, không cần tự mò trong Cài đặt.
 
 1. Mở app **Gemini**, làm theo hướng dẫn để đặt Gemini làm trợ lý chính bên trong hệ sinh thái Google.
-2. Vào **Cài đặt → Ứng dụng → Thông tin ứng dụng**, tìm **Google** và **Gemini**, bật đủ 4 mục cho **cả hai app**:
+2. Vào **Cài đặt → Ứng dụng → Thông tin ứng dụng → chọn Google (và Gemini) → Quyền → Tất cả quyền**, bật đủ các quyền trong mục **Quản lý thiết bị**:
 
-   | Quyền | Giá trị |
-   | --- | --- |
-   | Tự khởi chạy (Autostart) | Bật |
-   | Khởi chạy liên kết (Associated startup) | Bật |
-   | Cửa sổ nổi (Floating window) | Bật |
-   | Pin (Battery) | Không hạn chế (Don't restrict background usage) |
+<table>
+  <tr>
+    <td width="33%"><img src="docs/images/guides/guide_vivo_perm_google.webp" alt="Quyền của Google"></td>
+    <td width="33%"><img src="docs/images/guides/guide_vivo_perm_gemini.webp" alt="5 quyền của Gemini"></td>
+    <td width="33%"><img src="docs/images/guides/guide_battery_bg.webp" alt="Kiểm soát pin dưới nền"></td>
+  </tr>
+  <tr>
+    <td><b>Quyền của Google:</b> bật <b>Tự động khởi động</b>, <b>Cửa sổ nổi</b>, <b>Hiển thị trên màn hình khóa</b>.</td>
+    <td><b>Quyền của Gemini:</b> bật đủ 5 mục <b>Tự động khởi động</b>, <b>Khởi động liên kết</b>, <b>Cửa sổ nổi</b>, <b>Hiển thị trên màn hình khóa</b>, <b>Cửa sổ bật lên dưới nền</b>.</td>
+    <td><b>Kiểm soát pin dưới nền:</b> vào <i>Cài đặt → Pin → Kiểm soát pin dưới nền</i>, bấm chữ <b>G</b> bên phải → đặt cả <b>Gemini</b> và <b>Google</b> thành <b>Cho phép sử dụng pin ngầm</b>.</td>
+  </tr>
+</table>
 
-3. Bật sẵn tín hiệu gốc của Vivo để mượn sự kiện:
-   - **Giọng nói:** Cài đặt → Tiểu V (Jovi / 蓝心小V) → Đánh thức bằng giọng nói → bật **"Hi Jovi"**.
-   - **Nút cứng:** Cài đặt → Nút lối tắt → mục **Nhấn và giữ** chọn **Không có hành động nào**. Mục **Nhấn hai lần** giữ nguyên **Chuông/Rung**.
+3. Đặt **Google** làm trợ lý kỹ thuật số mặc định và bật sẵn tín hiệu gốc của Vivo để mượn sự kiện:
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/images/guides/guide_default_assistant.webp" alt="Trợ lý kỹ thuật số mặc định"></td>
+    <td width="33%"><img src="docs/images/guides/guide_voice_wakeup.webp" alt="Đánh thức bằng giọng nói Hi Jovi"></td>
+    <td width="33%"><img src="docs/images/guides/guide_smart_key.webp" alt="Nút thông minh"></td>
+  </tr>
+  <tr>
+    <td><b>Trợ lý số mặc định:</b> chọn <b>Google</b> và bật <b>Dùng dữ liệu của màn hình và ứng dụng</b>.</td>
+    <td><b>Giọng nói:</b> <i>Cài đặt → BlueAI → Trợ lý ảo BlueLM → Đánh thức bằng giọng nói</i> → bật <b>"Hi, Jovi"</b>.</td>
+    <td><b>Nút thông minh (nếu có):</b> <i>Cài đặt → Lối tắt và trợ năng → Nút thông minh</i> → Nhấn và giữ chọn <b>Trợ lý giọng nói</b>.</td>
+  </tr>
+</table>
 
 <a name="buoc-2-adb-chuyen-tro-ly-mac-dinh-va-va-loi-crash"></a>
 
@@ -326,7 +345,18 @@ Script trong repo đã thêm `input keyevent 224` (`KEYCODE_WAKEUP`) sau nhịp 
 
 ### 3. Bật trả lời khi máy khóa trong app Gemini
 
-Mở **Gemini** → ảnh đại diện góc trên → **Cài đặt** → **Gemini trên màn hình khóa** → bật **Dùng Gemini mà không cần mở khóa**. Cần gọi điện/nhắn tin khi khóa thì bật thêm **Gọi điện và nhắn tin mà không cần mở khóa**.
+Mở **Gemini** → chạm **ảnh đại diện (Avatar)** góc trên phải → **Cài đặt** → **Điều khiển thiết bị** → **Gemini trên màn hình khoá** → bật **Dùng Gemini mà không cần mở khoá?**. Cần gọi điện/nhắn tin khi khóa thì bật thêm **Gọi điện và gửi tin nhắn mà không cần mở khoá**.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/guides/guide_gemini_device_control.webp" alt="Gemini Cài đặt -> Điều khiển thiết bị"></td>
+    <td width="50%"><img src="docs/images/guides/guide_gemini_lockscreen.webp" alt="Gemini trên màn hình khoá"></td>
+  </tr>
+  <tr>
+    <td><b>Bước 1:</b> Trong <i>Gemini → Avatar → Cài đặt → Điều khiển thiết bị</i>, chọn <b>Gemini trên màn hình khoá</b>.</td>
+    <td><b>Bước 2:</b> Bật công tắc <b>Dùng Gemini mà không cần mở khoá?</b>.</td>
+  </tr>
+</table>
 
 > Nội dung cá nhân (lịch, tin nhắn, email…) vẫn có thể bị Gemini yêu cầu mở khóa. Đó là giới hạn bảo mật của Google, không phải lỗi script.
 

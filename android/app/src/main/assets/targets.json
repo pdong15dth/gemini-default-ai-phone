@@ -74,6 +74,15 @@
           "verify": "cmd appops get com.google.android.apps.bard SYSTEM_ALERT_WINDOW",
           "expect": "allow",
           "hint": "Cài Gemini từ Play Store trước nếu bước này báo package not found."
+        },
+        {
+          "id": "battery_whitelist",
+          "title": "Cho Google & Gemini dùng pin ngầm",
+          "detail": "Thêm Google và Gemini vào danh sách miễn tối ưu pin (deviceidle whitelist) và cấp quyền chạy nền để không bị đóng băng khi tắt màn hình.",
+          "command": "dumpsys deviceidle whitelist +com.google.android.googlequicksearchbox; dumpsys deviceidle whitelist +com.google.android.apps.bard; cmd appops set com.google.android.googlequicksearchbox RUN_IN_BACKGROUND allow; cmd appops set com.google.android.googlequicksearchbox RUN_ANY_IN_BACKGROUND allow; cmd appops set com.google.android.apps.bard RUN_IN_BACKGROUND allow; cmd appops set com.google.android.apps.bard RUN_ANY_IN_BACKGROUND allow",
+          "verify": "dumpsys deviceidle whitelist",
+          "expect": "googlequicksearchbox",
+          "hint": "Vào Cài đặt → Pin → Kiểm soát pin dưới nền → chọn Cho phép sử dụng pin ngầm cho Google và Gemini."
         }
       ],
       "restore": [

@@ -8,7 +8,13 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.core.content.FileProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aikeybridge.data.ThemeMode
+import com.aikeybridge.service.SettingsGuideHelper
 import com.aikeybridge.ui.AppViewModel
 import com.aikeybridge.ui.BridgeApp
 import com.aikeybridge.ui.theme.BridgeTheme
@@ -26,13 +32,27 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-        )
         runCatching { Shizuku.addRequestPermissionResultListener(permissionListener) }
         setContent {
-            BridgeTheme {
+            val settings by viewModel.settings.collectAsStateWithLifecycle()
+            val darkTheme = when (settings.themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+            }
+            DisposableEffect(darkTheme) {
+                val barStyle = if (darkTheme) {
+                    SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(
+                    statusBarStyle = barStyle,
+                    navigationBarStyle = barStyle,
+                )
+                onDispose {}
+            }
+            BridgeTheme(themeMode = settings.themeMode) {
                 BridgeApp(viewModel)
             }
         }
@@ -40,6 +60,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        SettingsGuideHelper.dismiss()
         viewModel.refreshPermissions()
     }
 

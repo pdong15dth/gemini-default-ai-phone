@@ -34,6 +34,7 @@ import com.aikeybridge.R
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.AppSettings
 import com.aikeybridge.data.PermissionSnapshot
+import com.aikeybridge.data.ThemeMode
 import com.aikeybridge.ui.Format
 import com.aikeybridge.ui.Intents
 import com.aikeybridge.ui.ScriptStatus
@@ -46,6 +47,8 @@ import com.aikeybridge.ui.components.MonoText
 import com.aikeybridge.ui.components.NavRow
 import com.aikeybridge.ui.components.Panel
 import com.aikeybridge.ui.components.SectionLabel
+import com.aikeybridge.ui.components.SegmentOption
+import com.aikeybridge.ui.components.Segmented
 import com.aikeybridge.ui.components.TabHeader
 import com.aikeybridge.ui.theme.Accent
 import com.aikeybridge.ui.theme.CommunityBg
@@ -84,18 +87,15 @@ fun SettingsScreen(
     onExport: () -> Unit,
     onClear: () -> Unit,
     onRestore: () -> Unit,
+    onSetThemeMode: (ThemeMode) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var confirmClear by rememberSaveable { mutableStateOf(false) }
     var confirmRestore by rememberSaveable { mutableStateOf(false) }
     val profile = config.profile
-    val granted = listOf(
-        permissions.accessibility,
-        settings.manualAutostart,
-        permissions.batteryUnrestricted,
-        permissions.targetInstalled,
-    ).count { it }
+    val granted = permissions.coreGrantedCount
+    val totalPerms = permissions.coreTotalCount
 
     Column(modifier.fillMaxSize()) {
         TabHeader("AI Key Bridge", "Cài đặt")
@@ -144,6 +144,28 @@ fun SettingsScreen(
                 )
             }
 
+            SectionLabel("Giao diện", Modifier.padding(top = 8.dp, bottom = 3.dp))
+            Segmented(
+                options = listOf(
+                    SegmentOption("Hệ thống"),
+                    SegmentOption("Sáng"),
+                    SegmentOption("Tối"),
+                ),
+                selected = when (settings.themeMode) {
+                    ThemeMode.SYSTEM -> 0
+                    ThemeMode.LIGHT -> 1
+                    ThemeMode.DARK -> 2
+                },
+                onSelect = { index ->
+                    val mode = when (index) {
+                        1 -> ThemeMode.LIGHT
+                        2 -> ThemeMode.DARK
+                        else -> ThemeMode.SYSTEM
+                    }
+                    onSetThemeMode(mode)
+                },
+            )
+
             SectionLabel("Thiết bị", Modifier.padding(top = 8.dp, bottom = 3.dp))
             Panel {
                 NavRow(
@@ -190,10 +212,10 @@ fun SettingsScreen(
                     onClick = onOpenShortcuts,
                 )
                 NavRow(
-                    title = "Quyền hệ thống",
-                    subtitle = "$granted / 4 đã bật",
-                    trailing = if (permissions.ready) null else "thiếu",
-                    trailingColor = Danger,
+                    title = "Quyền & Hướng dẫn bằng ảnh",
+                    subtitle = "$granted / $totalPerms mục cốt lõi · mở thẳng cài đặt",
+                    trailing = if (permissions.ready) "ảnh HD" else "thiếu",
+                    trailingColor = if (permissions.ready) Accent else Danger,
                     onClick = onOpenPermissions,
                 )
                 NavRow(
