@@ -133,6 +133,7 @@ fun PermissionsScreen(
     onSkip: () -> Unit,
     onToggleAutostart: (Boolean) -> Unit,
     onRequestShizuku: () -> Unit,
+    onConnectShizuku: () -> Unit = onRequestShizuku,
     onStartWirelessPairing: () -> Unit = {},
     onLockDevMode: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -391,17 +392,17 @@ fun PermissionsScreen(
             PermissionGuideItem(
                 id = "shizuku",
                 section = "3. Công cụ kích hoạt & Bảo mật ngân hàng",
-                title = "Engine nội bộ (Gỡ lỗi không dây)",
+                title = "Engine nội bộ (Gỡ lỗi không dây 6 số)",
                 subtitle = when {
                     permissions.engineDaemonRunning && !permissions.devOptionsEnabled && !permissions.adbEnabled ->
                         "Engine đang chạy ngầm · đã tắt Gỡ lỗi (Bank-Safe) ✓"
                     permissions.engineDaemonRunning ->
-                        "Engine nội bộ đã kết nối (không cần Shizuku) ✓"
-                    permissions.shizukuGranted -> "Đã kết nối ✓"
-                    permissions.shizukuRunning -> "Đang chạy — chạm để cấp quyền"
-                    else -> "Kết nối trực tiếp qua Gỡ lỗi không dây (không cần Shizuku)"
+                        "Engine nội bộ đã kết nối trong RAM (UID 2000) ✓"
+                    permissions.adbWifiEnabled && permissions.wirelessAdbPaired ->
+                        "Đã ghép nối trước đó — chạm để kết nối lại"
+                    else -> "Kết nối trực tiếp qua Gỡ lỗi không dây 6 số (không cần app ngoài)"
                 },
-                granted = permissions.shizukuGranted,
+                granted = permissions.engineDaemonRunning,
                 required = false,
                 pathSummary = "Gỡ lỗi không dây → Ghép nối 6 số trực tiếp trên thông báo của AI Key Bridge",
                 steps = listOf(
@@ -418,17 +419,55 @@ fun PermissionsScreen(
                     ),
                 ),
                 openButtonLabel = when {
-                    permissions.shizukuGranted -> "Kiểm tra kết nối Engine"
-                    permissions.shizukuRunning -> "Cấp quyền Engine"
+                    permissions.engineDaemonRunning -> "Kiểm tra kết nối Engine"
+                    permissions.adbWifiEnabled && permissions.wirelessAdbPaired -> "Kết nối lại Engine"
                     else -> "Ghép nối Gỡ lỗi không dây (6 số)"
                 },
                 onOpenSettings = {
-                    if (permissions.shizukuRunning || permissions.shizukuGranted) {
+                    if (permissions.engineDaemonRunning || (permissions.adbWifiEnabled && permissions.wirelessAdbPaired)) {
                         onRequestShizuku()
                     } else {
                         onStartWirelessPairing()
                     }
                 },
+            ),
+            PermissionGuideItem(
+                id = "shizuku_app",
+                section = "3. Công cụ kích hoạt & Bảo mật ngân hàng",
+                title = "Shizuku (App ngoài · Dự phòng ổn định)",
+                subtitle = when {
+                    permissions.shizukuPermissionGranted ->
+                        "Đã cấp quyền Shizuku ✓ · tự động dự phòng nếu Engine nội bộ gặp lỗi"
+                    permissions.shizukuBinderAlive ->
+                        "Shizuku đang chạy — chạm để cấp quyền ngay"
+                    permissions.shizukuAppInstalled ->
+                        "Đã cài Shizuku — mở app bấm Start nếu muốn dùng Shizuku dự phòng"
+                    else ->
+                        "Công cụ dự phòng ổn định khi Engine nội bộ lỗi — chạm để tải / mở Shizuku"
+                },
+                granted = permissions.shizukuPermissionGranted,
+                required = false,
+                pathSummary = "Ứng dụng Shizuku → Ghép nối Gỡ lỗi không dây → Bắt đầu (Start)",
+                steps = listOf(
+                    "Nếu Engine nội bộ gặp lỗi trên bản ROM của bạn, hãy mở ứng dụng Shizuku → làm theo hướng dẫn Ghép nối và bấm “Bắt đầu (Start)”.",
+                    "Quay lại AI Key Bridge và bấm “Cấp quyền Shizuku” — app sẽ tự động dùng Shizuku hoặc dự phòng qua lại giữa cả hai.",
+                ),
+                images = listOf(
+                    GuideImage(
+                        resId = R.drawable.guide_shizuku,
+                        label = "Ứng dụng Shizuku (Dự phòng)",
+                        spotlights = listOf(
+                            SpotlightRect(85, 2440, 585, 2790),
+                        ),
+                    ),
+                ),
+                openButtonLabel = when {
+                    permissions.shizukuPermissionGranted -> "Kiểm tra Shizuku"
+                    permissions.shizukuBinderAlive -> "Cấp quyền Shizuku ngay"
+                    permissions.shizukuAppInstalled -> "Mở ứng dụng Shizuku"
+                    else -> "Tải / Mở ứng dụng Shizuku"
+                },
+                onOpenSettings = onConnectShizuku,
             ),
             PermissionGuideItem(
                 id = "dev_options",

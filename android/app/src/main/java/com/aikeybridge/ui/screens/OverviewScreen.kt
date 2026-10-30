@@ -97,6 +97,7 @@ fun OverviewScreen(
     onStartScript: () -> Unit,
     onStopScript: () -> Unit,
     onRequestShizuku: () -> Unit = {},
+    onConnectShizuku: () -> Unit = onRequestShizuku,
     onToggleRedirect: (Boolean) -> Unit,
     onToggleAutoMic: (Boolean) -> Unit,
     onToggleLockScreen: (Boolean) -> Unit,
@@ -222,6 +223,7 @@ fun OverviewScreen(
                     onStart = onStartScript,
                     onStop = onStopScript,
                     onRequestShizuku = onRequestShizuku,
+                    onConnectShizuku = onConnectShizuku,
                 )
             }
 
@@ -399,6 +401,7 @@ private fun ScriptCard(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onRequestShizuku: () -> Unit,
+    onConnectShizuku: () -> Unit,
 ) {
     val context = LocalContext.current
     val state = scriptState(status, startedThisBoot)
@@ -458,19 +461,33 @@ private fun ScriptCard(
             }
         } else if (!runningOrBoot) {
             val canAutoConnectWireless = permissions.adbWifiEnabled && permissions.wirelessAdbPaired
-            PrimaryCta(
-                text = when {
-                    permissions.shizukuRunning || canAutoConnectWireless -> "Kết nối Engine để bật Script"
-                    else -> "Mở Script nền & Ghép nối 6 số"
-                },
-                onClick = {
-                    if (permissions.shizukuRunning || canAutoConnectWireless) onRequestShizuku() else onOpen()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = R.drawable.lc_terminal,
-                height = 42.dp,
-                radius = 12.dp,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PrimaryCta(
+                    text = when {
+                        permissions.shizukuBinderAlive -> "Cấp quyền Shizuku"
+                        permissions.shizukuRunning || canAutoConnectWireless -> "Kết nối Engine"
+                        else -> "Ghép nối 6 số"
+                    },
+                    onClick = {
+                        when {
+                            permissions.shizukuBinderAlive -> onConnectShizuku()
+                            permissions.shizukuRunning || canAutoConnectWireless -> onRequestShizuku()
+                            else -> onOpen()
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    leadingIcon = R.drawable.lc_terminal,
+                    height = 42.dp,
+                    radius = 12.dp,
+                )
+                OutlineCta(
+                    text = "Shizuku",
+                    onClick = onConnectShizuku,
+                    modifier = Modifier.weight(0.65f),
+                    height = 42.dp,
+                    radius = 12.dp,
+                )
+            }
         }
         if (runningOrBoot) {
             MonoText(

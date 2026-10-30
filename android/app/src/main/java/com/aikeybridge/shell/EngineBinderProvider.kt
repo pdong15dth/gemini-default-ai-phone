@@ -220,6 +220,10 @@ class EngineBinderProvider : ContentProvider() {
             }
         }
 
+        fun notifyStateChanged() {
+            notifyListeners()
+        }
+
         /**
          * Đánh thức Engine nội bộ (`/data/local/tmp/akb-engine.sh`) cập nhật nhịp sống tức thì
          * ngay cả khi người dùng đã tắt hoàn toàn Tùy chọn nhà phát triển và Gỡ lỗi USB/Không dây.

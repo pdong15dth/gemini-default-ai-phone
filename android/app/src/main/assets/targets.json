@@ -107,6 +107,82 @@
       ]
     },
     {
+      "id": "google_cts",
+      "display_name": "Google · Circle to Search",
+      "packages": [
+        "com.google.android.googlequicksearchbox"
+      ],
+      "launch": {
+        "type": "assist",
+        "action": "android.intent.action.ASSIST"
+      },
+      "launch_label": "khoanh tròn tìm kiếm · dịch màn hình",
+      "beta": false,
+      "overlay_needs_default_assistant": true,
+      "shell_keyevent": 219,
+      "provisioning": [
+        {
+          "id": "assistant",
+          "title": "Đặt Google làm trợ lý mặc định",
+          "detail": "Qua RoleManager (android.app.role.ASSISTANT); hệ thống tự ghi secure assistant và voice_interaction_service.",
+          "command": "cmd role remove-role-holder android.app.role.ASSISTANT com.google.android.googlequicksearchbox; cmd role add-role-holder android.app.role.ASSISTANT com.google.android.googlequicksearchbox",
+          "verify": "cmd role get-role-holders android.app.role.ASSISTANT",
+          "expect": "googlequicksearchbox",
+          "hint": "Cần app Google (googlequicksearchbox). Android 10+ bỏ qua settings put nếu role không khớp."
+        },
+        {
+          "id": "voice_interaction",
+          "title": "Đặt voice interaction service",
+          "detail": "Cùng dịch vụ trợ lý của Google cho Circle to Search.",
+          "command": "settings put secure voice_interaction_service com.google.android.googlequicksearchbox/com.google.android.voiceinteraction.GsaVoiceInteractionService",
+          "verify": "settings get secure voice_interaction_service",
+          "expect": "googlequicksearchbox",
+          "hint": "Một số ROM dùng tên dịch vụ khác; đọc lại giá trị để chắc chắn."
+        },
+        {
+          "id": "screen_context",
+          "title": "Cho Google xem & chụp màn hình",
+          "detail": "Bật \"Dùng dữ liệu của màn hình và ứng dụng\" của trợ lý mặc định để khoanh tròn tìm kiếm và dịch trực tiếp.",
+          "command": "settings put secure assist_structure_enabled 1; settings put secure assist_screenshot_enabled 1; settings put secure visual_query_accessibility_detection_enabled 1",
+          "verify": "case \"$(settings get secure assist_structure_enabled) $(settings get secure assist_screenshot_enabled)\" in *0*) echo off ;; *) echo on ;; esac",
+          "expect": "on",
+          "hint": "Cài đặt → Ứng dụng mặc định → Trợ lý số → Dùng dữ liệu của màn hình và ứng dụng."
+        },
+        {
+          "id": "overlay_google",
+          "title": "Cho Google hiển thị trên ứng dụng khác",
+          "detail": "Cấp SYSTEM_ALERT_WINDOW bằng appops.",
+          "command": "cmd appops set com.google.android.googlequicksearchbox SYSTEM_ALERT_WINDOW allow",
+          "verify": "cmd appops get com.google.android.googlequicksearchbox SYSTEM_ALERT_WINDOW",
+          "expect": "allow",
+          "hint": "Cài Google từ Play Store trước nếu bước này báo package not found."
+        },
+        {
+          "id": "battery_whitelist",
+          "title": "Cho Google chạy nền không bị đóng băng",
+          "detail": "Thêm Google vào danh sách miễn tối ưu pin (deviceidle whitelist) và cấp quyền chạy nền.",
+          "command": "dumpsys deviceidle whitelist +com.google.android.googlequicksearchbox; cmd appops set com.google.android.googlequicksearchbox RUN_IN_BACKGROUND allow; cmd appops set com.google.android.googlequicksearchbox RUN_ANY_IN_BACKGROUND allow",
+          "verify": "dumpsys deviceidle whitelist",
+          "expect": "googlequicksearchbox",
+          "hint": "Vào Cài đặt → Pin → Kiểm soát pin dưới nền → chọn Cho phép sử dụng pin ngầm cho Google."
+        }
+      ],
+      "restore": [
+        {
+          "id": "restore_assistant",
+          "title": "Bỏ Google khỏi trợ lý mặc định",
+          "command": "cmd role remove-role-holder android.app.role.ASSISTANT com.google.android.googlequicksearchbox",
+          "hint": "Sau đó chọn lại trợ lý gốc trong Cài đặt → Ứng dụng mặc định → Trợ lý số."
+        },
+        {
+          "id": "restore_overlay_google",
+          "title": "Trả quyền overlay của Google",
+          "command": "cmd appops reset com.google.android.googlequicksearchbox SYSTEM_ALERT_WINDOW",
+          "hint": "Bỏ qua nếu app chưa cài."
+        }
+      ]
+    },
+    {
       "id": "chatgpt",
       "display_name": "ChatGPT Voice",
       "packages": [

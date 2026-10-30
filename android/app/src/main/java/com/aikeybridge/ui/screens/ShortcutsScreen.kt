@@ -108,6 +108,19 @@ fun ShortcutsScreen(
                             Intent(context, LaunchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                         )
                     },
+                )
+                NavRow(
+                    title = "Thử Circle to Search (Google)",
+                    subtitle = "khoanh tròn tìm kiếm & dịch màn hình ngay",
+                    trailing = "thử",
+                    trailingColor = Accent,
+                    onClick = {
+                        context.startActivity(
+                            Intent(context, LaunchActivity::class.java)
+                                .setAction(LaunchActivity.ACTION_CTS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    },
                     divider = false,
                 )
             }
@@ -146,7 +159,7 @@ fun ShortcutsScreen(
             }
             Gap(12.dp)
             BodyText(
-                "Màn hình chính: nhấn giữ icon AI Key Bridge → kéo lối tắt “Gọi AI” ra ngoài.",
+                "Màn hình chính: nhấn giữ icon AI Key Bridge → kéo lối tắt “Gọi AI” hoặc “Circle to Search” ra ngoài.",
                 11.sp,
                 TextFaint,
                 Modifier.padding(horizontal = 2.dp),

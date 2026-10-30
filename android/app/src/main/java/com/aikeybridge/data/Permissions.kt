@@ -92,6 +92,9 @@ data class PermissionSnapshot(
     val shizukuInstalled: Boolean = false,
     val shizukuRunning: Boolean = false,
     val shizukuGranted: Boolean = false,
+    val shizukuAppInstalled: Boolean = false,
+    val shizukuBinderAlive: Boolean = false,
+    val shizukuPermissionGranted: Boolean = false,
     val engineDaemonRunning: Boolean = false,
     val targetInstalled: Boolean = false,
     val assistantRequired: Boolean = true,
@@ -256,9 +259,28 @@ object PermissionsReader {
             Settings.Global.getInt(resolver, "adb_wifi_enabled", 0) == 1
         }.getOrDefault(false)
 
-        val engineAlive = EngineBinderProvider.isAlive()
+        val engineAlive = EngineBinderProvider.isAlive(context)
         if (!engineAlive) {
             EngineBinderProvider.requestDaemonReconnect(context)
+        }
+        val rawShizukuInstalled = isInstalled(context, SHIZUKU_PACKAGE)
+        val rawShizukuRunning = shizukuRunning()
+        val rawShizukuGranted = shizukuGranted()
+
+        val effectiveGranted = when (settings.shellBackend) {
+            ShellBackend.SHIZUKU -> rawShizukuGranted
+            ShellBackend.BUILTIN -> engineAlive
+            ShellBackend.AUTO -> rawShizukuGranted || engineAlive
+        }
+        val effectiveRunning = when (settings.shellBackend) {
+            ShellBackend.SHIZUKU -> rawShizukuRunning
+            ShellBackend.BUILTIN -> engineAlive
+            ShellBackend.AUTO -> rawShizukuRunning || engineAlive
+        }
+        val effectiveInstalled = when (settings.shellBackend) {
+            ShellBackend.SHIZUKU -> rawShizukuInstalled
+            ShellBackend.BUILTIN -> true
+            ShellBackend.AUTO -> engineAlive || rawShizukuInstalled
         }
 
         return PermissionSnapshot(
@@ -276,9 +298,12 @@ object PermissionsReader {
             autostartConfirmed = autostartOk,
             googleInstalled = isInstalled(context, GOOGLE_PACKAGE),
             geminiInstalled = isInstalled(context, GEMINI_PACKAGE),
-            shizukuInstalled = engineAlive || isInstalled(context, SHIZUKU_PACKAGE),
-            shizukuRunning = engineAlive || shizukuRunning(),
-            shizukuGranted = engineAlive || shizukuGranted(),
+            shizukuInstalled = effectiveInstalled,
+            shizukuRunning = effectiveRunning,
+            shizukuGranted = effectiveGranted,
+            shizukuAppInstalled = rawShizukuInstalled,
+            shizukuBinderAlive = rawShizukuRunning,
+            shizukuPermissionGranted = rawShizukuGranted,
             engineDaemonRunning = engineAlive,
             targetInstalled = targetPackages.any { isInstalled(context, it) },
             assistantRequired = assistantRequired,

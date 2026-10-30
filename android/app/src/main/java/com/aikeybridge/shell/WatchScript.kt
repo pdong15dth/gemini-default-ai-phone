@@ -1,5 +1,6 @@
 package com.aikeybridge.shell
 
+import com.aikeybridge.data.ActionMode
 import com.aikeybridge.model.OverlayMic
 import com.aikeybridge.model.ShellWatch
 import java.util.Base64
@@ -26,10 +27,18 @@ object WatchScript {
         eventLog: String,
         dismissDelayMs: Long = 500,
         mic: OverlayMic? = null,
+        voiceAction: ActionMode = ActionMode.DEFAULT,
+        buttonAction: ActionMode = ActionMode.DEFAULT,
     ): String {
         val pattern = listOfNotNull(watch.panel, watch.button).joinToString("|")
         val panelCase = watch.panel.split('|').filter { it.isNotBlank() }.joinToString("|") { "*$it*" }
         val dismiss = seconds(dismissDelayMs)
+        val voiceTapMic = mic != null && (voiceAction == ActionMode.DEFAULT || voiceAction == ActionMode.GEMINI_VOICE)
+        val buttonTapMic = mic != null && (buttonAction == ActionMode.DEFAULT || buttonAction == ActionMode.GEMINI_VOICE)
+        val activeMic = mic?.takeIf { voiceTapMic || buttonTapMic }
+        val voiceCmd = launchCommandFor(voiceAction, keyevent)
+        val buttonCmd = launchCommandFor(buttonAction, keyevent)
+        val defaultKeyeventCmd = "input keyevent $keyevent"
         return buildString {
             appendLine("#!/system/bin/sh")
             appendLine("# AI Key Bridge — script nền (Shizuku/ADB). Bỏ qua HUP/INT/TERM để rút cáp không chết.")
@@ -52,7 +61,7 @@ object WatchScript {
                 EngineDaemonMain.engineScriptContent(extDir).toByteArray(Charsets.UTF_8),
             )
             appendLine("if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-engine.sh'; then")
-            appendLine("  echo $engineB64 | base64 -d > ${EngineDaemonMain.PATH} 2>/dev/null && chmod 755 ${EngineDaemonMain.PATH} 2>/dev/null")
+            appendLine("  echo $engineB64 | base64 -d > ${EngineDaemonMain.PATH}.tmp 2>/dev/null && chmod 755 ${EngineDaemonMain.PATH}.tmp 2>/dev/null && mv -f ${EngineDaemonMain.PATH}.tmp ${EngineDaemonMain.PATH} 2>/dev/null")
             appendLine("  [ -f ${EngineDaemonMain.PATH} ] && setsid sh ${EngineDaemonMain.PATH} </dev/null >/dev/null 2>&1 &")
             appendLine("fi")
             appendLine("# Chẩn đoán đọc được cả khi Shizuku đã chết: trạng thái lúc khởi động + nhịp còn sống mỗi ${ALIVE_INTERVAL_S}s.")
@@ -61,10 +70,10 @@ object WatchScript {
                     "cat /proc/\$\$/cgroup; } > \"\$DIR/$STATE_FILE\" 2>/dev/null",
             )
             appendLine("( while true; do [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && settings put global adb_wifi_enabled 1 2>/dev/null; date '+%F %T' > \"\$DIR/$ALIVE_FILE\" 2>/dev/null; sleep $ALIVE_INTERVAL_S; done ) &")
-            if (mic != null) {
+            if (activeMic != null) {
                 appendLine("# Toạ độ nút Micro của lớp phủ theo tỉ lệ màn hình, tính một lần (wm size in kích thước dọc).")
                 appendLine("set -- \$(wm size | tail -1 | sed 's/.*: //; s/x/ /')")
-                appendLine("MX=\$((\$1 * ${permille(mic.x)} / 1000)); MY=\$((\$2 * ${permille(mic.y)} / 1000))")
+                appendLine("MX=\$((\$1 * ${permille(activeMic.x)} / 1000)); MY=\$((\$2 * ${permille(activeMic.y)} / 1000))")
             }
             appendLine("while true; do")
             appendLine("  logcat -b events -c")
@@ -75,41 +84,79 @@ object WatchScript {
             appendLine("    $panelCase) input keyevent 4; kind=voice; sleep $dismiss ;;")
             appendLine("    *) kind=button ;;")
             appendLine("  esac")
-            appendLine("  if dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then")
-            appendLine("    input keyevent $keyevent")
-            appendLine("  else")
-            appendLine("    input keyevent 224")
-            appendLine("    sleep 0.5")
-            appendLine("    input keyevent $keyevent")
-            appendLine("  fi")
-            appendLine("  echo \"\$(date +%T) \$kind · đã gửi phím $keyevent\" > \"\$DIR/$TRACE_FILE\" 2>/dev/null")
-            if (mic != null) {
-                val focused = "timeout 2 dumpsys window displays 2>/dev/null | grep -q 'mCurrentFocus=.*${mic.window}'"
-                appendLine("  # Chỉ chạm khi lớp phủ đã giữ focus và đứng yên: chạm lúc lớp phủ còn trượt lên là trúng ô nhập chữ,")
-                appendLine("  # chạm khi chưa hiện là trúng app bên dưới. timeout để script không kẹt và bỏ lỡ lần gọi sau.")
-                appendLine("  i=0")
-                appendLine("  while [ \$i -lt $MIC_TRIES ]; do")
-                appendLine("    if $focused; then")
-                appendLine("      sleep ${seconds(MIC_SETTLE_MS)}")
-                appendLine("      $focused && timeout 2 input tap \$MX \$MY && echo \"\$(date +%T) chạm Micro\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null")
-                appendLine("      break")
-                appendLine("    fi")
-                appendLine("    # Dọn đa nhiệm giết cả dịch vụ trợ lý của Google; phím đầu tới lúc nó đang chạy lại thì bị bỏ qua.")
-                appendLine("    [ \$i -eq $MIC_RESEND_AT ] && timeout 2 input keyevent $keyevent && echo \"\$(date +%T) gửi lại phím $keyevent\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null")
-                if (mic.owner != null) {
-                    appendLine("    # App trợ lý có lúc kẹt, từ chối mọi lời gọi (\"Invocation source … is not enabled\") tới khi khởi động lại.")
+            if (voiceCmd == defaultKeyeventCmd && buttonCmd == defaultKeyeventCmd) {
+                appendLine("  if dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then")
+                appendLine("    input keyevent $keyevent")
+                appendLine("  else")
+                appendLine("    input keyevent 224")
+                appendLine("    sleep 0.5")
+                appendLine("    input keyevent $keyevent")
+                appendLine("  fi")
+                appendLine("  echo \"\$(date +%T) \$kind · đã gửi phím $keyevent\" > \"\$DIR/$TRACE_FILE\" 2>/dev/null")
+            } else {
+                appendLine("  if ! dumpsys power 2>/dev/null | grep -q 'mWakefulness=Awake'; then")
+                appendLine("    input keyevent 224")
+                appendLine("    sleep 0.5")
+                appendLine("  fi")
+                if (voiceCmd == buttonCmd) {
+                    appendLine("  $voiceCmd")
+                } else {
+                    appendLine("  if [ \"\$kind\" = \"voice\" ]; then")
+                    appendLine("    $voiceCmd")
+                    appendLine("  else")
+                    appendLine("    $buttonCmd")
+                    appendLine("  fi")
+                }
+                appendLine("  echo \"\$(date +%T) \$kind · đã gọi hành động\" > \"\$DIR/$TRACE_FILE\" 2>/dev/null")
+            }
+            if (activeMic != null) {
+                val onlyKind = when {
+                    voiceTapMic && !buttonTapMic -> "voice"
+                    !voiceTapMic && buttonTapMic -> "button"
+                    else -> null
+                }
+                val indent = if (onlyKind != null) "  " else ""
+                if (onlyKind != null) {
+                    appendLine("  if [ \"\$kind\" = \"$onlyKind\" ]; then")
+                }
+                val focused = "timeout 2 dumpsys window displays 2>/dev/null | grep -q 'mCurrentFocus=.*${activeMic.window}'"
+                appendLine("$indent  # Chỉ chạm khi lớp phủ đã giữ focus và đứng yên: chạm lúc lớp phủ còn trượt lên là trúng ô nhập chữ,")
+                appendLine("$indent  # chạm khi chưa hiện là trúng app bên dưới. timeout để script không kẹt và bỏ lỡ lần gọi sau.")
+                appendLine("$indent  i=0")
+                appendLine("$indent  while [ \$i -lt $MIC_TRIES ]; do")
+                appendLine("$indent    if $focused; then")
+                appendLine("$indent      sleep ${seconds(MIC_SETTLE_MS)}")
+                appendLine("$indent      $focused && timeout 2 input tap \$MX \$MY && echo \"\$(date +%T) chạm Micro\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null")
+                appendLine("$indent      break")
+                appendLine("$indent    fi")
+                appendLine("$indent    # Dọn đa nhiệm giết cả dịch vụ trợ lý của Google; phím đầu tới lúc nó đang chạy lại thì bị bỏ qua.")
+                appendLine("$indent    [ \$i -eq $MIC_RESEND_AT ] && timeout 2 input keyevent $keyevent && echo \"\$(date +%T) gửi lại phím $keyevent\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null")
+                if (activeMic.owner != null) {
+                    appendLine("$indent    # App trợ lý có lúc kẹt, từ chối mọi lời gọi (\"Invocation source … is not enabled\") tới khi khởi động lại.")
                     appendLine(
-                        "    [ \$i -eq 14 ] && timeout 3 am force-stop ${mic.owner} && sleep 1 && timeout 2 input keyevent $keyevent && " +
-                            "echo \"\$(date +%T) khởi động lại ${mic.owner}, gửi lại phím\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null",
+                        "$indent    [ \$i -eq 14 ] && timeout 3 am force-stop ${activeMic.owner} && sleep 1 && timeout 2 input keyevent $keyevent && " +
+                            "echo \"\$(date +%T) khởi động lại ${activeMic.owner}, gửi lại phím\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null",
                     )
                 }
-                appendLine("    sleep 0.2; i=\$((i + 1))")
-                appendLine("  done")
+                appendLine("$indent    sleep 0.2; i=\$((i + 1))")
+                appendLine("$indent  done")
+                if (onlyKind != null) {
+                    appendLine("  fi")
+                }
             }
             appendLine("  echo \"\$(date +%s) \$kind\" >> \"\$LOG\" 2>/dev/null")
             appendLine("  sleep 0.5")
             appendLine("done")
         }
+    }
+
+    private fun launchCommandFor(mode: ActionMode, keyevent: Int): String = when (mode) {
+        ActionMode.GOOGLE_CTS ->
+            "am start --user 0 -a com.aikeybridge.action.CTS -n com.aikeybridge/.LaunchActivity --es action_mode GOOGLE_CTS --ez from_script true >/dev/null 2>&1"
+        ActionMode.GOOGLE_APP ->
+            "monkey -p com.google.android.googlequicksearchbox -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1"
+        ActionMode.DEFAULT, ActionMode.GEMINI_VOICE, ActionMode.GEMINI_SCREEN ->
+            "input keyevent $keyevent"
     }
 
     /** 0.642 → 642: sh chỉ tính số nguyên. */

@@ -19,7 +19,7 @@ class ConfigResolverTest {
     private val oppo = profile("oppo_coloros", listOf("oppo", "oneplus", "realme"))
     private val catalog = Catalog(
         profiles = listOf(vivo, xiaomi, oppo),
-        targets = listOf(gemini(), chatgpt()),
+        targets = listOf(gemini(), googleCts(), chatgpt()),
         profileAssets = emptyMap(),
     )
 
@@ -136,6 +136,39 @@ class ConfigResolverTest {
         assertEquals(ThemeMode.SYSTEM, AppSettings().themeMode)
     }
 
+    @Test
+    fun resolvesPerActionModesFromTargetOrExplicitOverrides() {
+        val defaultGeminiVoice = ConfigResolver.resolve(catalog, AppSettings(), "vivo", "vivo")
+        assertEquals(ActionMode.GEMINI_VOICE, defaultGeminiVoice.voiceAction)
+        assertEquals(ActionMode.GEMINI_VOICE, defaultGeminiVoice.buttonAction)
+        assertEquals(ActionMode.GEMINI_VOICE, defaultGeminiVoice.shortcutAction)
+
+        val defaultGeminiScreen = ConfigResolver.resolve(catalog, AppSettings(autoMic = false), "vivo", "vivo")
+        assertEquals(ActionMode.GEMINI_SCREEN, defaultGeminiScreen.voiceAction)
+        assertEquals(ActionMode.GEMINI_SCREEN, defaultGeminiScreen.buttonAction)
+
+        val defaultCts = ConfigResolver.resolve(catalog, AppSettings(targetId = AssistantTarget.GOOGLE_CTS), "vivo", "vivo")
+        assertEquals(ActionMode.GOOGLE_CTS, defaultCts.voiceAction)
+        assertEquals(ActionMode.GOOGLE_CTS, defaultCts.buttonAction)
+        assertEquals(ActionMode.GOOGLE_CTS, defaultCts.shortcutAction)
+
+        val mixed = ConfigResolver.resolve(
+            catalog,
+            AppSettings(
+                targetId = AssistantTarget.GEMINI,
+                autoMic = true,
+                voiceAction = ActionMode.DEFAULT,
+                buttonAction = ActionMode.GOOGLE_CTS,
+                shortcutAction = ActionMode.GEMINI_SCREEN,
+            ),
+            "vivo",
+            "vivo",
+        )
+        assertEquals(ActionMode.GEMINI_VOICE, mixed.voiceAction)
+        assertEquals(ActionMode.GOOGLE_CTS, mixed.buttonAction)
+        assertEquals(ActionMode.GEMINI_SCREEN, mixed.shortcutAction)
+    }
+
     private fun profile(id: String, match: List<String>, verified: Boolean = false) = OemProfile(
         schema = 3,
         id = id,
@@ -180,5 +213,12 @@ class ConfigResolverTest {
         overlayNeedsDefaultAssistant = false,
         shellKeyevent = null,
         provisioning = emptyList(),
+    )
+
+    private fun googleCts() = gemini().copy(
+        id = AssistantTarget.GOOGLE_CTS,
+        displayName = "Google · Circle to Search",
+        packages = listOf("com.google.android.googlequicksearchbox"),
+        voiceUi = null,
     )
 }

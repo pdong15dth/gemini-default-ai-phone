@@ -78,6 +78,7 @@ data class AssistantTarget(
 ) {
     companion object {
         const val GEMINI = "gemini"
+        const val GOOGLE_CTS = "google_cts"
         const val CUSTOM = "custom"
     }
 }
