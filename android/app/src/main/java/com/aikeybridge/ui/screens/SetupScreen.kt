@@ -310,22 +310,21 @@ fun SetupScreen(
                         body = failed.first().hint.ifBlank { failed.first().message },
                         onShowAdb = { showAdb = true },
                     )
-                } else if (!permissions.shizukuGranted && !ran) {
-                    ShizukuCard(
-                        permissions = permissions,
-                        shellBackend = shellBackend,
-                        onSetShellBackend = onSetShellBackend,
-                        startCommand = shizukuStartCommand,
-                        onShowAdb = { showAdb = true },
-                        onCopyStart = { command ->
-                            copyToClipboard(context, "Khởi động Engine nội bộ", command)
-                            onMessage("Đã copy lệnh khởi động Engine nội bộ.")
-                        },
-                        onPairWireless = onStartWirelessPairing,
-                        onConnectShizuku = onConnectShizuku,
-                        onReconnect = onRequestShizuku,
-                    )
                 }
+                ShizukuCard(
+                    permissions = permissions,
+                    shellBackend = shellBackend,
+                    onSetShellBackend = onSetShellBackend,
+                    startCommand = shizukuStartCommand,
+                    onShowAdb = { showAdb = true },
+                    onCopyStart = { command ->
+                        copyToClipboard(context, "Khởi động Engine nội bộ", command)
+                        onMessage("Đã copy lệnh khởi động Engine nội bộ.")
+                    },
+                    onPairWireless = onStartWirelessPairing,
+                    onConnectShizuku = onConnectShizuku,
+                    onReconnect = onRequestShizuku,
+                )
 
                 Row(
                     Modifier.padding(horizontal = 2.dp, vertical = 4.dp),
@@ -589,6 +588,12 @@ private fun ShizukuCard(
     ) {
         BodyText(
             when {
+                permissions.shizukuPermissionGranted && permissions.engineDaemonRunning ->
+                    "Công cụ chạy lệnh: Cả Shizuku & Engine nội bộ đều sẵn sàng ✓"
+                permissions.shizukuPermissionGranted ->
+                    "Công cụ chạy lệnh: Shizuku đã kết nối ✓"
+                permissions.engineDaemonRunning ->
+                    "Công cụ chạy lệnh: Engine nội bộ đã kết nối ✓"
                 permissions.shizukuBinderAlive -> "Shizuku đang chạy · chạm để cấp quyền"
                 permissions.adbWifiEnabled -> "Gỡ lỗi không dây đang bật · chọn Engine nội bộ hoặc Shizuku"
                 else -> "Chọn công cụ chạy lệnh: Engine nội bộ hoặc Shizuku (Dự phòng)"
