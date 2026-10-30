@@ -1,472 +1,135 @@
 package com.aikeybridge.shell
 
-import android.content.AttributionSource
 import android.content.Context
-import android.database.ContentObserver
-import android.net.Uri
-import android.os.Binder
-import android.os.Build
-import android.os.Bundle
-import android.os.IBinder
-import android.os.Looper
-import android.os.Process
-import android.util.Log
 import java.io.File
-import java.util.concurrent.atomic.AtomicLong
+import java.util.Base64
+import kotlin.system.exitProcess
 
 /**
- * Tiến trình Engine nội bộ chạy dưới quyền `shell` (UID 2000) qua `/system/bin/app_process`.
+ * Engine nội bộ chạy dưới quyền `shell` (UID 2000) thuần `/system/bin/sh` (`/data/local/tmp/akb-engine.sh`).
  *
- * Đặc điểm cốt lõi:
- * 1. Tự chuyển PID sang nhóm cgroup gốc ([WatchScript.ESCAPE_CGROUPS]) ngay khi khởi chạy.
- *    Trên Android 16 (như vivo X200 Ultra), nơi `/sys/fs/cgroup` thuộc quyền `system:system` (`0775`) khiến
- *    tiến trình UID 2000 vẫn nằm trong `0::/system/uid_0/pid_<adbd>`, Engine tự động neo giữ `adb_wifi_enabled=1`
- *    qua `IContentObserver` thời gian thực để khi người dùng tắt Gỡ lỗi USB (`adb_enabled=0`) hoặc tắt
- *    Tùy chọn nhà phát triển (`development_settings_enabled=0`), `AdbService` không bao giờ dừng `adbd`
- *    và `init` không bao giờ giết tiến trình này hay script nền.
- * 2. Không mở bất kỳ cổng mạng TCP nào (tránh mọi trình quét cổng của app ngân hàng / VNeID),
- *    mà truyền thẳng [IShellService] Binder vào [EngineBinderProvider] của app.
- * 3. Khi app đóng hoặc bị buộc dừng, Engine KHÔNG tự gọi hệ thống mở lại app ngầm; chỉ khi người dùng
- *    mở lại app (ghi `.engine-req`), Engine mới đẩy lại Binder trong ~150ms.
+ * Đặc điểm cốt lõi trên Vivo OriginOS & Android 16:
+ * 1. **TUYỆT ĐỐI KHÔNG giữ `/system/bin/app_process` trong RAM**:
+ *    Trên Vivo OriginOS (`vivo-services.jar` + `SettingsProvider.apk`), mọi `app_process` chạy dưới UID 2000
+ *    đều đăng ký `SHELL_MONITOR` với `VivoCommonService`, đặt cờ `mHasShellAppProc = true` (`HasShellAppProc=true`).
+ *    Khi cờ này bật, `SettingsProvider.shouldBlockShell()` chặn toàn bộ lệnh `settings put system/secure/global`
+ *    từ UID 2000. Chạy thuần `/system/bin/sh` giúp `HasShellAppProc=false` 100% thời gian, mọi lệnh `settings put`
+ *    đều hoạt động bình thường.
+ * 2. **Sống sót khi tắt Gỡ lỗi USB (`adb_enabled=0`) và tắt Tùy chọn nhà phát triển (`development_settings_enabled=0`)**:
+ *    Tự chuyển sang cgroup gốc ([WatchScript.ESCAPE_CGROUPS]) và neo giữ `adb_wifi_enabled=1` để trên Android 16
+ *    (như vivo X200 Ultra, nơi `/sys/fs/cgroup` thuộc `system:system`), `AdbService.stopAdbd()` không dừng `adbd`
+ *    và `init` không bao giờ giết tiến trình nền.
+ * 3. **Không mở cổng mạng TCP**: Giao tiếp với app qua thư mục IPC riêng (`getExternalFilesDir`),
+ *    an toàn tuyệt đối trước mọi trình quét cổng của ứng dụng ngân hàng và VNeID.
  */
 object EngineDaemonMain {
 
-    private const val TAG = "AKB_EngineDaemon"
-
-    @Volatile
-    private var cachedSettingsProvider: Any? = null
-    private val settingsToken = Binder()
-    private val guardBurstUntilMs = AtomicLong(0L)
-    private val guardLock = Object()
+    const val PATH = "/data/local/tmp/akb-engine.sh"
 
     @JvmStatic
     fun main(args: Array<String>) {
-        escapeAddbCgroup()
-        if (Looper.getMainLooper() == null) {
-            @Suppress("DEPRECATION")
-            Looper.prepareMainLooper()
-        }
-
+        // Nếu được gọi qua app_process cũ, cài đặt & khởi chạy ngay daemon thuần /system/bin/sh rồi thoát ngay
+        // để VivoCommonService trả HasShellAppProc về false tức thì.
         val extDir = args.firstOrNull()?.takeIf { it.isNotBlank() }
             ?: "/sdcard/Android/data/com.aikeybridge/files"
-        val dir = File(extDir)
-        runCatching { dir.mkdirs() }
-
-        val myPid = Process.myPid()
-        val pidFile = File(dir, EngineBinderProvider.PID_FILE)
-        val reqFile = File(dir, EngineBinderProvider.REQ_FILE)
-        val aliveFile = File(dir, EngineBinderProvider.ALIVE_FILE)
-        val enabledFile = File(dir, WatchScript.ENABLED_FILE)
-
-        // Nếu có phiên bản daemon cũ đang chạy thì dừng nó trước
         runCatching {
-            if (pidFile.exists()) {
-                val oldPid = pidFile.readText().trim().toIntOrNull()
-                if (oldPid != null && oldPid != myPid && oldPid > 100) {
-                    Process.killProcess(oldPid)
-                }
-            }
-            pidFile.writeText(myPid.toString())
+            val scriptFile = File(PATH)
+            scriptFile.writeText(engineScriptContent(extDir), Charsets.UTF_8)
+            scriptFile.setExecutable(true, false)
+            ProcessBuilder("sh", "-c", "setsid sh $PATH </dev/null >/dev/null 2>&1 &")
+                .redirectErrorStream(true)
+                .start()
+                .waitFor()
         }
-
-        // Khởi tạo neo giữ adbd (adb_wifi_enabled=1) để tắt Gỡ lỗi USB / Nhà phát triển trên Android 16 không chết
-        startAdbKeepAliveGuard()
-
-        val service = ShellUserService()
-        var lastReqToken = readReqToken(reqFile)
-        var lastAliveWrite = 0L
-        var lastScriptCheck = 0L
-        var clientAlive = false
-        var pendingPushRetries = 4
-
-        fun pushBinder(): Boolean {
-            val reply = callEngineProvider(service.asBinder()) ?: return false
-            val token = runCatching {
-                reply.classLoader = EngineDaemonMain::class.java.classLoader
-                reply.getBinder(EngineBinderProvider.KEY_CLIENT_TOKEN)
-            }.getOrNull()
-            if (token != null && token.pingBinder()) {
-                clientAlive = true
-                runCatching {
-                    token.linkToDeath({ clientAlive = false }, 0)
-                }
-                Log.i(TAG, "Delivered IShellService binder to app (pid=$myPid)")
-                return true
-            }
-            return false
-        }
-
-        // Đẩy binder ngay khi khởi chạy (lúc này app đang mở sẵn)
-        if (pushBinder()) {
-            pendingPushRetries = 0
-        }
-
-        // Vòng lặp nhẹ theo dõi nhịp sống & tự kết nối lại khi app mở lại (kể cả khi đã tắt Gỡ lỗi)
-        while (true) {
-            try {
-                val currentOwnerPid = runCatching { pidFile.readText().trim().toIntOrNull() }.getOrNull()
-                if (currentOwnerPid != null && currentOwnerPid != myPid) {
-                    break
-                }
-
-                val now = System.currentTimeMillis()
-                if (now - lastAliveWrite >= 15_000L) {
-                    lastAliveWrite = now
-                    runCatching { aliveFile.writeText("$now pid=$myPid") }
-                }
-
-                if (now - lastScriptCheck >= 3_000L) {
-                    lastScriptCheck = now
-                    if (getGlobalSettingFast("adb_wifi_enabled") != "1") {
-                        putGlobalSettingFast("adb_wifi_enabled", "1")
-                    }
-                    ensureWatchScriptAlive(enabledFile)
-                }
-
-                val reqToken = readReqToken(reqFile)
-                if (reqToken.isNotEmpty() && reqToken != lastReqToken) {
-                    lastReqToken = reqToken
-                    pendingPushRetries = 6
-                }
-
-                if (pendingPushRetries > 0 && !clientAlive) {
-                    if (pushBinder()) {
-                        pendingPushRetries = 0
-                    } else {
-                        pendingPushRetries -= 1
-                    }
-                }
-
-                Thread.sleep(if (pendingPushRetries > 0 && !clientAlive) 150L else 250L)
-            } catch (_: InterruptedException) {
-                break
-            } catch (_: Throwable) {
-                runCatching { Thread.sleep(1000L) }
-            }
-        }
-    }
-
-    private fun startAdbKeepAliveGuard() {
-        runCatching {
-            putGlobalSettingFast("adb_wifi_enabled", "1")
-        }
-
-        val guardThread = Thread({
-            while (true) {
-                try {
-                    val now = System.currentTimeMillis()
-                    val until = guardBurstUntilMs.get()
-                    if (now < until) {
-                        if (getGlobalSettingFast("adb_wifi_enabled") != "1") {
-                            putGlobalSettingFast("adb_wifi_enabled", "1")
-                        }
-                        Thread.sleep(1L)
-                    } else {
-                        synchronized(guardLock) {
-                            guardLock.wait(5_000L)
-                        }
-                    }
-                } catch (_: InterruptedException) {
-                    break
-                } catch (_: Throwable) {
-                    runCatching { Thread.sleep(10L) }
-                }
-            }
-        }, "akb_adb_guard").apply {
-            isDaemon = true
-            priority = Thread.MAX_PRIORITY
-            start()
-        }
-
-        runCatching {
-            val observer = object : ContentObserver(null) {
-                override fun onChange(selfChange: Boolean) {
-                    onSettingChanged()
-                }
-
-                override fun onChange(selfChange: Boolean, uri: Uri?) {
-                    onSettingChanged()
-                }
-
-                override fun onChange(selfChange: Boolean, uri: Uri?, flags: Int) {
-                    onSettingChanged()
-                }
-
-                private fun onSettingChanged() {
-                    if (getGlobalSettingFast("adb_wifi_enabled") != "1") {
-                        putGlobalSettingFast("adb_wifi_enabled", "1")
-                    }
-                    val target = System.currentTimeMillis() + 350L
-                    guardBurstUntilMs.set(target)
-                    synchronized(guardLock) {
-                        guardLock.notifyAll()
-                    }
-                }
-            }
-
-            val iObserver = ContentObserver::class.java
-                .getDeclaredMethod("getContentObserver")
-                .apply { isAccessible = true }
-                .invoke(observer) ?: return@runCatching
-
-            val smClass = Class.forName("android.os.ServiceManager")
-            val contentBinder = smClass.getDeclaredMethod("getService", String::class.java)
-                .invoke(null, "content") as? IBinder ?: return@runCatching
-            val stubClass = Class.forName("android.content.IContentService\$Stub")
-            val contentService = stubClass.getDeclaredMethod("asInterface", IBinder::class.java)
-                .invoke(null, contentBinder) ?: return@runCatching
-
-            val uris = listOf(
-                Uri.parse("content://settings/global/adb_wifi_enabled"),
-                Uri.parse("content://settings/global/adb_enabled"),
-                Uri.parse("content://settings/global/development_settings_enabled"),
-            )
-            for (uri in uris) {
-                registerObserverOnService(contentService, uri, iObserver)
-            }
-            Log.i(TAG, "Registered real-time adbd keepalive observer (${guardThread.name})")
-        }.onFailure { t ->
-            Log.w(TAG, "registerContentObserver failed: ${t.message}")
-        }
-    }
-
-    private fun registerObserverOnService(contentService: Any, uri: Uri, iObserver: Any) {
-        val iCsClass = runCatching { Class.forName("android.content.IContentService") }
-            .getOrDefault(contentService.javaClass)
-        for (m in iCsClass.methods) {
-            if (m.name != "registerContentObserver") continue
-            m.isAccessible = true
-            val p = m.parameterTypes
-            runCatching {
-                when (p.size) {
-                    5 -> {
-                        m.invoke(contentService, uri, false, iObserver, 0, Build.VERSION.SDK_INT)
-                        return
-                    }
-                    4 -> {
-                        m.invoke(contentService, uri, false, iObserver, 0)
-                        return
-                    }
-                    3 -> {
-                        m.invoke(contentService, uri, false, iObserver)
-                        return
-                    }
-                }
-            }
-        }
-    }
-
-    private fun getSettingsProvider(): Any? {
-        cachedSettingsProvider?.let { return it }
-        synchronized(this) {
-            cachedSettingsProvider?.let { return it }
-            val am = getActivityManager() ?: return null
-            val holder = getContentProviderExternal(am, "settings", settingsToken) ?: return null
-            val providerField = holder.javaClass.getDeclaredField("provider").apply { isAccessible = true }
-            val provider = providerField.get(holder) ?: return null
-            cachedSettingsProvider = provider
-            return provider
-        }
-    }
-
-    private fun putGlobalSettingFast(key: String, value: String): Boolean {
-        val provider = getSettingsProvider() ?: return false
-        val extras = Bundle().apply {
-            putString("value", value)
-        }
-        return runCatching {
-            invokeProviderCall(provider, "settings", "PUT_global", extras, arg = key)
-            true
-        }.getOrElse {
-            cachedSettingsProvider = null
-            false
-        }
-    }
-
-    private fun getGlobalSettingFast(key: String): String? {
-        val provider = getSettingsProvider() ?: return null
-        return runCatching {
-            val reply = invokeProviderCall(provider, "settings", "GET_global", Bundle.EMPTY, arg = key)
-            reply?.getString("value")
-        }.getOrElse {
-            cachedSettingsProvider = null
-            null
-        }
-    }
-
-    private fun ensureWatchScriptAlive(enabledFile: File) {
-        if (!enabledFile.exists()) return
-        val scriptFile = File(WatchScript.PATH)
-        if (!scriptFile.exists()) return
-        val running = isWatchScriptRunning()
-        if (!running) {
-            runCatching {
-                ProcessBuilder("sh", "-c", WatchScript.startCommand())
-                    .redirectErrorStream(true)
-                    .start()
-                    .waitFor()
-                Log.i(TAG, "Respawned background WatchScript (${WatchScript.PATH})")
-            }
-        }
-    }
-
-    private fun isWatchScriptRunning(): Boolean = runCatching {
-        val procDir = File("/proc")
-        val entries = procDir.listFiles() ?: return false
-        for (entry in entries) {
-            val name = entry.name
-            if (name.isEmpty() || !name[0].isDigit()) continue
-            val cmdline = runCatching {
-                File(entry, "cmdline").readBytes().toString(Charsets.UTF_8).replace('\u0000', ' ')
-            }.getOrDefault("")
-            if (cmdline.contains("akb-gemini.sh")) return true
-        }
-        false
-    }.getOrDefault(false)
-
-    private fun readReqToken(reqFile: File): String =
-        runCatching { if (reqFile.exists()) reqFile.readText().trim() else "" }.getOrDefault("")
-
-    private fun escapeAddbCgroup() {
-        val pid = Process.myPid().toString()
-        val cgroupRoots = listOf("/sys/fs/cgroup", "/acct", "/dev/cg2_bpf")
-        for (root in cgroupRoots) {
-            runCatching {
-                val procs = File(root, "cgroup.procs")
-                if (procs.exists() && procs.canWrite()) {
-                    procs.writeText(pid)
-                }
-            }
-        }
-    }
-
-    private fun callEngineProvider(serviceBinder: IBinder): Bundle? {
-        val authority = EngineBinderProvider.AUTHORITY
-        val token = Binder()
-        val am = getActivityManager() ?: return null
-        var holder: Any? = null
-        try {
-            holder = getContentProviderExternal(am, authority, token) ?: return null
-            val providerField = holder.javaClass.getDeclaredField("provider").apply { isAccessible = true }
-            val provider = providerField.get(holder) ?: return null
-            val extras = Bundle().apply {
-                putBinder(EngineBinderProvider.KEY_BINDER, serviceBinder)
-            }
-            return invokeProviderCall(provider, authority, EngineBinderProvider.METHOD_SEND_BINDER, extras)
-        } catch (t: Throwable) {
-            Log.w(TAG, "callEngineProvider failed: ${t.javaClass.simpleName}: ${t.message}")
-            return null
-        } finally {
-            if (holder != null) {
-                runCatching { removeContentProviderExternal(am, authority, token) }
-            }
-        }
-    }
-
-    private fun getActivityManager(): Any? = runCatching {
-        val cls = Class.forName("android.app.ActivityManager")
-        cls.getDeclaredMethod("getService").apply { isAccessible = true }.invoke(null)
-    }.getOrElse {
-        runCatching {
-            val cls = Class.forName("android.app.ActivityManagerNative")
-            cls.getDeclaredMethod("getDefault").apply { isAccessible = true }.invoke(null)
-        }.getOrNull()
-    }
-
-    private fun getContentProviderExternal(am: Any, authority: String, token: IBinder): Any? {
-        val iAmClass = runCatching { Class.forName("android.app.IActivityManager") }.getOrDefault(am.javaClass)
-        for (method in iAmClass.methods) {
-            if (method.name != "getContentProviderExternal") continue
-            method.isAccessible = true
-            val params = method.parameterTypes
-            return when (params.size) {
-                4 -> method.invoke(am, authority, 0, token, "*cmd*")
-                3 -> method.invoke(am, authority, 0, token)
-                else -> continue
-            }
-        }
-        return null
-    }
-
-    private fun removeContentProviderExternal(am: Any, authority: String, token: IBinder) {
-        val iAmClass = runCatching { Class.forName("android.app.IActivityManager") }.getOrDefault(am.javaClass)
-        for (method in iAmClass.methods) {
-            if (method.name == "removeContentProviderExternalAsUser" && method.parameterTypes.size == 3) {
-                method.isAccessible = true
-                method.invoke(am, authority, token, 0)
-                return
-            }
-            if (method.name == "removeContentProviderExternal" && method.parameterTypes.size == 2) {
-                method.isAccessible = true
-                method.invoke(am, authority, token)
-                return
-            }
-        }
-    }
-
-    private fun invokeProviderCall(
-        provider: Any,
-        authority: String,
-        methodName: String,
-        extras: Bundle,
-        arg: String? = null,
-    ): Bundle? {
-        val iProviderClass = runCatching { Class.forName("android.content.IContentProvider") }
-            .getOrDefault(provider.javaClass)
-        val callMethods = iProviderClass.methods.filter { it.name == "call" }
-
-        // 1. Android 12+ (API 31+): bắt buộc ưu tiên overload nhận AttributionSource + authority
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            for (m in callMethods) {
-                val p = m.parameterTypes
-                if (p.isNotEmpty() && p[0].name == "android.content.AttributionSource") {
-                    m.isAccessible = true
-                    val attr = AttributionSource.Builder(Process.myUid())
-                        .setPackageName("com.android.shell")
-                        .build()
-                    return when (p.size) {
-                        5 -> m.invoke(provider, attr, authority, methodName, arg, extras) as? Bundle
-                        6 -> m.invoke(provider, attr, authority, methodName, arg, extras, null) as? Bundle
-                        else -> continue
-                    }
-                }
-            }
-        }
-
-        // 2. Android 10–11 (API 29–30): ưu tiên overload có tham số authority (5 hoặc 6 tham số)
-        for (m in callMethods.sortedByDescending { it.parameterTypes.size }) {
-            m.isAccessible = true
-            val p = m.parameterTypes
-            if (p.isNotEmpty() && p[0].name == "android.content.AttributionSource") continue
-            return when (p.size) {
-                6 -> m.invoke(provider, "com.android.shell", null, authority, methodName, arg, extras) as? Bundle
-                5 -> m.invoke(provider, "com.android.shell", authority, methodName, arg, extras) as? Bundle
-                4 -> m.invoke(provider, "com.android.shell", methodName, arg, extras) as? Bundle
-                else -> continue
-            }
-        }
-        return null
+        exitProcess(0)
     }
 
     /**
-     * Lệnh shell khởi chạy [EngineDaemonMain] tách khỏi nhóm cgroup của `adbd` (hoặc neo giữ `adbd`
-     * trên Android 16) để sống sót ngay cả khi người dùng tắt Gỡ lỗi USB và tắt Tùy chọn nhà phát triển.
+     * Nội dung daemon thuần `/system/bin/sh` chạy ngầm dưới UID 2000 (`/data/local/tmp/akb-engine.sh`).
+     */
+    fun engineScriptContent(extDir: String): String = buildString {
+        appendLine("#!/system/bin/sh")
+        appendLine("# AI Key Bridge — Engine nội bộ thuần /system/bin/sh (UID 2000).")
+        appendLine("# Không dùng app_process để giữ VivoCommonService HasShellAppProc=false.")
+        appendLine("exec </dev/null >/dev/null 2>&1")
+        appendLine("trap \"\" HUP INT TERM")
+        appendLine("for cg in ${WatchScript.ESCAPE_CGROUPS}; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
+        appendLine("MY_PID=\$\$")
+        appendLine("ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[i]notifyd - .*com\\.aikeybridge' | while read p r; do")
+        appendLine("  [ \"\$p\" != \"\$MY_PID\" ] && kill -9 \"\$p\" 2>/dev/null")
+        appendLine("done")
+        appendLine("settings put global adb_wifi_enabled 1 2>/dev/null")
+        appendLine("DIR='$extDir'")
+        appendLine("IPC_DIR=\"\$DIR/${EngineBinderProvider.IPC_DIR}\"")
+        appendLine("PID_FILE=\"\$DIR/${EngineBinderProvider.PID_FILE}\"")
+        appendLine("ALIVE_FILE=\"\$DIR/${EngineBinderProvider.ALIVE_FILE}\"")
+        appendLine("REQ_FILE=\"\$DIR/${EngineBinderProvider.REQ_FILE}\"")
+        appendLine("ENABLED_FILE=\"\$DIR/${WatchScript.ENABLED_FILE}\"")
+        appendLine("mkdir -p \"\$IPC_DIR\" 2>/dev/null")
+        appendLine("if [ -f \"\$PID_FILE\" ]; then")
+        appendLine("  OLD_PID=\$(cat \"\$PID_FILE\" 2>/dev/null)")
+        appendLine("  if [ -n \"\$OLD_PID\" ] && [ \"\$OLD_PID\" != \"\$MY_PID\" ]; then")
+        appendLine("    kill -9 \"\$OLD_PID\" 2>/dev/null")
+        appendLine("  fi")
+        appendLine("fi")
+        appendLine("echo \"\$MY_PID\" > \"\$PID_FILE\" 2>/dev/null")
+        appendLine("rm -f \"\$IPC_DIR\"/.run-* \"\$IPC_DIR\"/req-* \"\$IPC_DIR\"/.tmp-* 2>/dev/null")
+        appendLine("date +%s > \"\$ALIVE_FILE\" 2>/dev/null")
+        appendLine("run_ipc() {")
+        appendLine("  for req in \"\$IPC_DIR\"/req-*.sh; do")
+        appendLine("    [ -f \"\$req\" ] || continue")
+        appendLine("    id=\"\${req##*/req-}\"")
+        appendLine("    id=\"\${id%.sh}\"")
+        appendLine("    work=\"\$IPC_DIR/.run-\$id.sh\"")
+        appendLine("    mv \"\$req\" \"\$work\" 2>/dev/null || continue")
+        appendLine("    (")
+        appendLine("      /system/bin/sh \"\$work\" > \"\$IPC_DIR/out-\$id\" 2> \"\$IPC_DIR/err-\$id\"")
+        appendLine("      rc=\$?")
+        appendLine("      rm -f \"\$work\" 2>/dev/null")
+        appendLine("      echo \"\$rc\" > \"\$IPC_DIR/.rc-\$id\" 2>/dev/null")
+        appendLine("      mv \"\$IPC_DIR/.rc-\$id\" \"\$IPC_DIR/rc-\$id\" 2>/dev/null")
+        appendLine("    ) &")
+        appendLine("  done")
+        appendLine("  if [ -f \"\$REQ_FILE\" ]; then")
+        appendLine("    rm -f \"\$REQ_FILE\" 2>/dev/null")
+        appendLine("    date +%s > \"\$ALIVE_FILE\" 2>/dev/null")
+        appendLine("  fi")
+        appendLine("}")
+        appendLine("tick=0")
+        appendLine("while true; do")
+        appendLine("  [ \"\$(cat \"\$PID_FILE\" 2>/dev/null)\" = \"\$MY_PID\" ] || break")
+        appendLine("  run_ipc")
+        appendLine("  tick=\$((tick + 1))")
+        appendLine("  if [ \$tick -ge 10 ]; then")
+        appendLine("    tick=0")
+        appendLine("    date +%s > \"\$ALIVE_FILE\" 2>/dev/null")
+        appendLine("    [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && settings put global adb_wifi_enabled 1 2>/dev/null")
+        appendLine("    if [ -f \"\$ENABLED_FILE\" ] && [ -f ${WatchScript.PATH} ]; then")
+        appendLine("      if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-gemini.sh'; then")
+        appendLine("        setsid sh ${WatchScript.PATH} </dev/null >/dev/null 2>&1 &")
+        appendLine("      fi")
+        appendLine("    fi")
+        appendLine("  fi")
+        appendLine("  sleep 0.1")
+        appendLine("done")
+    }
+
+    /**
+     * Lệnh shell cài đặt và khởi chạy `/data/local/tmp/akb-engine.sh` tách khỏi cgroup của `adbd`
+     * (và neo giữ `adb_wifi_enabled=1` trên Android 16) mà không dùng `app_process`.
      */
     fun bootstrapCommand(context: Context): String {
         val pkg = context.packageName
         val extDir = context.getExternalFilesDir(null)?.absolutePath
             ?: "/sdcard/Android/data/$pkg/files"
+        val encoded = Base64.getEncoder().encodeToString(
+            engineScriptContent(extDir).toByteArray(Charsets.UTF_8),
+        )
         return buildString {
+            append("ps -A -o PID,ARGS 2>/dev/null | grep '[a]kb_engine' | while read p r; do kill -9 \$p 2>/dev/null; done; ")
             append("settings put global adb_wifi_enabled 1 2>/dev/null; ")
-            append("APK=\$(pm path $pkg | head -n 1 | cut -d: -f2); ")
-            append("if [ -n \"\$APK\" ]; then ")
-            append("setsid sh -c '")
-            append("trap \"\" HUP INT TERM; ")
-            append("for cg in ${WatchScript.ESCAPE_CGROUPS}; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done; ")
-            append("CLASSPATH=\"'\"\$APK\"'\" /system/bin/app_process /system/bin --nice-name=akb_engine ")
-            append("com.aikeybridge.shell.EngineDaemonMain \"'\"$extDir\"'\" </dev/null >/dev/null 2>&1 & ")
-            append("sleep 0.2")
-            append("' </dev/null >/dev/null 2>&1; fi")
+            append("echo $encoded | base64 -d > $PATH && chmod 755 $PATH; ")
+            append("setsid sh $PATH </dev/null >/dev/null 2>&1 & sleep 0.15")
         }
     }
 

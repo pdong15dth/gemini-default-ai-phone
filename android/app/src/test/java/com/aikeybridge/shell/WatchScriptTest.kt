@@ -156,4 +156,22 @@ class WatchScriptTest {
 
         assertTrue(script.contains("*com.heytap.speechassist*|*com.coloros.speechassist*) input keyevent 4; kind=voice; sleep 0.5 ;;"))
     }
+
+    @Test
+    fun shellLoopsAndBranchesAreBalanced() {
+        val mic = com.aikeybridge.model.OverlayMic("FloatyActivity", 0.642f, 0.939f, "com.google.android.googlequicksearchbox")
+        val scripts = listOf(
+            WatchScript.content(watch, 231, log),
+            WatchScript.content(watch, 219, log, mic = mic),
+            EngineDaemonMain.engineScriptContent("/storage/emulated/0/Android/data/com.aikeybridge/files"),
+        )
+        val tokenRegex = Regex("\\b(do|done|then|fi|case|esac)\\b")
+        for (script in scripts) {
+            val codeLines = script.lines().filterNot { it.trimStart().startsWith("#") }
+            val tokens = codeLines.flatMap { line -> tokenRegex.findAll(line).map { it.value } }
+            assertEquals(tokens.count { it == "do" }, tokens.count { it == "done" })
+            assertEquals(tokens.count { it == "then" }, tokens.count { it == "fi" })
+            assertEquals(tokens.count { it == "case" }, tokens.count { it == "esac" })
+        }
+    }
 }
