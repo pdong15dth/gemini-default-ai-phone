@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Key Bridge — Hô “Hi Jovi”, Gemini trả lời</title>
-<meta name="description" content="Hô “Hi Jovi” là hiện lớp phủ Gemini đang nghe, khoanh tròn để hỏi được. Script nền qua Shizuku, dùng được cùng app ngân hàng, không cần PC, không root. Mã nguồn mở MIT, Android 11+.">
+<meta name="description" content="Hô “Hi Jovi” là hiện lớp phủ Gemini đang nghe, khoanh tròn để hỏi được. Tích hợp sẵn Engine nội bộ (ghép nối 6 số Gỡ lỗi không dây, không cần Shizuku), tự tắt Gỡ lỗi để dùng cùng app ngân hàng &amp; VNeID, không cần PC, không root. Mã nguồn mở MIT, Android 11+.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0A0B0D">
 <link rel="canonical" href="https://pdong15dth.github.io/gemini-default-ai-phone/">
@@ -76,7 +76,7 @@
     </nav>
 
     <div class="nav__right">
-      <span class="version"><span class="dot" aria-hidden="true"></span>v1.0.11</span>
+      <span class="version" id="nav-version"><span class="dot" aria-hidden="true"></span><span id="nav-version-text">v1.0.12</span></span>
       <a class="btn btn--light btn--sm" href="https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk">
         Tải APK <svg class="i" aria-hidden="true"><use href="#i-arrow-down-to-line"/></svg>
       </a>
@@ -177,11 +177,11 @@
             <span class="compare__time compare__time--accent">≈ 3 phút</span>
           </div>
           <ul class="list-check">
-            <li>Chọn cách dùng: Script nền (Bank-Safe) hoặc Cấu hình một lần</li>
-            <li>Chạm “Kích hoạt &amp; vá lỗi” — Shizuku chạy lệnh thay PC</li>
+            <li>Chọn cách dùng: Script nền (Bank-Safe) tích hợp sẵn Engine nội bộ</li>
+            <li>Ghép nối 6 số Gỡ lỗi không dây ngay trên thanh thông báo — không cần cài Shizuku, không cần PC</li>
             <li>Hô “Hi Jovi” → lớp phủ Gemini, Micro bật, khoanh tròn được</li>
-            <li>Tắt Tuỳ chọn nhà phát triển &amp; Gỡ lỗi USB để dùng app ngân hàng — script vẫn chạy</li>
-            <li>Reboot: bật lại script bằng một chạm, không cần cáp</li>
+            <li>Bấm 1 chạm tự tắt Tuỳ chọn nhà phát triển &amp; Gỡ lỗi USB để dùng app ngân hàng / VNeID — script vẫn chạy</li>
+            <li>Reboot: bật lại Gỡ lỗi không dây là Engine tự kết nối lại không cần nhập mã lần 2</li>
             <li>Đổi đích đến: Gemini, ChatGPT Voice, Claude hoặc app khác</li>
           </ul>
           <p class="compare__note">Không root · Không Xposed · Không gửi dữ liệu ra ngoài</p>
@@ -247,9 +247,9 @@
         </div>
 
         <div class="provision__copy" data-reveal data-delay="1">
-          <h3 class="h3">Cấu hình 8 lệnh, hoặc dán tay nếu chưa có Shizuku.</h3>
-          <p>Provisioner chạy qua Shizuku hoặc in lệnh ADB cho bạn dán. Mỗi bước đều đọc lại giá trị để xác nhận — không tin exit code; bước nào đã đúng thì bỏ qua, không làm Google và Tiểu V khởi động lại. Lệnh nào fail thì báo đúng lệnh đó, kèm gợi ý theo ROM.</p>
-          <p class="note"><svg class="i" aria-hidden="true"><use href="#i-triangle-alert"/></svg>Kích hoạt xong thì tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB — script vẫn chạy. Khởi động lại máy là script mất: bật lại Shizuku, mở app, bấm Kích hoạt.</p>
+          <h3 class="h3">Cấu hình tự động qua Engine nội bộ, hoặc dán tay bằng ADB.</h3>
+          <p>Provisioner chạy trực tiếp qua Engine nội bộ (ghép nối 6 số Gỡ lỗi không dây, không cần Shizuku) hoặc in lệnh ADB cho bạn dán. Mỗi bước đều đọc lại giá trị để xác nhận — không tin exit code; bước nào đã đúng thì bỏ qua, không làm Google và Tiểu V khởi động lại. Lệnh nào fail thì báo đúng lệnh đó, kèm gợi ý theo ROM.</p>
+          <p class="note"><svg class="i" aria-hidden="true"><use href="#i-triangle-alert"/></svg>Kích hoạt xong app tự động tắt Tuỳ chọn nhà phát triển và Gỡ lỗi USB — cả Engine nội bộ lẫn script nền vẫn chạy trong RAM. Khởi động lại máy thì mở lại Gỡ lỗi không dây để Engine tự kết nối và bật lại script.</p>
         </div>
       </div>
     </div>
@@ -324,13 +324,13 @@
       <ul class="features">
         <li class="feature" data-reveal>
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-monitor-smartphone"/></svg>
-          <h3>Không cần PC</h3>
-          <p>Shizuku khởi chạy script ngay trên máy. Rút cáp, tắt laptop, dừng Shizuku, vuốt tắt app — chuyển hướng vẫn hoạt động.</p>
+          <h3>Không cần PC &amp; Shizuku</h3>
+          <p>Engine nội bộ tự ghép nối 6 số Gỡ lỗi không dây và khởi chạy script ngay trên máy. Tắt Gỡ lỗi, vuốt tắt app — chuyển hướng vẫn hoạt động.</p>
         </li>
         <li class="feature" data-reveal data-delay="1">
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-lock"/></svg>
-          <h3>Dùng cùng app ngân hàng</h3>
-          <p>Không Trợ năng, không cần bật Gỡ lỗi USB lúc chạy. Tắt hẳn Tuỳ chọn nhà phát triển để app ngân hàng không chặn — script vẫn chạy.</p>
+          <h3>Dùng cùng app ngân hàng &amp; VNeID</h3>
+          <p>Không Trợ năng, không mở cổng TCP ngầm. Chạm 1 lần tự tắt hẳn Tuỳ chọn nhà phát triển và Gỡ lỗi USB để mọi app ngân hàng và VNeID hoạt động bình thường.</p>
         </li>
         <li class="feature" data-reveal data-delay="2">
           <svg class="i feature__icon" aria-hidden="true"><use href="#i-languages"/></svg>

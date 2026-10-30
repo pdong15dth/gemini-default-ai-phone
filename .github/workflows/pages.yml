@@ -5,7 +5,10 @@ on:
     branches: [main]
     paths:
       - "web/**"
+      - "android/app/build.gradle.kts"
       - ".github/workflows/pages.yml"
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -22,6 +25,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Sync version badge from build.gradle.kts
+        run: |
+          VER=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' android/app/build.gradle.kts | head -n 1)
+          if [ -n "$VER" ]; then
+            sed -i "s/<span id=\"nav-version-text\">v[^<]*<\/span>/<span id=\"nav-version-text\">v${VER}<\/span>/g" web/index.html
+          fi
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site

@@ -126,4 +126,19 @@
   /* ---------- Footer year */
   var year = document.getElementById("year");
   if (year) year.textContent = String(new Date().getFullYear());
+
+  /* ---------- Auto-sync latest release version badge from GitHub Releases */
+  var verEl = document.getElementById("nav-version-text");
+  if (verEl && "fetch" in window) {
+    fetch("https://api.github.com/repos/pdong15dth/gemini-default-ai-phone/releases/latest", {
+      headers: { Accept: "application/vnd.github+json" }
+    })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        if (data && typeof data.tag_name === "string" && data.tag_name.trim()) {
+          verEl.textContent = data.tag_name.trim();
+        }
+      })
+      .catch(function () { /* keep static version */ });
+  }
 })();
