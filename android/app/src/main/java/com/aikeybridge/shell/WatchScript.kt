@@ -33,20 +33,27 @@ object WatchScript {
         return buildString {
             appendLine("#!/system/bin/sh")
             appendLine("# AI Key Bridge — script nền (Shizuku/ADB). Bỏ qua HUP/INT/TERM để rút cáp không chết.")
+            appendLine("exec </dev/null >/dev/null 2>&1")
             appendLine("trap \"\" HUP INT TERM")
             appendLine("# Tắt Gỡ lỗi / Tuỳ chọn nhà phát triển thì init dừng adbd và giết cả nhóm tiến trình (cgroup) của nó.")
             appendLine("# Chuyển sang nhóm gốc như Shizuku, logcat/input sinh ra sau đó cũng nằm ngoài nhóm của adbd.")
             appendLine("for cg in $ESCAPE_CGROUPS; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
             appendLine("# Trên Android 16 (như vivo X200 Ultra), /sys/fs/cgroup thuộc system:system (0775) nên UID 2000")
-            appendLine("# vẫn nằm trong 0::/system/uid_0/pid_<adbd>. Giữ adb_wifi_enabled=1 để khi tắt Gỡ lỗi USB (adb_enabled=0)")
+            appendLine("# vẫn nằm trong 0::/system/uid_0/pid_<adbd>. Dừng mọi app_process akb_engine cũ để VivoCommonService")
+            appendLine("# giữ HasShellAppProc=false, rồi neo giữ adb_wifi_enabled=1 để khi tắt Gỡ lỗi USB (adb_enabled=0)")
             appendLine("# hoặc tắt Tùy chọn nhà phát triển, AdbService không dừng adbd và init không giết script.")
+            appendLine("ps -A -o PID,ARGS 2>/dev/null | grep '[a]kb_engine' | while read p r; do kill -9 \$p 2>/dev/null; done")
             appendLine("settings put global adb_wifi_enabled 1 2>/dev/null")
             appendLine("LOG='$eventLog'")
             appendLine("DIR=\"\${LOG%/*}\"")
             appendLine("echo 1 > \"\$DIR/$ENABLED_FILE\" 2>/dev/null")
-            appendLine("if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb_engine'; then")
-            appendLine("  APK=\$(pm path com.aikeybridge 2>/dev/null | head -n 1 | cut -d: -f2)")
-            appendLine("  [ -n \"\$APK\" ] && CLASSPATH=\"\$APK\" /system/bin/app_process /system/bin --nice-name=akb_engine com.aikeybridge.shell.EngineDaemonMain \"\$DIR\" </dev/null >/dev/null 2>&1 &")
+            val extDir = eventLog.substringBeforeLast('/', "/sdcard/Android/data/com.aikeybridge/files")
+            val engineB64 = Base64.getEncoder().encodeToString(
+                EngineDaemonMain.engineScriptContent(extDir).toByteArray(Charsets.UTF_8),
+            )
+            appendLine("if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-engine.sh'; then")
+            appendLine("  echo $engineB64 | base64 -d > ${EngineDaemonMain.PATH} 2>/dev/null && chmod 755 ${EngineDaemonMain.PATH} 2>/dev/null")
+            appendLine("  [ -f ${EngineDaemonMain.PATH} ] && setsid sh ${EngineDaemonMain.PATH} </dev/null >/dev/null 2>&1 &")
             appendLine("fi")
             appendLine("# Chẩn đoán đọc được cả khi Shizuku đã chết: trạng thái lúc khởi động + nhịp còn sống mỗi ${ALIVE_INTERVAL_S}s.")
             appendLine(
@@ -92,7 +99,7 @@ object WatchScript {
                 if (mic.owner != null) {
                     appendLine("    # App trợ lý có lúc kẹt, từ chối mọi lời gọi (\"Invocation source … is not enabled\") tới khi khởi động lại.")
                     appendLine(
-                        "    [ \$i -eq $MIC_RESET_AT ] && timeout 3 am force-stop ${mic.owner} && sleep 1 && timeout 2 input keyevent $keyevent && " +
+                        "    [ \$i -eq 14 ] && timeout 3 am force-stop ${mic.owner} && sleep 1 && timeout 2 input keyevent $keyevent && " +
                             "echo \"\$(date +%T) khởi động lại ${mic.owner}, gửi lại phím\" >> \"\$DIR/$TRACE_FILE\" 2>/dev/null",
                     )
                 }

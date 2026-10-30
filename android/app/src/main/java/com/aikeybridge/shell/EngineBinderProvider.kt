@@ -8,17 +8,31 @@ import android.net.Uri
 import android.os.Binder
 import android.os.Bundle
 import android.os.IBinder
+import android.os.SystemClock
 import java.io.File
 import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 
 /**
- * Nhận [IBinder] của [IShellService] từ [EngineDaemonMain] (chạy dưới UID 2000 `shell`).
- * Chỉ tiến trình hệ thống / shell có quyền `INTERACT_ACROSS_USERS_FULL` mới gọi được provider này.
+ * Cầu nối giao tiếp với Engine nội bộ chạy dưới UID 2000 (`shell`).
+ *
+ * Trên Vivo OriginOS, mọi tiến trình `/system/bin/app_process` chạy dưới UID 2000 đều bị
+ * `VivoCommonService` gắn cờ `HasShellAppProc=true`, khiến `SettingsProvider.shouldBlockShell()`
+ * chặn toàn bộ lệnh `settings put`. Vì vậy Engine nội bộ chạy thuần `/system/bin/sh`
+ * (`/data/local/tmp/akb-engine.sh`), giao tiếp với app qua thư mục IPC riêng và giữ `HasShellAppProc=false`.
  */
 class EngineBinderProvider : ContentProvider() {
 
     override fun onCreate(): Boolean {
-        context?.let { requestDaemonReconnect(it) }
+        context?.let {
+            appContext = it.applicationContext
+            requestDaemonReconnect(it)
+        }
         return true
     }
 
@@ -65,9 +79,15 @@ class EngineBinderProvider : ContentProvider() {
         const val REQ_FILE = ".engine-req"
         const val ALIVE_FILE = "engine-alive"
         const val PID_FILE = "engine-daemon.pid"
+        const val IPC_DIR = "ipc"
+        private const val ALIVE_MAX_AGE_MS = 12_000L
 
         private val clientToken = Binder()
         private val listeners = CopyOnWriteArraySet<() -> Unit>()
+        private val reqCounter = AtomicLong(0L)
+
+        @Volatile
+        private var appContext: Context? = null
 
         @Volatile
         private var currentBinder: IBinder? = null
@@ -81,20 +101,98 @@ class EngineBinderProvider : ContentProvider() {
             notifyListeners()
         }
 
-        fun isAlive(): Boolean {
-            val b = currentBinder ?: return false
-            return if (b.pingBinder()) {
-                true
-            } else {
+        fun isAlive(context: Context? = null): Boolean {
+            if (context != null) {
+                appContext = context.applicationContext
+            }
+            val b = currentBinder
+            if (b != null) {
+                if (b.pingBinder()) return true
                 currentBinder = null
                 currentService = null
-                false
             }
+            return isShellDaemonAlive(context ?: appContext)
+        }
+
+        private fun isShellDaemonAlive(context: Context?): Boolean {
+            val ctx = context ?: return false
+            val dir = runCatching { ctx.getExternalFilesDir(null) }.getOrNull() ?: return false
+            val aliveFile = File(dir, ALIVE_FILE)
+            if (!aliveFile.exists()) return false
+            val now = System.currentTimeMillis()
+            val bootAt = now - SystemClock.elapsedRealtime()
+            val modified = aliveFile.lastModified()
+            return modified >= bootAt && (now - modified) <= ALIVE_MAX_AGE_MS
         }
 
         fun service(): IShellService? {
-            if (!isAlive()) return null
+            val b = currentBinder ?: return null
+            if (!b.pingBinder()) {
+                currentBinder = null
+                currentService = null
+                return null
+            }
             return currentService
+        }
+
+        /**
+         * Thực thi lệnh shell UID 2000 qua Engine nội bộ (`/data/local/tmp/akb-engine.sh`).
+         */
+        suspend fun execCommand(
+            context: Context,
+            command: String,
+            timeoutMs: Long = ShizukuShell.COMMAND_TIMEOUT_MS,
+        ): ShellResult? = withContext(Dispatchers.IO) {
+            appContext = context.applicationContext
+            service()?.let { daemon ->
+                runCatching {
+                    val raw = withTimeoutOrNull(timeoutMs) { daemon.exec(command) }
+                        ?: return@withContext ShellResult(-1, "", "Lệnh quá thời gian (${timeoutMs / 1000}s).")
+                    val json = JSONObject(raw)
+                    return@withContext ShellResult(
+                        exitCode = json.optInt("exit", -1),
+                        stdout = json.optString("out"),
+                        stderr = json.optString("err"),
+                    )
+                }
+            }
+
+            if (!isAlive(context)) return@withContext null
+            val dir = runCatching { context.getExternalFilesDir(null) }.getOrNull() ?: return@withContext null
+            val ipcDir = File(dir, IPC_DIR).apply { mkdirs() }
+            val id = "${System.currentTimeMillis()}_${reqCounter.incrementAndGet()}"
+            val tmpFile = File(ipcDir, ".tmp-$id")
+            val reqFile = File(ipcDir, "req-$id.sh")
+            val outFile = File(ipcDir, "out-$id")
+            val errFile = File(ipcDir, "err-$id")
+            val rcFile = File(ipcDir, "rc-$id")
+
+            try {
+                tmpFile.writeText(command, Charsets.UTF_8)
+                if (!tmpFile.renameTo(reqFile)) {
+                    reqFile.writeText(command, Charsets.UTF_8)
+                    tmpFile.delete()
+                }
+                val deadline = System.currentTimeMillis() + timeoutMs
+                while (System.currentTimeMillis() < deadline) {
+                    if (rcFile.exists()) {
+                        val code = runCatching { rcFile.readText().trim().toIntOrNull() }.getOrNull() ?: -1
+                        val out = runCatching { if (outFile.exists()) outFile.readText() else "" }.getOrDefault("")
+                        val err = runCatching { if (errFile.exists()) errFile.readText() else "" }.getOrDefault("")
+                        return@withContext ShellResult(code, out, err)
+                    }
+                    delay(25)
+                }
+                ShellResult(-1, "", "Lệnh quá thời gian (${timeoutMs / 1000}s).")
+            } catch (_: Throwable) {
+                null
+            } finally {
+                runCatching { tmpFile.delete() }
+                runCatching { reqFile.delete() }
+                runCatching { outFile.delete() }
+                runCatching { errFile.delete() }
+                runCatching { rcFile.delete() }
+            }
         }
 
         internal fun acceptBinder(binder: IBinder) {
@@ -123,11 +221,12 @@ class EngineBinderProvider : ContentProvider() {
         }
 
         /**
-         * Báo cho [EngineDaemonMain] đang chạy ngầm trong RAM gửi lại [IBinder] vào tiến trình app mới mở.
-         * Hoạt động ngay cả khi người dùng đã tắt hoàn toàn Tùy chọn nhà phát triển và Gỡ lỗi USB/Không dây.
+         * Đánh thức Engine nội bộ (`/data/local/tmp/akb-engine.sh`) cập nhật nhịp sống tức thì
+         * ngay cả khi người dùng đã tắt hoàn toàn Tùy chọn nhà phát triển và Gỡ lỗi USB/Không dây.
          */
         fun requestDaemonReconnect(context: Context) {
-            if (isAlive()) return
+            appContext = context.applicationContext
+            if (isAlive(context)) return
             runCatching {
                 val dir = context.getExternalFilesDir(null) ?: return
                 dir.mkdirs()

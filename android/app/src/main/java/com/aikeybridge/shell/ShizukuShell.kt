@@ -37,8 +37,8 @@ interface ShellRunner {
 /**
  * Bộ thực thi lệnh Shell đa tầng (Multi-Engine):
  * 1. **Engine nội bộ ([EngineBinderProvider] / [EngineDaemonMain])**: Chạy ngầm trong RAM dưới quyền `UID 2000`
- *    và đã tách khỏi nhóm cgroup của `adbd` — hoạt động ngay cả khi đã TẮT Tùy chọn nhà phát triển, TẮT Gỡ lỗi USB/Không dây
- *    và không cài Shizuku.
+ *    thuần `/system/bin/sh` (`HasShellAppProc=false`), đã tách khỏi nhóm cgroup của `adbd` — hoạt động ngay cả khi
+ *    đã TẮT Tùy chọn nhà phát triển, TẮT Gỡ lỗi USB/Không dây và không cài Shizuku.
  * 2. **Engine Gỡ lỗi không dây nội bộ ([BuiltInWirelessAdb])**: Tự kết nối TLS `127.0.0.1` khi bật Gỡ lỗi không dây
  *    và tự khởi chạy [EngineDaemonMain] mà không cần app Shizuku.
  * 3. **Shizuku (Dự phòng)**: Nếu máy có sẵn Shizuku đang chạy thì tận dụng luôn và tự nâng cấp lên [EngineDaemonMain].
@@ -112,17 +112,8 @@ class ShizukuShell(private val context: Context) : ShellRunner {
         ShellResult(-1, "", "Chưa kết nối được Engine nội bộ hoặc Gỡ lỗi không dây.")
     }
 
-    private suspend fun execViaEngineDaemon(command: String): ShellResult? {
-        val daemon = EngineBinderProvider.service() ?: return null
-        return try {
-            val raw = withTimeoutOrNull(COMMAND_TIMEOUT_MS) {
-                daemon.exec(command)
-            } ?: return ShellResult(-1, "", "Lệnh quá thời gian (${COMMAND_TIMEOUT_MS / 1000}s).")
-            parse(raw)
-        } catch (_: Throwable) {
-            null
-        }
-    }
+    private suspend fun execViaEngineDaemon(command: String): ShellResult? =
+        EngineBinderProvider.execCommand(context, command, COMMAND_TIMEOUT_MS)
 
     private suspend fun execViaShizukuInternal(command: String): ShellResult? {
         if (!userServiceBlocked) {
