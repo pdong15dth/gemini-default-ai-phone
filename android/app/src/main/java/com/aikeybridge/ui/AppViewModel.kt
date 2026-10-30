@@ -496,6 +496,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     private var logSnifferJob: Job? = null
+    private val vivoQueryRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var exporting = false
 
     private val binderReceived = Shizuku.OnBinderReceivedListener { refreshPermissions() }
     private val binderDead = Shizuku.OnBinderDeadListener { refreshPermissions() }
@@ -530,8 +532,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-
-    private val vivoQueryRunning = java.util.concurrent.atomic.AtomicBoolean(false)
 
     fun refreshPermissions() {
         importScriptEvents()
@@ -1111,8 +1111,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-
-    private var exporting = false
 
     /** Trạng thái hệ thống và logcat toàn máy, đọc bằng quyền shell của Shizuku. */
     private suspend fun collectShellReport(): Diagnostics.ShellReport {
