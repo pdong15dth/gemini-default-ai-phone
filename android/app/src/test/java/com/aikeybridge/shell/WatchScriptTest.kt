@@ -125,6 +125,8 @@ class WatchScriptTest {
         val script = WatchScript.content(watch, 231, log)
 
         assertTrue(script.contains("DIR=\"\${LOG%/*}\""))
+        assertTrue(script.contains("settings put global adb_wifi_enabled 1 2>/dev/null"))
+        assertTrue(script.contains("echo 1 > \"\$DIR/script-enabled\" 2>/dev/null"))
         assertTrue(script.contains("cat /proc/\$\$/cgroup; } > \"\$DIR/script-state.log\""))
         assertTrue(script.contains("date '+%F %T' > \"\$DIR/script-alive\" 2>/dev/null; sleep 30; done ) &"))
     }

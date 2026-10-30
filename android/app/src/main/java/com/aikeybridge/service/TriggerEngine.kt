@@ -235,9 +235,7 @@ class TriggerEngine(
         return false
     }
 
-    private fun shizukuGranted(): Boolean = runCatching {
-        Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-    }.getOrDefault(false)
+    private fun shizukuGranted(): Boolean = ShizukuShell.isEngineOrShizukuReady()
 
     private suspend fun tryShellVoice(config: ActiveConfig, wake: Boolean): Boolean {
         val keyevent = config.target.shellKeyevent ?: return false

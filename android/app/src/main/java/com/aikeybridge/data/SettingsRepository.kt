@@ -53,7 +53,7 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
 )
 
-class SettingsRepository(context: Context) {
+class SettingsRepository(context: Context) : SharedPreferences.OnSharedPreferenceChangeListener {
 
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences("ai_key_bridge_settings", Context.MODE_PRIVATE)
@@ -61,13 +61,12 @@ class SettingsRepository(context: Context) {
     private val _state = MutableStateFlow(read())
     val state: StateFlow<AppSettings> = _state.asStateFlow()
 
-    private val changeListener =
-        SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            _state.value = read()
-        }
-
     init {
-        prefs.registerOnSharedPreferenceChangeListener(changeListener)
+        prefs.registerOnSharedPreferenceChangeListener(this)
+    }
+
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        _state.value = read()
     }
 
     fun setRedirectEnabled(value: Boolean) = edit { putBoolean(KEY_REDIRECT, value) }
@@ -182,6 +181,7 @@ class SettingsRepository(context: Context) {
         val editor = prefs.edit()
         editor.block()
         editor.apply()
+        _state.value = read()
     }
 
     private fun SharedPreferences.Editor.putOrRemove(key: String, value: String?) {

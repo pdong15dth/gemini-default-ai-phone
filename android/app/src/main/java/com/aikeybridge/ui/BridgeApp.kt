@@ -187,6 +187,8 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onSkip = ::finishOnboarding,
                         onToggleAutostart = viewModel::setManualAutostart,
                         onRequestShizuku = viewModel::requestShizukuPermission,
+                        onStartWirelessPairing = viewModel::startWirelessPairing,
+                        onLockDevMode = viewModel::lockDeveloperMode,
                     )
                     "onboarding:4:FULL", "onboarding:4:ONE_TIME", "onboarding:4:SCRIPT" -> {
                         val hasStep5 = settings.usageMode != UsageMode.FULL
@@ -200,6 +202,7 @@ fun BridgeApp(viewModel: AppViewModel) {
                             onRun = viewModel::runProvisioning,
                             shizukuStartCommand = viewModel.shizukuStartCommand,
                             onRequestShizuku = viewModel::requestShizukuPermission,
+                            onStartWirelessPairing = viewModel::startWirelessPairing,
                             onFinish = { if (hasStep5) onboardingStep = 5 else finishOnboarding() },
                             onMessage = viewModel::showMessage,
                             onOpenPermissions = { onboardingStep = 3 },
@@ -214,13 +217,16 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onboarding = true,
                         onBack = { onboardingStep = 4 },
                         onCheck = viewModel::checkScript,
-                        onStart = viewModel::startScript,
+                        onStart = { viewModel.startScript(autoLockDevMode = false) },
                         onStop = viewModel::stopScript,
                         onFinish = ::finishOnboarding,
                         onOpenSetup = { onboardingStep = 4 },
                         onOpenPermissions = { push(Overlay.PERMISSIONS) },
                         onOpenTriggers = { push(Overlay.TRIGGERS) },
                         onRequestShizuku = viewModel::requestShizukuPermission,
+                        onStartAndLock = { viewModel.startScript(autoLockDevMode = true) },
+                        onLockDevMode = viewModel::lockDeveloperMode,
+                        onStartWirelessPairing = viewModel::startWirelessPairing,
                         onMessage = viewModel::showMessage,
                     )
                     Overlay.SCRIPT.name -> ScriptScreen(
@@ -232,13 +238,16 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onboarding = false,
                         onBack = ::pop,
                         onCheck = viewModel::checkScript,
-                        onStart = viewModel::startScript,
+                        onStart = { viewModel.startScript(autoLockDevMode = false) },
                         onStop = viewModel::stopScript,
                         onFinish = ::pop,
                         onOpenSetup = { push(Overlay.SETUP) },
                         onOpenPermissions = { push(Overlay.PERMISSIONS) },
                         onOpenTriggers = { push(Overlay.TRIGGERS) },
                         onRequestShizuku = viewModel::requestShizukuPermission,
+                        onStartAndLock = { viewModel.startScript(autoLockDevMode = true) },
+                        onLockDevMode = viewModel::lockDeveloperMode,
+                        onStartWirelessPairing = viewModel::startWirelessPairing,
                         onMessage = viewModel::showMessage,
                     )
                     "onboarding:5:ONE_TIME" -> ShortcutsScreen(
@@ -267,6 +276,8 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onSkip = ::pop,
                         onToggleAutostart = viewModel::setManualAutostart,
                         onRequestShizuku = viewModel::requestShizukuPermission,
+                        onStartWirelessPairing = viewModel::startWirelessPairing,
+                        onLockDevMode = viewModel::lockDeveloperMode,
                     )
                     Overlay.SETUP.name -> SetupScreen(
                         config = config,
@@ -277,6 +288,7 @@ fun BridgeApp(viewModel: AppViewModel) {
                         onRun = viewModel::runProvisioning,
                         shizukuStartCommand = viewModel.shizukuStartCommand,
                         onRequestShizuku = viewModel::requestShizukuPermission,
+                        onStartWirelessPairing = viewModel::startWirelessPairing,
                         onFinish = ::pop,
                         onMessage = viewModel::showMessage,
                         onOpenPermissions = { push(Overlay.PERMISSIONS) },

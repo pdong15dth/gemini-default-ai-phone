@@ -71,11 +71,7 @@ object SettingsGuideHelper {
             shellRunner ?: ShizukuShell(context.applicationContext).also { shellRunner = it }
         }
 
-    private fun isShizukuReady(): Boolean = runCatching {
-        !Shizuku.isPreV11() &&
-            Shizuku.pingBinder() &&
-            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-    }.getOrDefault(false)
+    private fun isShizukuReady(): Boolean = ShizukuShell.isEngineOrShizukuReady()
 
     internal data class RowTarget(
         val rect: RectF,

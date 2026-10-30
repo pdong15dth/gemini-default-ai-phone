@@ -1,5 +1,12 @@
+-keep class com.aikeybridge.data.SettingsRepository { *; }
 -keep class com.aikeybridge.shell.ShellUserService { *; }
+-keep class com.aikeybridge.shell.EngineDaemonMain { *; }
+-keep class com.aikeybridge.shell.EngineBinderProvider { *; }
+-keep class com.aikeybridge.shell.WirelessAdbPairingReceiver { *; }
 -keep class com.aikeybridge.shell.IShellService { *; }
 -keep class com.aikeybridge.shell.IShellService$* { *; }
+-keep class io.github.muntashirakon.adb.** { *; }
+-keep class org.conscrypt.** { *; }
+-dontwarn org.conscrypt.**
 -keep class rikka.shizuku.** { *; }
 -keep class moe.shizuku.** { *; }

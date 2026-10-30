@@ -457,14 +457,14 @@ private fun ScriptCard(
                 }
             }
         } else if (!runningOrBoot) {
+            val canAutoConnectWireless = permissions.adbWifiEnabled && permissions.wirelessAdbPaired
             PrimaryCta(
                 text = when {
-                    !permissions.shizukuInstalled -> "Tải Shizuku để bật Script"
-                    !permissions.shizukuRunning -> "Mở Shizuku để bật Script"
-                    else -> "Cấp quyền Shizuku"
+                    permissions.shizukuRunning || canAutoConnectWireless -> "Kết nối Engine để bật Script"
+                    else -> "Mở Script nền & Ghép nối 6 số"
                 },
                 onClick = {
-                    if (permissions.shizukuRunning) onRequestShizuku() else Intents.openShizuku(context)
+                    if (permissions.shizukuRunning || canAutoConnectWireless) onRequestShizuku() else onOpen()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = R.drawable.lc_terminal,

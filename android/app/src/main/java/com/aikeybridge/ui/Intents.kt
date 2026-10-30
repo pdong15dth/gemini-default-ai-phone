@@ -41,6 +41,21 @@ object Intents {
         }
     }
 
+    /** Mở thẳng tới mục Gỡ lỗi không dây trong Tuỳ chọn nhà phát triển để ghép nối mã 6 số. */
+    fun openWirelessDebuggingSettings(context: Context) {
+        val devIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+            .putExtra(SettingsGuideHelper.EXTRA_FRAGMENT_ARG_KEY, "toggle_adb_wireless")
+        if (start(context, devIntent)) {
+            SettingsGuideHelper.guideDynamicSetting(
+                context = context,
+                texts = listOf("Gỡ lỗi không dây", "Ghép nối thiết bị bằng mã ghép nối", "Wireless debugging"),
+                scrollDownFirst = true,
+            )
+        } else {
+            start(context, Intent(Settings.ACTION_SETTINGS))
+        }
+    }
+
     fun openAppDetails(context: Context, packageName: String = context.packageName) {
         val intent = Intent(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,

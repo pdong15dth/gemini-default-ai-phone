@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -132,7 +132,7 @@ val LightPalette = BridgePalette(
     warn = Color(0xFFB86B00),
 )
 
-val LocalBridgePalette = staticCompositionLocalOf { DarkPalette }
+val LocalBridgePalette = compositionLocalOf { DarkPalette }
 
 // Bề mặt — tự động đổi theo giao diện đang chọn.
 val Ink: Color

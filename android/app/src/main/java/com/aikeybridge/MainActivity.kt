@@ -12,6 +12,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aikeybridge.data.ThemeMode
 import com.aikeybridge.service.SettingsGuideHelper
@@ -33,6 +34,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         runCatching { Shizuku.addRequestPermissionResultListener(permissionListener) }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                runCatching {
+                    requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 2001)
+                }
+            }
+        }
         setContent {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
             val darkTheme = when (settings.themeMode) {
@@ -50,6 +60,13 @@ class MainActivity : ComponentActivity() {
                     statusBarStyle = barStyle,
                     navigationBarStyle = barStyle,
                 )
+                window.decorView.setBackgroundColor(
+                    if (darkTheme) 0xFF0A0B0D.toInt() else 0xFFF5F2EA.toInt(),
+                )
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !darkTheme
+                    isAppearanceLightNavigationBars = !darkTheme
+                }
                 onDispose {}
             }
             BridgeTheme(themeMode = settings.themeMode) {
