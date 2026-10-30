@@ -8,6 +8,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import com.aikeybridge.TriggerActivity
+import com.aikeybridge.data.ActionMode
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.ConfigSource
 import com.aikeybridge.data.HardwareMode
@@ -80,27 +81,47 @@ class TriggerEngine(
         if (settings.hardwareMode != HardwareMode.LOGCAT) return
         val config = source.current()
         val trigger = config.logTriggers.firstOrNull { it.pattern.containsMatchIn(line) } ?: return
-        scope.launch { fire(config, "${trigger.label} · log", line.take(120), dismiss = false) }
+        scope.launch {
+            fire(
+                config = config,
+                label = "${trigger.label} · log",
+                detail = line.take(120),
+                dismiss = false,
+                actionMode = config.buttonAction,
+            )
+        }
     }
 
     /** Lối tắt "Gọi AI" (phím tắt ROM, chạm mặt lưng, icon): mở đích + bật Micro, không cần Back. */
-    fun launchFromShortcut() {
+    fun launchFromShortcut(mode: ActionMode? = null) {
         val config = source.current()
-        fire(config, "Lối tắt Gọi AI", "shortcut", dismiss = false)
+        fire(
+            config = config,
+            label = "Lối tắt Gọi AI",
+            detail = "shortcut",
+            dismiss = false,
+            actionMode = mode ?: config.shortcutAction,
+        )
     }
 
     private fun fire(config: ActiveConfig, trigger: TriggerSpec, cls: String) =
-        fire(config, trigger.label, "${trigger.packageName}/$cls", dismiss = true)
+        fire(config, trigger.label, "${trigger.packageName}/$cls", dismiss = true, actionMode = config.voiceAction)
 
-    private fun fire(config: ActiveConfig, label: String, detail: String, dismiss: Boolean) {
+    private fun fire(
+        config: ActiveConfig,
+        label: String,
+        detail: String,
+        dismiss: Boolean,
+        actionMode: ActionMode = ActionMode.DEFAULT,
+    ) {
         val now = SystemClock.elapsedRealtime()
         if (config.dedupe && now - lastFiredAt < config.cooldownMs) return
         if (!busy.compareAndSet(false, true)) return
         lastFiredAt = now
         scope.launch {
             val outcome = try {
-                Diagnostics.info("trigger", "$label · $detail")
-                runFlow(config, dismiss)
+                Diagnostics.info("trigger", "$label · $detail (${actionMode.shortLabel})")
+                runFlow(config, dismiss, actionMode)
             } catch (throwable: Throwable) {
                 Diagnostics.error("flow", throwable.message ?: throwable.toString())
                 RuntimeStatus.setState(RedirectState.FAILED)
@@ -111,7 +132,11 @@ class TriggerEngine(
             AttemptLog.record(
                 Attempt(
                     at = System.currentTimeMillis(),
-                    flow = config.flowLabel,
+                    flow = when (actionMode) {
+                        ActionMode.GOOGLE_CTS -> "${config.profile.assistantName} → Google · Circle to Search"
+                        ActionMode.GOOGLE_APP -> "${config.profile.assistantName} → Google"
+                        else -> config.flowLabel
+                    },
                     ok = outcome.ok,
                     durationMs = SystemClock.elapsedRealtime() - now,
                     detail = outcome.detail,
@@ -123,7 +148,11 @@ class TriggerEngine(
 
     private data class FlowOutcome(val ok: Boolean, val detail: String, val micFailed: Boolean = false)
 
-    private suspend fun runFlow(config: ActiveConfig, dismiss: Boolean): FlowOutcome {
+    private suspend fun runFlow(
+        config: ActiveConfig,
+        dismiss: Boolean,
+        actionMode: ActionMode = ActionMode.DEFAULT,
+    ): FlowOutcome {
         val target = config.target
         val app = source.settings.state.value
         val keyguard = service.getSystemService(KeyguardManager::class.java)
@@ -144,6 +173,27 @@ class TriggerEngine(
 
         RuntimeStatus.setState(RedirectState.LAUNCHING)
         val needsActivity = locked || power?.isInteractive == false
+
+        if (actionMode == ActionMode.GOOGLE_CTS) {
+            if (needsActivity && shizukuGranted()) {
+                shell.exec("input keyevent 224")
+                delay(350)
+            }
+            val cts = AssistOverlay.launchCircleToSearch(service)
+            RuntimeStatus.setState(if (cts.ok) RedirectState.DONE else RedirectState.FAILED)
+            return FlowOutcome(cts.ok, cts.detail)
+        }
+
+        if (actionMode == ActionMode.GOOGLE_APP) {
+            if (needsActivity && shizukuGranted()) {
+                shell.exec("input keyevent 224")
+                delay(250)
+            }
+            val res = AssistantLauncher.launchPackage(service, AssistantLauncher.GOOGLE_PACKAGE, "Google")
+            RuntimeStatus.setState(if (res.ok) RedirectState.DONE else RedirectState.FAILED)
+            return FlowOutcome(res.ok, res.detail)
+        }
+
         // Lớp phủ nổi chỉ gọi được bằng phím trợ lý từ shell, và chỉ an toàn khi Google là trợ lý
         // mặc định — nếu không, phím đó sẽ mở lại trợ lý gốc.
         val overlayReady = target.shellKeyevent != null && shizukuGranted() &&
@@ -184,7 +234,12 @@ class TriggerEngine(
 
         val voice = target.voiceUi
         val via = if (usedOverlay) "lớp phủ" else "app"
-        if (!app.autoMic || voice == null) {
+        val shouldTapMic = when (actionMode) {
+            ActionMode.GEMINI_SCREEN -> false
+            ActionMode.GEMINI_VOICE -> true
+            else -> app.autoMic
+        }
+        if (!shouldTapMic || voice == null) {
             RuntimeStatus.setState(RedirectState.DONE)
             return FlowOutcome(true, if (voice == null) "đã mở $via" else "$via · micro: tắt")
         }

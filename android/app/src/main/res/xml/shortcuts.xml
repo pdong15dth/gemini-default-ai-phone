@@ -11,4 +11,15 @@
             android:targetClass="com.aikeybridge.LaunchActivity"
             android:targetPackage="com.aikeybridge" />
     </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="circle_to_search"
+        android:shortcutLongLabel="@string/cts_long_label"
+        android:shortcutShortLabel="@string/cts_label">
+        <intent
+            android:action="com.aikeybridge.action.CTS"
+            android:targetClass="com.aikeybridge.LaunchActivity"
+            android:targetPackage="com.aikeybridge" />
+    </shortcut>
 </shortcuts>

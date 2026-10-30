@@ -25,6 +25,38 @@ enum class UsageMode { FULL, SCRIPT, ONE_TIME }
 /** Giao diện: SYSTEM = theo cài đặt hệ thống (mặc định), LIGHT = sáng, DARK = tối. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/**
+ * Công cụ chạy lệnh Shell (UID 2000):
+ * - AUTO: Tự động (ưu tiên Shizuku nếu đang chạy, hoặc Engine nội bộ, tự động chuyển đổi dự phòng khi 1 bên lỗi).
+ * - SHIZUKU: Ưu tiên dùng Shizuku chuẩn (dự phòng ổn định nhất nếu nghi ngờ Engine nội bộ lỗi).
+ * - BUILTIN: Ưu tiên dùng Engine nội bộ (ghép nối 6 số Gỡ lỗi không dây, không cần cài Shizuku).
+ */
+enum class ShellBackend(val label: String) {
+    AUTO("Tự động (Cả 2)"),
+    SHIZUKU("Shizuku"),
+    BUILTIN("Engine nội bộ"),
+}
+
+/**
+ * Hành động mở cho từng thao tác riêng biệt (Khẩu lệnh, Nút cứng, Lối tắt).
+ * - DEFAULT: Theo đích đến chung + cài đặt Tự bật Micro.
+ * - GEMINI_VOICE: Lớp phủ Gemini + tự động bật Micro nghe ngay.
+ * - GEMINI_SCREEN: Lớp phủ Gemini để hỏi màn hình (không tự bật Micro).
+ * - GOOGLE_CTS: Google Circle to Search (khoanh tròn tìm kiếm / dịch màn hình).
+ * - GOOGLE_APP: Mở thẳng ứng dụng Google.
+ */
+enum class ActionMode(
+    val title: String,
+    val subtitle: String,
+    val shortLabel: String,
+) {
+    DEFAULT("Theo đích đến chung", "dùng Đích đến & Tự bật Micro đã chọn", "Mặc định"),
+    GEMINI_VOICE("Gemini · Nghe giọng nói", "mở lớp phủ Gemini và tự bật Micro", "Gemini Voice"),
+    GEMINI_SCREEN("Gemini · Hỏi màn hình", "mở lớp phủ Gemini, không tự bật Micro", "Gemini Màn hình"),
+    GOOGLE_CTS("Google · Circle to Search", "khoanh tròn tìm kiếm hoặc dịch màn hình", "Circle to Search"),
+    GOOGLE_APP("Google · Mở ứng dụng", "mở thẳng ứng dụng Google", "App Google"),
+}
+
 data class AppSettings(
     val redirectEnabled: Boolean = true,
     val autoMic: Boolean = true,
@@ -51,6 +83,10 @@ data class AppSettings(
     val provisionedFingerprint: String? = null,
     val lastRomCheckAt: Long = 0,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val voiceAction: ActionMode = ActionMode.DEFAULT,
+    val buttonAction: ActionMode = ActionMode.DEFAULT,
+    val shortcutAction: ActionMode = ActionMode.DEFAULT,
+    val shellBackend: ShellBackend = ShellBackend.AUTO,
 )
 
 class SettingsRepository(context: Context) : SharedPreferences.OnSharedPreferenceChangeListener {
@@ -129,6 +165,14 @@ class SettingsRepository(context: Context) : SharedPreferences.OnSharedPreferenc
 
     fun setThemeMode(mode: ThemeMode) = edit { putString(KEY_THEME_MODE, mode.name) }
 
+    fun setVoiceAction(mode: ActionMode) = edit { putString(KEY_VOICE_ACTION, mode.name) }
+
+    fun setButtonAction(mode: ActionMode) = edit { putString(KEY_BUTTON_ACTION, mode.name) }
+
+    fun setShortcutAction(mode: ActionMode) = edit { putString(KEY_SHORTCUT_ACTION, mode.name) }
+
+    fun setShellBackend(backend: ShellBackend) = edit { putString(KEY_SHELL_BACKEND, backend.name) }
+
     private fun writeTriggers(list: List<CustomTrigger>) = edit {
         putString(KEY_CUSTOM_TRIGGERS, list.joinToString("\n") { "${it.packageName}\t${it.className}" })
     }
@@ -175,6 +219,18 @@ class SettingsRepository(context: Context) : SharedPreferences.OnSharedPreferenc
         themeMode = prefs.getString(KEY_THEME_MODE, null)
             ?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } }
             ?: ThemeMode.SYSTEM,
+        voiceAction = prefs.getString(KEY_VOICE_ACTION, null)
+            ?.let { name -> ActionMode.entries.firstOrNull { it.name == name } }
+            ?: ActionMode.DEFAULT,
+        buttonAction = prefs.getString(KEY_BUTTON_ACTION, null)
+            ?.let { name -> ActionMode.entries.firstOrNull { it.name == name } }
+            ?: ActionMode.DEFAULT,
+        shortcutAction = prefs.getString(KEY_SHORTCUT_ACTION, null)
+            ?.let { name -> ActionMode.entries.firstOrNull { it.name == name } }
+            ?: ActionMode.DEFAULT,
+        shellBackend = prefs.getString(KEY_SHELL_BACKEND, null)
+            ?.let { name -> ShellBackend.entries.firstOrNull { it.name == name } }
+            ?: ShellBackend.AUTO,
     )
 
     private fun edit(block: SharedPreferences.Editor.() -> Unit) {
@@ -214,6 +270,10 @@ class SettingsRepository(context: Context) : SharedPreferences.OnSharedPreferenc
         const val KEY_FINGERPRINT = "provisioned_fingerprint"
         const val KEY_ROM_CHECK = "last_rom_check"
         const val KEY_THEME_MODE = "theme_mode"
+        const val KEY_VOICE_ACTION = "voice_action"
+        const val KEY_BUTTON_ACTION = "button_action"
+        const val KEY_SHORTCUT_ACTION = "shortcut_action"
+        const val KEY_SHELL_BACKEND = "shell_backend"
         const val MAX_CUSTOM_TRIGGERS = 10
     }
 }

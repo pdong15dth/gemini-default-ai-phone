@@ -33,11 +33,23 @@ object AssistantLauncher {
 
     private fun launchPackage(context: Context, target: AssistantTarget): LaunchOutcome {
         for (pkg in target.packages) {
-            val intent = context.packageManager.getLaunchIntentForPackage(pkg) ?: continue
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-            val started = runCatching { context.startActivity(intent) }.isSuccess
-            if (started) return LaunchOutcome(true, "Mở app → $pkg")
+            val outcome = launchPackage(context, pkg, target.displayName)
+            if (outcome.ok) return outcome
         }
         return LaunchOutcome(false, "Chưa cài ${target.displayName} (${target.packages.joinToString()})")
     }
+
+    fun launchPackage(context: Context, pkg: String, displayName: String = pkg): LaunchOutcome {
+        val intent = context.packageManager.getLaunchIntentForPackage(pkg)
+            ?: return LaunchOutcome(false, "Chưa cài $displayName ($pkg)")
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        val started = runCatching { context.startActivity(intent) }.isSuccess
+        return if (started) {
+            LaunchOutcome(true, "Mở app → $pkg")
+        } else {
+            LaunchOutcome(false, "Không mở được $displayName ($pkg)")
+        }
+    }
+
+    const val GOOGLE_PACKAGE = "com.google.android.googlequicksearchbox"
 }

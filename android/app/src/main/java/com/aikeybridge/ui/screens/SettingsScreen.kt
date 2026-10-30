@@ -34,6 +34,7 @@ import com.aikeybridge.R
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.AppSettings
 import com.aikeybridge.data.PermissionSnapshot
+import com.aikeybridge.data.ShellBackend
 import com.aikeybridge.data.ThemeMode
 import com.aikeybridge.ui.Format
 import com.aikeybridge.ui.Intents
@@ -88,6 +89,7 @@ fun SettingsScreen(
     onClear: () -> Unit,
     onRestore: () -> Unit,
     onSetThemeMode: (ThemeMode) -> Unit = {},
+    onSetShellBackend: (ShellBackend) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -163,6 +165,28 @@ fun SettingsScreen(
                         else -> ThemeMode.SYSTEM
                     }
                     onSetThemeMode(mode)
+                },
+            )
+
+            SectionLabel("Công cụ chạy lệnh (Shell & Shizuku dự phòng)", Modifier.padding(top = 8.dp, bottom = 3.dp))
+            Segmented(
+                options = listOf(
+                    SegmentOption("Tự động (Cả 2)"),
+                    SegmentOption("Shizuku"),
+                    SegmentOption("Engine nội bộ"),
+                ),
+                selected = when (settings.shellBackend) {
+                    ShellBackend.AUTO -> 0
+                    ShellBackend.SHIZUKU -> 1
+                    ShellBackend.BUILTIN -> 2
+                },
+                onSelect = { index ->
+                    val backend = when (index) {
+                        1 -> ShellBackend.SHIZUKU
+                        2 -> ShellBackend.BUILTIN
+                        else -> ShellBackend.AUTO
+                    }
+                    onSetShellBackend(backend)
                 },
             )
 

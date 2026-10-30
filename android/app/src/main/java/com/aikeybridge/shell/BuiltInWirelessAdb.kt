@@ -202,7 +202,7 @@ object BuiltInWirelessAdb {
                 }
                 // Nếu máy đã ghép nối từ trước và người dùng vừa gạt bật Gỡ lỗi không dây, tự kết nối luôn!
                 if (_state.value.pairedBefore &&
-                    !EngineBinderProvider.isAlive() &&
+                    !EngineBinderProvider.isAlive(appContext) &&
                     !_state.value.connecting &&
                     _state.value.pairingPort <= 0
                 ) {
@@ -380,13 +380,16 @@ object BuiltInWirelessAdb {
      * Trả về `true` nếu [EngineBinderProvider.isAlive] đã nhận được Binder.
      */
     suspend fun connectAndBootstrapDaemon(context: Context): Boolean = withContext(Dispatchers.IO) {
-        if (EngineBinderProvider.isAlive()) return@withContext true
         val appContext = context.applicationContext
+        if (EngineBinderProvider.isAlive(appContext)) return@withContext true
 
         // Thử đánh thức daemon sẵn có trong RAM trước (trường hợp đã bật trong lần khởi động này)
         EngineBinderProvider.requestDaemonReconnect(appContext)
         repeat(6) {
-            if (EngineBinderProvider.isAlive()) return@withContext true
+            if (EngineBinderProvider.isAlive(appContext)) {
+                EngineBinderProvider.notifyStateChanged()
+                return@withContext true
+            }
             delay(60)
         }
 
@@ -407,9 +410,10 @@ object BuiltInWirelessAdb {
             val cmd = EngineDaemonMain.bootstrapCommand(appContext)
             execDirectOnAdb(mgr, cmd)
 
-            // Chờ tối đa 3 giây để EngineDaemonMain đẩy IShellService Binder về EngineBinderProvider
+            // Chờ tối đa 3 giây để EngineDaemonMain sẵn sàng
             repeat(35) { step ->
-                if (EngineBinderProvider.isAlive()) {
+                if (EngineBinderProvider.isAlive(appContext)) {
+                    EngineBinderProvider.notifyStateChanged()
                     Diagnostics.success("engine", "Engine nội bộ (UID 2000) đã kết nối qua Gỡ lỗi không dây.")
                     return@withContext true
                 }
@@ -418,7 +422,9 @@ object BuiltInWirelessAdb {
                 }
                 delay(85)
             }
-            return@withContext EngineBinderProvider.isAlive()
+            val alive = EngineBinderProvider.isAlive(appContext)
+            if (alive) EngineBinderProvider.notifyStateChanged()
+            return@withContext alive
         } finally {
             _state.update { it.copy(connecting = false) }
         }

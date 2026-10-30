@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aikeybridge.data.ActionMode
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.ConfigResolver
 import com.aikeybridge.data.ConfigSource
@@ -15,6 +16,7 @@ import com.aikeybridge.data.UsageMode
 import com.aikeybridge.data.PermissionSnapshot
 import com.aikeybridge.data.PermissionsReader
 import com.aikeybridge.data.SettingsRepository
+import com.aikeybridge.data.ShellBackend
 import com.aikeybridge.diagnostics.AttemptLog
 import com.aikeybridge.diagnostics.AttemptStats
 import com.aikeybridge.diagnostics.AttemptSummary
@@ -157,12 +159,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val active = config.value
         val watch = active.shellWatch ?: return null
         val log = scriptEventLog?.absolutePath ?: "/dev/null"
+        val mic = active.target.overlayMic ?: catalog.target(AssistantTarget.GEMINI)?.overlayMic
         return WatchScript.content(
             watch = watch,
             keyevent = active.target.shellKeyevent ?: GEMINI_ASSIST_KEY,
             eventLog = log,
             dismissDelayMs = active.dismissDelayMs,
-            mic = active.target.overlayMic,
+            mic = mic,
+            voiceAction = active.voiceAction,
+            buttonAction = active.buttonAction,
         )
     }
 
@@ -182,10 +187,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (lines.isEmpty()) return@launch
             val active = config.value
             lines.mapNotNull(WatchScript::parseEvent).forEach { (at, kind) ->
+                val mode = if (kind == "voice") active.voiceAction else active.buttonAction
+                val dst = when (mode) {
+                    ActionMode.GOOGLE_CTS -> "Google · Circle to Search"
+                    ActionMode.GOOGLE_APP -> "Google"
+                    ActionMode.GEMINI_SCREEN -> "Gemini · Hỏi màn hình"
+                    ActionMode.GEMINI_VOICE -> "Gemini"
+                    ActionMode.DEFAULT -> active.target.displayName
+                }
                 AttemptLog.record(
                     com.aikeybridge.diagnostics.Attempt(
                         at = at,
-                        flow = if (kind == "voice") active.flowLabel else "Nút → ${active.target.displayName}",
+                        flow = if (kind == "voice") "${active.profile.assistantName} → $dst" else "Nút → $dst",
                         ok = true,
                         durationMs = SCRIPT_FLOW_MS,
                         detail = "script nền · ${if (kind == "voice") "khẩu lệnh" else "nút"}",
@@ -228,18 +241,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _script.update { it.copy(busy = true) }
             refreshPermissions()
             if (!_permissions.value.shizukuGranted) {
+                val backend = settingsRepository.state.value.shellBackend
+                if (backend == ShellBackend.SHIZUKU) {
+                    _script.update { it.copy(busy = false) }
+                    connectOrOpenShizuku()
+                    return@launch
+                }
                 val connected = BuiltInWirelessAdb.connectAndBootstrapDaemon(app)
                 refreshPermissions()
                 if (!connected && !_permissions.value.shizukuGranted) {
                     _script.update { it.copy(busy = false) }
-                    _message.value = "Chưa kết nối được Engine nội bộ. Hãy bật Gỡ lỗi không dây để ghép nối 1 lần hoặc chạy lệnh ADB bên dưới."
+                    _message.value = "Chưa kết nối được Engine hoặc Shizuku. Hãy ghép nối 6 số Gỡ lỗi không dây hoặc bật ứng dụng Shizuku."
                     return@launch
                 }
             }
-            // Đảm bảo EngineDaemonMain (UID 2000) đã chạy trong RAM và thoát cgroup adbd
-            if (!EngineBinderProvider.isAlive()) {
-                shell.exec(EngineDaemonMain.bootstrapCommand(app))
-            }
+            // Đảm bảo EngineDaemonMain (UID 2000) đã chạy trong RAM và cập nhật lên bản mới nhất
+            shell.exec(EngineDaemonMain.bootstrapCommand(app))
             val active = config.value
             if (active.provisioning.isNotEmpty()) {
                 _setup.value = SetupUiState.from(active.provisioning, active.restore).copy(running = true)
@@ -307,21 +324,49 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Đảm bảo `akb-gemini.sh` đã được cài và chạy ngầm khi đang ở chế độ [UsageMode.SCRIPT].
+     * Giúp người dùng dù bấm "Tắt Tùy chọn nhà phát triển" ngay ở bước 3 hay vừa chạy xong 9 lệnh ở bước 4
+     * thì script nền vẫn luôn được cài đặt và kích hoạt đầy đủ.
+     */
+    private suspend fun ensureWatchScriptStartedQuietly() {
+        if (settingsRepository.state.value.usageMode != UsageMode.SCRIPT) return
+        val content = scriptContent() ?: return
+        scriptEventLog?.parentFile?.mkdirs()
+        if (!_permissions.value.readLogs) {
+            shell.exec("pm grant ${app.packageName} android.permission.READ_LOGS")
+        }
+        val install = shell.exec(WatchScript.installCommand(content))
+        if (!install.ok) return
+        shell.exec(WatchScript.stopCommand())
+        shell.exec(WatchScript.startCommand())
+        delay(350)
+        val status = shell.exec(WatchScript.statusCommand())
+        val running = status.stdout.isNotBlank()
+        if (running) {
+            settingsRepository.setScriptStartedAt(System.currentTimeMillis())
+            val pid = status.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty()
+            val detached = if (pid.isNotEmpty()) logScriptCgroup(pid) else null
+            _script.value = ScriptStatus(running = true, busy = false, pid = pid, detachedFromAdbd = detached)
+            Diagnostics.success("script", "Đã tự động cài đặt & khởi chạy Script nền (${WatchScript.PATH}).")
+        }
+    }
+
+    /**
      * Tắt sạch Gỡ lỗi không dây, Gỡ lỗi USB và Tùy chọn nhà phát triển bằng 1 chạm qua Engine nội bộ.
      * Cả [WatchScript] và [EngineDaemonMain] đều đã tách khỏi cgroup của `adbd` nên vẫn tiếp tục chạy ngầm.
      */
     fun lockDeveloperMode() {
         viewModelScope.launch {
-            if (!EngineBinderProvider.isAlive()) {
-                shell.exec(EngineDaemonMain.bootstrapCommand(app))
-                delay(250)
+            shell.exec(EngineDaemonMain.bootstrapCommand(app))
+            if (_script.value.running != true) {
+                ensureWatchScriptStartedQuietly()
             }
             val res = shell.exec(EngineDaemonMain.LOCK_DEV_MODE_CMD)
             delay(200)
             refreshPermissions()
             if (res.ok || (!_permissions.value.devOptionsEnabled && !_permissions.value.adbEnabled)) {
                 Diagnostics.success("security", "Đã tắt Tùy chọn nhà phát triển & Gỡ lỗi — an toàn 100% cho app ngân hàng & VNeID.")
-                _message.value = "Đã tắt sạch Tùy chọn nhà phát triển & Gỡ lỗi! Dùng app ngân hàng & VNeID bình thường."
+                _message.value = "Đã bật Script nền & tắt sạch Tùy chọn nhà phát triển / Gỡ lỗi! Dùng app ngân hàng & VNeID bình thường."
             } else {
                 Intents.openDeveloperSettings(app)
                 _message.value = "Hãy gạt tắt công tắc Tùy chọn nhà phát triển ở đầu trang."
@@ -331,21 +376,60 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Kết nối Engine nội bộ qua Gỡ lỗi không dây (hoặc đánh thức daemon sẵn có trong RAM). */
     fun connectBuiltInEngine() {
+        if (settingsRepository.state.value.shellBackend == ShellBackend.SHIZUKU) {
+            settingsRepository.setShellBackend(ShellBackend.AUTO)
+        }
         viewModelScope.launch {
             EngineBinderProvider.requestDaemonReconnect(app)
             delay(180)
-            if (EngineBinderProvider.isAlive()) {
+            if (EngineBinderProvider.isAlive(app)) {
+                shell.exec(EngineDaemonMain.bootstrapCommand(app))
+                if (_script.value.running != true) ensureWatchScriptStartedQuietly()
                 refreshPermissions()
                 _message.value = "Đã kết nối Engine nội bộ (UID 2000) trong RAM!"
                 return@launch
             }
             val ok = BuiltInWirelessAdb.connectAndBootstrapDaemon(app)
+            if (ok && _script.value.running != true) {
+                ensureWatchScriptStartedQuietly()
+            }
             refreshPermissions()
             if (ok) {
-                _message.value = "Đã kết nối Engine nội bộ qua Gỡ lỗi không dây — không cần Shizuku!"
+                _message.value = "Đã kết nối Engine nội bộ qua Gỡ lỗi không dây!"
             } else {
                 startWirelessPairing()
             }
+        }
+    }
+
+    /** Mở ứng dụng Shizuku hoặc xin quyền Shizuku (dự phòng ổn định cho Engine nội bộ). */
+    fun connectOrOpenShizuku() {
+        val shizukuRawRunning = runCatching { !Shizuku.isPreV11() && Shizuku.pingBinder() }.getOrDefault(false)
+        val shizukuRawGranted = shizukuRawRunning && runCatching {
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        }.getOrDefault(false)
+
+        if (shizukuRawGranted) {
+            if (settingsRepository.state.value.shellBackend == ShellBackend.BUILTIN) {
+                settingsRepository.setShellBackend(ShellBackend.AUTO)
+            }
+            refreshPermissions()
+            _message.value = "Shizuku đã cấp quyền & sẵn sàng chạy lệnh!"
+            return
+        }
+        if (shizukuRawRunning) {
+            if (settingsRepository.state.value.shellBackend == ShellBackend.BUILTIN) {
+                settingsRepository.setShellBackend(ShellBackend.AUTO)
+            }
+            runCatching { Shizuku.requestPermission(SHIZUKU_REQUEST_CODE) }
+                .onFailure { _message.value = "Không gửi được yêu cầu quyền Shizuku: ${it.message}" }
+            return
+        }
+        Intents.openShizuku(app)
+        _message.value = if (_permissions.value.shizukuAppInstalled) {
+            "Hãy mở Shizuku → bấm Start (Gỡ lỗi không dây), sau đó quay lại AI Key Bridge."
+        } else {
+            "Hãy cài đặt ứng dụng Shizuku, bấm Start rồi quay lại AI Key Bridge."
         }
     }
 
@@ -362,6 +446,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun submitWirelessPairingCode(code: String) {
         BuiltInWirelessAdb.submitPairingCode(app, code) { ok, msg ->
             viewModelScope.launch {
+                if (ok && _script.value.running != true) {
+                    ensureWatchScriptStartedQuietly()
+                }
                 refreshPermissions()
                 _message.value = msg
             }
@@ -444,6 +531,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val vivoQueryRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+
     fun refreshPermissions() {
         importScriptEvents()
         val active = config.value
@@ -455,18 +544,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             nativeAssistantPackages = active.profile.assistantPackages,
         )
         _permissions.value = snap
-        if (snap.shizukuGranted) {
+        if (snap.shizukuGranted && !_setup.value.running && !_script.value.busy && !exporting &&
+            vivoQueryRunning.compareAndSet(false, true)
+        ) {
             viewModelScope.launch {
-                val res = shell.exec(PermissionsReader.VIVO_QUERY_CMD)
-                if (res.ok && PermissionsReader.updateFromVivoShell(app, res.stdout)) {
-                    val latestActive = config.value
-                    _permissions.value = PermissionsReader.read(
-                        context = app,
-                        settings = settingsRepository.state.value,
-                        targetPackages = latestActive.target.packages,
-                        assistantRequired = false,
-                        nativeAssistantPackages = latestActive.profile.assistantPackages,
-                    )
+                try {
+                    val res = shell.exec(PermissionsReader.VIVO_QUERY_CMD)
+                    if (res.ok && PermissionsReader.updateFromVivoShell(app, res.stdout)) {
+                        val latestActive = config.value
+                        _permissions.value = PermissionsReader.read(
+                            context = app,
+                            settings = settingsRepository.state.value,
+                            targetPackages = latestActive.target.packages,
+                            assistantRequired = false,
+                            nativeAssistantPackages = latestActive.profile.assistantPackages,
+                        )
+                    }
+                } finally {
+                    vivoQueryRunning.set(false)
                 }
             }
         }
@@ -487,7 +582,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val shizukuStartCommand: String
         get() = "adb shell \"${EngineDaemonMain.bootstrapCommand(app)}\""
 
-    fun setAutoMic(value: Boolean) = settingsRepository.setAutoMic(value)
+    fun setAutoMic(value: Boolean) {
+        settingsRepository.setAutoMic(value)
+        syncRunningScriptIfNeeded()
+    }
 
     fun setLockScreen(value: Boolean) = settingsRepository.setLockScreen(value)
 
@@ -496,6 +594,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setDedupe(value: Boolean) = settingsRepository.setDedupe(value)
 
     fun setThemeMode(mode: ThemeMode) = settingsRepository.setThemeMode(mode)
+
+    fun setShellBackend(backend: ShellBackend) {
+        settingsRepository.setShellBackend(backend)
+        refreshPermissions()
+        _message.value = "Công cụ chạy lệnh: ${backend.label}."
+    }
+
+    fun setVoiceAction(mode: ActionMode) {
+        settingsRepository.setVoiceAction(mode)
+        syncRunningScriptIfNeeded(announce = "Khẩu lệnh: ${mode.title}")
+    }
+
+    fun setButtonAction(mode: ActionMode) {
+        settingsRepository.setButtonAction(mode)
+        syncRunningScriptIfNeeded(announce = "Nút cứng: ${mode.title}")
+    }
+
+    fun setShortcutAction(mode: ActionMode) {
+        settingsRepository.setShortcutAction(mode)
+        _message.value = "Lối tắt Gọi AI: ${mode.title}."
+    }
 
     fun setManualAutostart(value: Boolean) {
         settingsRepository.setManualAutostart(value)
@@ -515,6 +634,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectTarget(id: String) {
         settingsRepository.setTarget(id)
+        syncRunningScriptIfNeeded()
+    }
+
+    private fun syncRunningScriptIfNeeded(announce: String? = null) {
+        viewModelScope.launch {
+            delay(80)
+            val content = scriptContent()
+            val runningOrAlive = _script.value.running == true || scriptAlive() == true
+            if (content != null && runningOrAlive && ShizukuShell.isEngineOrShizukuReady(app)) {
+                val install = shell.exec(WatchScript.installCommand(content))
+                if (install.ok) {
+                    shell.exec(WatchScript.stopCommand())
+                    shell.exec(WatchScript.startCommand())
+                    Diagnostics.info("script", "Đã tự cập nhật Script nền theo tùy chọn mới.")
+                    if (announce != null) {
+                        _message.value = "$announce · đã cập nhật Script nền."
+                    }
+                    return@launch
+                }
+            }
+            if (announce != null) {
+                _message.value = announce
+            }
+        }
     }
 
     fun selectCustomTarget(entry: AppEntry) {
@@ -709,15 +852,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun requestShizukuPermission() {
+        val backend = settingsRepository.state.value.shellBackend
         val snapshot = _permissions.value
-        if (snapshot.engineDaemonRunning) {
-            _message.value = "Engine nội bộ (UID 2000) đã kết nối sẵn sàng!"
+        if (backend == ShellBackend.SHIZUKU) {
+            connectOrOpenShizuku()
             return
         }
-        val shizukuRawRunning = runCatching { !Shizuku.isPreV11() && Shizuku.pingBinder() }.getOrDefault(false)
-        if (shizukuRawRunning) {
-            runCatching { Shizuku.requestPermission(SHIZUKU_REQUEST_CODE) }
-                .onFailure { _message.value = "Không gửi được yêu cầu quyền: ${it.message}" }
+        if (backend == ShellBackend.BUILTIN) {
+            if (snapshot.engineDaemonRunning) {
+                _message.value = "Engine nội bộ (UID 2000) đã kết nối sẵn sàng!"
+            } else {
+                connectBuiltInEngine()
+            }
+            return
+        }
+        if (snapshot.shizukuBinderAlive && !snapshot.shizukuPermissionGranted) {
+            connectOrOpenShizuku()
+            return
+        }
+        if (snapshot.shizukuPermissionGranted || snapshot.engineDaemonRunning) {
+            _message.value = when {
+                snapshot.shizukuPermissionGranted && snapshot.engineDaemonRunning ->
+                    "Cả Shizuku và Engine nội bộ đều đã sẵn sàng!"
+                snapshot.shizukuPermissionGranted ->
+                    "Shizuku đã cấp quyền & sẵn sàng!"
+                else ->
+                    "Engine nội bộ (UID 2000) đã kết nối sẵn sàng!"
+            }
             return
         }
         connectBuiltInEngine()
@@ -727,10 +888,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         refreshPermissions()
         if (granted) {
             viewModelScope.launch {
-                shell.exec(EngineDaemonMain.bootstrapCommand(app))
+                if (!EngineBinderProvider.isAlive(app)) {
+                    shell.exec(EngineDaemonMain.bootstrapCommand(app))
+                }
+                if (_script.value.running != true) {
+                    ensureWatchScriptStartedQuietly()
+                }
                 refreshPermissions()
             }
-            _message.value = "Đã cấp quyền & khởi chạy Engine nội bộ. Có thể chạy ${_setup.value.steps.size} lệnh."
+            _message.value = "Đã cấp quyền Shizuku & sẵn sàng chạy ${_setup.value.steps.size} lệnh."
         } else {
             _message.value = "Bạn đã từ chối quyền Shizuku."
         }
@@ -748,17 +914,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _setup.value = SetupUiState.from(active.provisioning, active.restore).copy(running = true)
             if (!_permissions.value.shizukuGranted) {
+                val backend = settingsRepository.state.value.shellBackend
+                if (backend == ShellBackend.SHIZUKU) {
+                    _setup.update { it.copy(running = false) }
+                    connectOrOpenShizuku()
+                    return@launch
+                }
                 BuiltInWirelessAdb.connectAndBootstrapDaemon(app)
                 refreshPermissions()
                 if (!_permissions.value.shizukuGranted) {
                     _setup.update { it.copy(running = false) }
-                    _message.value = "Chưa kết nối được Engine nội bộ. Hãy bật Gỡ lỗi không dây hoặc ghép nối 6 số."
+                    _message.value = "Chưa kết nối được Engine hoặc Shizuku. Hãy ghép nối 6 số Gỡ lỗi không dây hoặc bật ứng dụng Shizuku."
                     return@launch
                 }
             }
-            if (!EngineBinderProvider.isAlive()) {
-                shell.exec(EngineDaemonMain.bootstrapCommand(app))
-            }
+            shell.exec(EngineDaemonMain.bootstrapCommand(app))
             Diagnostics.info("setup", "Bắt đầu chạy ${active.provisioning.size} lệnh · ${active.flowLabel}.")
 
             val report = Provisioner(shell, active.provisioning, active.restore).runProvisioning { step, phase, detail ->
@@ -778,6 +948,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 "Kết quả ${report.passed}/${report.total} bước.",
             )
             if (report.passed > 0) settingsRepository.setProvisionedFingerprint(device.fingerprint)
+            if (_script.value.running != true) {
+                ensureWatchScriptStartedQuietly()
+            }
             refreshPermissions()
             _message.value = if (report.ok) {
                 "Đã xác minh đủ ${report.total} bước. Gọi ${active.profile.assistantName} để thử."

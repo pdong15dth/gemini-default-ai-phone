@@ -23,6 +23,9 @@ data class ActiveConfig(
     val cooldownMs: Long,
     val dedupe: Boolean,
     val shellWatch: ShellWatch? = profile.shellWatch,
+    val voiceAction: ActionMode = ActionMode.DEFAULT,
+    val buttonAction: ActionMode = ActionMode.DEFAULT,
+    val shortcutAction: ActionMode = ActionMode.DEFAULT,
 ) {
     val provisioning: List<ProvisionStep> get() = target.provisioning + profile.provisioning
     val restore: List<RestoreStep> get() = target.restore + profile.restore
@@ -111,7 +114,19 @@ object ConfigResolver {
             cooldownMs = profile.cooldownMs,
             dedupe = settings.dedupe,
             shellWatch = resolvedShellWatch,
+            voiceAction = resolveActionMode(settings.voiceAction, target.id, settings.autoMic),
+            buttonAction = resolveActionMode(settings.buttonAction, target.id, settings.autoMic),
+            shortcutAction = resolveActionMode(settings.shortcutAction, target.id, settings.autoMic),
         )
+    }
+
+    fun resolveActionMode(mode: ActionMode, targetId: String, autoMic: Boolean): ActionMode = when (mode) {
+        ActionMode.DEFAULT -> when (targetId) {
+            AssistantTarget.GOOGLE_CTS -> ActionMode.GOOGLE_CTS
+            AssistantTarget.GEMINI -> if (autoMic) ActionMode.GEMINI_VOICE else ActionMode.GEMINI_SCREEN
+            else -> ActionMode.DEFAULT
+        }
+        else -> mode
     }
 
     private fun resolveTarget(catalog: Catalog, settings: AppSettings): AssistantTarget {

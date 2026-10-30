@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aikeybridge.R
+import com.aikeybridge.data.ActionMode
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.AppSettings
 import com.aikeybridge.data.ConfigResolver
@@ -86,10 +87,14 @@ fun ModesScreen(
     scriptStatus: ScriptStatus,
     scriptStartedThisBoot: Boolean,
     onCheckScript: () -> Unit,
+    onSetVoiceAction: (ActionMode) -> Unit = {},
+    onSetButtonAction: (ActionMode) -> Unit = {},
+    onSetShortcutAction: (ActionMode) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val target = config.target
     var confirmUsage by rememberSaveable { mutableStateOf(false) }
+    var editingActionSlot by rememberSaveable { mutableStateOf<String?>(null) }
     if (settings.usageMode == UsageMode.SCRIPT) {
         androidx.compose.runtime.LaunchedEffect(Unit) { onCheckScript() }
     }
@@ -156,7 +161,11 @@ fun ModesScreen(
             Panel {
                 targets.forEach { item ->
                     TargetRow(
-                        icon = if (item.id == AssistantTarget.GEMINI) R.drawable.lc_audio_lines else R.drawable.lc_message_circle,
+                        icon = when (item.id) {
+                            AssistantTarget.GEMINI -> R.drawable.lc_audio_lines
+                            AssistantTarget.GOOGLE_CTS -> R.drawable.lc_scan_search
+                            else -> R.drawable.lc_message_circle
+                        },
                         name = item.displayName,
                         subtitle = item.launchLabel,
                         selected = target.id == item.id,
@@ -181,6 +190,33 @@ fun ModesScreen(
                     9.5.sp,
                     com.aikeybridge.ui.theme.Danger,
                     Modifier.padding(start = 2.dp, top = 8.dp),
+                )
+            }
+
+            SectionLabel("Tùy chọn theo thao tác", Modifier.padding(top = 6.dp))
+            Panel {
+                val wakeLabel = config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName
+                NavRow(
+                    title = "Khẩu lệnh ($wakeLabel)",
+                    subtitle = actionModeSummary(settings.voiceAction, config.voiceAction, target.displayName),
+                    subColor = if (settings.voiceAction == ActionMode.DEFAULT) TextFaint else Accent,
+                    trailing = "đổi",
+                    onClick = { editingActionSlot = SLOT_VOICE },
+                )
+                NavRow(
+                    title = "Nút cứng / Nút AI",
+                    subtitle = actionModeSummary(settings.buttonAction, config.buttonAction, target.displayName),
+                    subColor = if (settings.buttonAction == ActionMode.DEFAULT) TextFaint else Accent,
+                    trailing = "đổi",
+                    onClick = { editingActionSlot = SLOT_BUTTON },
+                )
+                NavRow(
+                    title = "Lối tắt “Gọi AI”",
+                    subtitle = actionModeSummary(settings.shortcutAction, config.shortcutAction, target.displayName),
+                    subColor = if (settings.shortcutAction == ActionMode.DEFAULT) TextFaint else Accent,
+                    trailing = "đổi",
+                    onClick = { editingActionSlot = SLOT_SHORTCUT },
+                    divider = false,
                 )
             }
 
@@ -300,7 +336,37 @@ fun ModesScreen(
             onDismiss = { confirmUsage = false },
         )
     }
+
+    editingActionSlot?.let { slot ->
+        val wakeLabel = config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName
+        val (dialogTitle, currentMode, onSave) = when (slot) {
+            SLOT_VOICE -> Triple("Khẩu lệnh ($wakeLabel)", settings.voiceAction, onSetVoiceAction)
+            SLOT_BUTTON -> Triple("Nút cứng / Nút AI", settings.buttonAction, onSetButtonAction)
+            else -> Triple("Lối tắt “Gọi AI”", settings.shortcutAction, onSetShortcutAction)
+        }
+        ActionModeDialog(
+            title = dialogTitle,
+            current = currentMode,
+            onConfirm = { chosen ->
+                editingActionSlot = null
+                if (chosen != currentMode) onSave(chosen)
+            },
+            onDismiss = { editingActionSlot = null },
+        )
+    }
 }
+
+private const val SLOT_VOICE = "voice"
+private const val SLOT_BUTTON = "button"
+private const val SLOT_SHORTCUT = "shortcut"
+
+private fun actionModeSummary(raw: ActionMode, effective: ActionMode, targetName: String): String =
+    if (raw == ActionMode.DEFAULT) {
+        val label = if (effective == ActionMode.DEFAULT) targetName else effective.shortLabel
+        "Theo đích đến chung ($label)"
+    } else {
+        raw.title
+    }
 
 @Composable
 private fun TargetRow(
@@ -410,6 +476,58 @@ private fun UsageModeDialog(
                         Column(Modifier.weight(1f)) {
                             BodyText(title, 14.sp, TextMain, weight = FontWeight.Medium)
                             MonoText(sub, 9.sp, TextFaint, maxLines = 2)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(choice) }) {
+                BodyText("Lưu", 14.sp, Accent, weight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { BodyText("Huỷ", 14.sp, com.aikeybridge.ui.theme.Muted) }
+        },
+    )
+}
+
+@Composable
+private fun ActionModeDialog(
+    title: String,
+    current: ActionMode,
+    onConfirm: (ActionMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var choice by rememberSaveable { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = com.aikeybridge.ui.theme.Surface,
+        title = { BodyText(title, 18.sp, TextMain, weight = FontWeight.SemiBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                ActionMode.entries.forEach { mode ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable(role = Role.RadioButton) { choice = mode }
+                            .padding(vertical = 9.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .border(1.5.dp, if (choice == mode) Accent else Hairline, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (choice == mode) StatusDot(Accent, 9.dp)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            BodyText(mode.title, 14.sp, TextMain, weight = FontWeight.Medium)
+                            MonoText(mode.subtitle, 9.sp, TextFaint, maxLines = 2)
                         }
                     }
                 }

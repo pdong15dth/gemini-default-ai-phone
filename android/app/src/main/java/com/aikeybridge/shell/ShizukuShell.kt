@@ -6,6 +6,7 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
 import com.aikeybridge.BuildConfig
+import com.aikeybridge.data.ShellBackend
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
@@ -81,35 +82,81 @@ class ShizukuShell(private val context: Context) : ShellRunner {
         .debuggable(BuildConfig.DEBUG)
         .version(BuildConfig.VERSION_CODE)
 
+    private fun currentBackend(): ShellBackend {
+        val prefs = context.applicationContext.getSharedPreferences("ai_key_bridge_settings", Context.MODE_PRIVATE)
+        val raw = prefs.getString("shell_backend", null)
+        return ShellBackend.entries.firstOrNull { it.name == raw } ?: ShellBackend.AUTO
+    }
+
     override suspend fun exec(command: String): ShellResult = withContext(Dispatchers.IO) {
-        // 1. Ưu tiên cao nhất: EngineDaemonMain (UID 2000 nội bộ của app, sống cả khi đã tắt Gỡ lỗi)
-        execViaEngineDaemon(command)?.let { return@withContext it }
+        val backend = currentBackend()
+        var lastError: ShellResult? = null
 
-        // Thử đánh thức EngineDaemonMain nếu tiến trình app vừa mới mở lại
-        EngineBinderProvider.requestDaemonReconnect(context)
-        repeat(4) {
-            delay(45)
-            execViaEngineDaemon(command)?.let { return@withContext it }
-        }
-
-        // 2. Nếu chưa có EngineDaemon nhưng có Shizuku đang chạy -> chạy lệnh và tự dựng luôn EngineDaemonMain
-        if (isShizukuReady()) {
-            val res = execViaShizukuInternal(command)
-            if (res != null) {
-                if (bootstrappedFromShizuku.compareAndSet(false, true)) {
+        suspend fun tryShizuku(): ShellResult? {
+            if (!isShizukuReady()) return null
+            val res = execViaShizukuInternal(command) ?: return null
+            if (res.exitCode >= 0) {
+                if (backend != ShellBackend.SHIZUKU && bootstrappedFromShizuku.compareAndSet(false, true)) {
                     runCatching { execViaShizukuInternal(EngineDaemonMain.bootstrapCommand(context)) }
                 }
-                return@withContext res
+                return res
+            }
+            lastError = res
+            return null
+        }
+
+        suspend fun tryEngine(): ShellResult? {
+            execViaEngineDaemon(command)?.let { res ->
+                if (res.exitCode >= 0) return res
+                lastError = res
+            }
+            EngineBinderProvider.requestDaemonReconnect(context)
+            repeat(4) {
+                delay(45)
+                if (EngineBinderProvider.isAlive(context)) {
+                    execViaEngineDaemon(command)?.let { res ->
+                        if (res.exitCode >= 0) return res
+                        lastError = res
+                    }
+                    return@repeat
+                }
+            }
+            if (BuiltInWirelessAdb.connectAndBootstrapDaemon(context)) {
+                execViaEngineDaemon(command)?.let { res ->
+                    if (res.exitCode >= 0) return res
+                    lastError = res
+                }
+            }
+            BuiltInWirelessAdb.execViaWirelessAdb(context, command)?.let { res ->
+                if (res.exitCode >= 0) return res
+                lastError = res
+            }
+            return null
+        }
+
+        when (backend) {
+            ShellBackend.SHIZUKU -> {
+                tryShizuku()?.let { return@withContext it }
+                tryEngine()?.let { return@withContext it }
+            }
+            ShellBackend.BUILTIN -> {
+                tryEngine()?.let { return@withContext it }
+                tryShizuku()?.let { return@withContext it }
+            }
+            ShellBackend.AUTO -> {
+                // Nếu Shizuku đang bật sẵn thì ưu tiên chạy trực tiếp qua Shizuku (ổn định tức thì)
+                // và dựng sẵn Engine nội bộ làm backup; nếu không có Shizuku thì chạy qua Engine nội bộ.
+                if (isShizukuReady()) {
+                    tryShizuku()?.let { return@withContext it }
+                    tryEngine()?.let { return@withContext it }
+                } else {
+                    tryEngine()?.let { return@withContext it }
+                    tryShizuku()?.let { return@withContext it }
+                }
             }
         }
 
-        // 3. Thử tự kết nối qua Built-in Wireless ADB (nếu người dùng đã ghép nối và đang bật Gỡ lỗi không dây)
-        if (BuiltInWirelessAdb.connectAndBootstrapDaemon(context)) {
-            execViaEngineDaemon(command)?.let { return@withContext it }
-        }
-        BuiltInWirelessAdb.execViaWirelessAdb(context, command)?.let { return@withContext it }
-
-        ShellResult(-1, "", "Chưa kết nối được Engine nội bộ hoặc Gỡ lỗi không dây.")
+        lastError ?: ShellResult(-1, "", "Chưa kết nối được Shizuku hoặc Engine nội bộ (Gỡ lỗi không dây).")
     }
 
     private suspend fun execViaEngineDaemon(command: String): ShellResult? =
@@ -213,8 +260,8 @@ class ShizukuShell(private val context: Context) : ShellRunner {
         const val BIND_TIMEOUT_MS = 3_500L
         const val COMMAND_TIMEOUT_MS = 8_000L
 
-        fun isEngineOrShizukuReady(): Boolean {
-            if (EngineBinderProvider.isAlive()) return true
+        fun isEngineOrShizukuReady(context: Context? = null): Boolean {
+            if (EngineBinderProvider.isAlive(context)) return true
             return runCatching {
                 !Shizuku.isPreV11() &&
                     Shizuku.pingBinder() &&

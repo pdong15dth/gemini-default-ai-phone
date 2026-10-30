@@ -1,5 +1,6 @@
 package com.aikeybridge.shell
 
+import com.aikeybridge.data.ActionMode
 import com.aikeybridge.model.ShellWatch
 import java.util.Base64
 import org.junit.Assert.assertEquals
@@ -158,11 +159,42 @@ class WatchScriptTest {
     }
 
     @Test
+    fun perActionCustomModesGenerateIndependentVoiceAndButtonBranches() {
+        val mic = com.aikeybridge.model.OverlayMic("FloatyActivity", 0.642f, 0.939f)
+        val script = WatchScript.content(
+            watch = watch,
+            keyevent = 219,
+            eventLog = log,
+            mic = mic,
+            voiceAction = ActionMode.GEMINI_VOICE,
+            buttonAction = ActionMode.GOOGLE_CTS,
+        )
+
+        assertTrue(script.contains("if [ \"\$kind\" = \"voice\" ]; then"))
+        assertTrue(script.contains("input keyevent 219"))
+        assertTrue(script.contains("am start --user 0 -a com.aikeybridge.action.CTS -n com.aikeybridge/.LaunchActivity --es action_mode GOOGLE_CTS"))
+        assertTrue(script.contains("input tap \$MX \$MY"))
+
+        val screenOnly = WatchScript.content(
+            watch = watch,
+            keyevent = 219,
+            eventLog = log,
+            mic = mic,
+            voiceAction = ActionMode.GEMINI_SCREEN,
+            buttonAction = ActionMode.GEMINI_SCREEN,
+        )
+        assertFalse(screenOnly.contains("input tap"))
+    }
+
+    @Test
     fun shellLoopsAndBranchesAreBalanced() {
         val mic = com.aikeybridge.model.OverlayMic("FloatyActivity", 0.642f, 0.939f, "com.google.android.googlequicksearchbox")
         val scripts = listOf(
             WatchScript.content(watch, 231, log),
             WatchScript.content(watch, 219, log, mic = mic),
+            WatchScript.content(watch, 219, log, mic = mic, voiceAction = ActionMode.GEMINI_VOICE, buttonAction = ActionMode.GOOGLE_CTS),
+            WatchScript.content(watch, 219, log, mic = mic, voiceAction = ActionMode.GEMINI_VOICE, buttonAction = ActionMode.GEMINI_SCREEN),
+            WatchScript.content(watch, 219, log, mic = mic, voiceAction = ActionMode.GOOGLE_CTS, buttonAction = ActionMode.GOOGLE_CTS),
             EngineDaemonMain.engineScriptContent("/storage/emulated/0/Android/data/com.aikeybridge/files"),
         )
         val tokenRegex = Regex("\\b(do|done|then|fi|case|esac)\\b")
@@ -173,5 +205,24 @@ class WatchScriptTest {
             assertEquals(tokens.count { it == "then" }, tokens.count { it == "fi" })
             assertEquals(tokens.count { it == "case" }, tokens.count { it == "esac" })
         }
+    }
+
+    @Test
+    fun engineDaemonPreservesInFlightIpcAndAvoidsSelfOverwrite() {
+        val daemon = EngineDaemonMain.engineScriptContent("/storage/emulated/0/Android/data/com.aikeybridge/files")
+        // Daemon khởi động lại tuyệt đối không được xoá .run-* hay req-* đang chạy dở.
+        assertFalse(daemon.contains("rm -f \"\$IPC_DIR\"/req-*"))
+        assertFalse(daemon.contains("rm -f \"\$IPC_DIR\"/.run-*"))
+        assertTrue(daemon.contains("rm -f \"\$IPC_DIR\"/.tmp-* 2>/dev/null"))
+        // Không được redirect trực tiếp fd 1/fd 2 của /system/bin/sh "$work" vào file FUSE vì SELinux
+        // chặn system_server nhận fuse:file descriptor qua Binder (Failed transaction 2147483646).
+        assertFalse(daemon.contains("/system/bin/sh \"\$work\" > \"\$IPC_DIR/out-\$id\""))
+        assertTrue(daemon.contains("timeout 12 /system/bin/sh \"\$work\" </dev/null 3>&-"))
+        assertTrue(daemon.contains(") 2>&1 1>&3 | cat > \"\$IPC_DIR/err-\$id\""))
+        assertTrue(daemon.contains(") 3>&1 | cat > \"\$IPC_DIR/out-\$id\""))
+
+        val watchScript = WatchScript.content(watch, 219, log)
+        assertTrue(watchScript.contains("if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-engine.sh'; then"))
+        assertTrue(watchScript.contains("mv -f ${EngineDaemonMain.PATH}.tmp ${EngineDaemonMain.PATH}"))
     }
 }

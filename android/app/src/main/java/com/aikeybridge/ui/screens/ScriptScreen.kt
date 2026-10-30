@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.aikeybridge.R
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.PermissionSnapshot
+import com.aikeybridge.data.ShellBackend
 import com.aikeybridge.shell.WatchScript
 import com.aikeybridge.ui.Intents
 import com.aikeybridge.ui.ScriptStatus
@@ -40,6 +41,8 @@ import com.aikeybridge.ui.components.Panel
 import com.aikeybridge.ui.components.PrimaryCta
 import com.aikeybridge.ui.components.ScreenTitle
 import com.aikeybridge.ui.components.SectionLabel
+import com.aikeybridge.ui.components.SegmentOption
+import com.aikeybridge.ui.components.Segmented
 import com.aikeybridge.ui.components.StatusDot
 import com.aikeybridge.ui.components.SubHeader
 import com.aikeybridge.ui.theme.Accent
@@ -72,6 +75,10 @@ fun ScriptScreen(
     onOpenPermissions: () -> Unit = {},
     onOpenTriggers: () -> Unit = {},
     onRequestShizuku: () -> Unit = {},
+    onConnectShizuku: () -> Unit = onRequestShizuku,
+    onConnectBuiltInEngine: () -> Unit = onRequestShizuku,
+    shellBackend: ShellBackend = ShellBackend.AUTO,
+    onSetShellBackend: (ShellBackend) -> Unit = {},
     onStartAndLock: () -> Unit = onStart,
     onLockDevMode: () -> Unit = {},
     onStartWirelessPairing: () -> Unit = {},
@@ -214,6 +221,84 @@ fun ScriptScreen(
                     }
                 }
 
+                SectionLabel("Công cụ chạy lệnh (Engine & Shizuku dự phòng)", Modifier.padding(top = 12.dp))
+                Segmented(
+                    options = listOf(
+                        SegmentOption("Tự động (Cả 2)"),
+                        SegmentOption("Shizuku"),
+                        SegmentOption("Engine nội bộ"),
+                    ),
+                    selected = when (shellBackend) {
+                        ShellBackend.AUTO -> 0
+                        ShellBackend.SHIZUKU -> 1
+                        ShellBackend.BUILTIN -> 2
+                    },
+                    onSelect = { idx ->
+                        val next = when (idx) {
+                            1 -> ShellBackend.SHIZUKU
+                            2 -> ShellBackend.BUILTIN
+                            else -> ShellBackend.AUTO
+                        }
+                        onSetShellBackend(next)
+                    },
+                )
+                Gap(8.dp)
+                Panel {
+                    val canAutoConnectWireless = permissions.adbWifiEnabled && permissions.wirelessAdbPaired
+                    NavRow(
+                        title = "Engine nội bộ (Gỡ lỗi không dây 6 số)",
+                        subtitle = when {
+                            permissions.engineDaemonRunning && !permissions.devOptionsEnabled && !permissions.adbEnabled ->
+                                "đang chạy ngầm · đã tắt Gỡ lỗi (Bank-Safe) ✓"
+                            permissions.engineDaemonRunning ->
+                                "đã kết nối trong RAM (UID 2000) ✓"
+                            canAutoConnectWireless ->
+                                "đã ghép nối trước đó · chạm để kết nối lại"
+                            else ->
+                                "chạm để ghép nối 6 số Gỡ lỗi không dây (không cần cài app ngoài)"
+                        },
+                        subColor = if (permissions.engineDaemonRunning) Accent else Warn,
+                        trailing = when {
+                            permissions.engineDaemonRunning -> "sẵn sàng"
+                            canAutoConnectWireless -> "kết nối"
+                            else -> "ghép nối 6 số"
+                        },
+                        trailingColor = if (permissions.engineDaemonRunning) Accent else Warn,
+                        onClick = when {
+                            permissions.engineDaemonRunning -> onConnectBuiltInEngine
+                            canAutoConnectWireless -> onConnectBuiltInEngine
+                            else -> onStartWirelessPairing
+                        },
+                    )
+                    NavRow(
+                        title = "Shizuku (App ngoài · Dự phòng ổn định)",
+                        subtitle = when {
+                            permissions.shizukuPermissionGranted ->
+                                "đã cấp quyền & kết nối Binder ✓ (tự dự phòng khi Engine lỗi)"
+                            permissions.shizukuBinderAlive ->
+                                "Shizuku đang chạy · chạm để cấp quyền ngay"
+                            permissions.shizukuAppInstalled ->
+                                "đã cài Shizuku · chạm để mở app Shizuku & bấm Start"
+                            else ->
+                                "dự phòng khi Engine nội bộ lỗi · chạm để cài hoặc mở Shizuku"
+                        },
+                        subColor = when {
+                            permissions.shizukuPermissionGranted -> Accent
+                            permissions.shizukuBinderAlive -> Warn
+                            else -> TextFaint
+                        },
+                        trailing = when {
+                            permissions.shizukuPermissionGranted -> "sẵn sàng"
+                            permissions.shizukuBinderAlive -> "cấp quyền"
+                            permissions.shizukuAppInstalled -> "mở app"
+                            else -> "cài đặt"
+                        },
+                        trailingColor = if (permissions.shizukuPermissionGranted) Accent else Warn,
+                        onClick = onConnectShizuku,
+                        divider = false,
+                    )
+                }
+
                 SectionLabel("Cấu hình & Cửa sổ bắt", Modifier.padding(top = 12.dp))
                 Panel {
                     NavRow(
@@ -246,24 +331,6 @@ fun ScriptScreen(
                         subColor = TextFaint,
                         trailing = "mở",
                         onClick = { Intents.openAssistantSettings(context, assistantAlreadySelected = true) },
-                    )
-                    NavRow(
-                        title = "Engine nội bộ (Gỡ lỗi không dây)",
-                        subtitle = when {
-                            permissions.engineDaemonRunning && !permissions.devOptionsEnabled && !permissions.adbEnabled ->
-                                "đang chạy ngầm · đã tắt Gỡ lỗi (Bank-Safe)"
-                            permissions.engineDaemonRunning -> "đã kết nối (không cần Shizuku)"
-                            permissions.shizukuGranted -> "đã cấp quyền"
-                            permissions.shizukuRunning -> "đang chạy · chạm để cấp quyền"
-                            else -> "chạm để ghép nối 6 số Gỡ lỗi không dây (không cần Shizuku)"
-                        },
-                        subColor = if (permissions.shizukuGranted) Accent else Warn,
-                        trailing = if (permissions.shizukuGranted) null else "ghép nối",
-                        onClick = when {
-                            permissions.shizukuGranted -> null
-                            permissions.shizukuRunning -> onRequestShizuku
-                            else -> onStartWirelessPairing
-                        },
                     )
                     NavRow(
                         title = "Mẫu cửa sổ (${config.profile.assistantName})",
@@ -318,9 +385,15 @@ fun ScriptScreen(
             if (scriptContent != null) {
                 val devStillOn = permissions.devOptionsEnabled || permissions.adbEnabled
                 val canAutoConnectWireless = permissions.adbWifiEnabled && permissions.wirelessAdbPaired
+                val preferShizuku = shellBackend == ShellBackend.SHIZUKU ||
+                    (shellBackend == ShellBackend.AUTO && permissions.shizukuBinderAlive && !permissions.shizukuPermissionGranted)
                 val ctaText = when {
                     status.busy -> "Đang kích hoạt & bật script…"
-                    !permissions.shizukuGranted && permissions.shizukuRunning -> "Cấp quyền Engine"
+                    !permissions.shizukuGranted && preferShizuku && permissions.shizukuBinderAlive ->
+                        "Cấp quyền Shizuku"
+                    !permissions.shizukuGranted && preferShizuku ->
+                        if (permissions.shizukuAppInstalled) "Mở ứng dụng Shizuku" else "Cài đặt Shizuku"
+                    !permissions.shizukuGranted && permissions.shizukuRunning -> "Cấp quyền Engine / Shizuku"
                     !permissions.shizukuGranted && canAutoConnectWireless -> "Kết nối Engine (Gỡ lỗi không dây)"
                     !permissions.shizukuGranted -> "Ghép nối Gỡ lỗi không dây (6 số)"
                     status.running == true && devStillOn -> "Bật lại Script & Tắt ngay Gỡ lỗi"
@@ -329,6 +402,7 @@ fun ScriptScreen(
                     else -> "Kích hoạt & Bật script nền"
                 }
                 val ctaAction: () -> Unit = when {
+                    !permissions.shizukuGranted && preferShizuku -> onConnectShizuku
                     !permissions.shizukuGranted && (permissions.shizukuRunning || canAutoConnectWireless) -> onRequestShizuku
                     !permissions.shizukuGranted -> onStartWirelessPairing
                     devStillOn -> onStartAndLock
@@ -341,6 +415,29 @@ fun ScriptScreen(
                     leadingIcon = R.drawable.lc_terminal,
                     loading = status.busy,
                 )
+                if (!permissions.shizukuGranted) {
+                    if (preferShizuku) {
+                        OutlineCta(
+                            text = if (canAutoConnectWireless) {
+                                "Hoặc kết nối Engine nội bộ (Gỡ lỗi không dây)"
+                            } else {
+                                "Hoặc ghép nối Engine nội bộ (6 số)"
+                            },
+                            onClick = if (canAutoConnectWireless) onConnectBuiltInEngine else onStartWirelessPairing,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        OutlineCta(
+                            text = when {
+                                permissions.shizukuBinderAlive -> "Dùng Shizuku (Đang chạy · chạm cấp quyền)"
+                                permissions.shizukuAppInstalled -> "Dùng Shizuku dự phòng (Mở app Shizuku)"
+                                else -> "Dùng Shizuku dự phòng (Tải ứng dụng)"
+                            },
+                            onClick = onConnectShizuku,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
                 if (status.running == true && permissions.shizukuGranted) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (devStillOn) {
