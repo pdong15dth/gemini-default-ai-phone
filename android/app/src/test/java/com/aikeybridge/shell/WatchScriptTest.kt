@@ -46,15 +46,20 @@ class WatchScriptTest {
 
     @Test
     fun micTapOnlyWhenOverlayHasFocus() {
-        val mic = com.aikeybridge.model.OverlayMic("FloatyActivity", 0.642f, 0.939f)
+        val mic = com.aikeybridge.model.OverlayMic("FloatyActivity", 0.686f, 0.940f)
         val script = WatchScript.content(watch, 219, log, mic = mic)
 
         assertTrue(script.contains("set -- \$(wm size | tail -1 | sed 's/.*: //; s/x/ /')"))
-        assertTrue(script.contains("MX=\$((\$1 * 642 / 1000)); MY=\$((\$2 * 939 / 1000))"))
+        assertTrue(script.contains("MX=\$((\$1 * 686 / 1000)); MY=\$((\$2 * 940 / 1000))"))
+        assertTrue(script.contains("MX=\$((\$1 - 113 * D / 160))"))
+        assertTrue(script.contains("MY=\$((\$2 - 80 * D / 160))"))
+        assertTrue(script.contains("MY=\$((\$2 - 48 * D / 160))"))
         // Chạm khi lớp phủ chưa hiện là chạm vào app bên dưới (có thể là app ngân hàng); chạm lúc nó còn trượt lên
         // là trúng ô nhập chữ. Mọi lệnh có timeout để script không kẹt rồi bỏ lỡ lần gọi sau.
         val focused = "timeout 2 dumpsys window displays 2>/dev/null | grep -q 'mCurrentFocus=.*FloatyActivity'"
-        assertTrue(script.contains("    if $focused; then\n      sleep 0.6\n      $focused && timeout 2 input tap \$MX \$MY"))
+        assertTrue(script.contains("    if $focused; then\n      sleep 0.6\n"))
+        assertTrue(script.contains("      $focused && timeout 2 input tap \$MX \$MY"))
+        assertTrue(script.contains("dumpsys input_method 2>/dev/null | grep -q 'mInputShown=true'"))
         // Dọn đa nhiệm giết dịch vụ trợ lý của Google: chưa thấy lớp phủ thì gửi lại phím một lần.
         assertTrue(script.contains("[ \$i -eq 7 ] && timeout 2 input keyevent 219"))
         // Không khai báo gói trợ lý thì không dừng app nào.

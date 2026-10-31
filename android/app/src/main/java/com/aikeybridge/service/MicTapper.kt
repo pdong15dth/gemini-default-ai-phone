@@ -62,6 +62,7 @@ object MicTapper {
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
         var visited = 0
+        var firstFallbackMatch: AccessibilityNodeInfo? = null
         while (queue.isNotEmpty() && visited < MAX_NODES) {
             val node = queue.removeFirst()
             visited++
@@ -74,20 +75,47 @@ object MicTapper {
                 (viewId.isNotEmpty() && voice.micViewIdRegex.containsMatchIn(viewId)) ||
                 (description.isNotEmpty() && voice.micContentDescRegex.containsMatchIn(description))
             ) {
-                return node
+                val clickable = runCatching { node.isClickable }.getOrDefault(false) == true
+                if (clickable) return node
+                if (firstFallbackMatch == null) firstFallbackMatch = node
             }
 
             for (index in 0 until runCatching { node.childCount }.getOrDefault(0)) {
                 runCatching { node.getChild(index) }.getOrNull()?.let(queue::add)
             }
         }
-        return null
+        return firstFallbackMatch
     }
 
     private fun clickNode(node: AccessibilityNodeInfo): Boolean {
-        var current: AccessibilityNodeInfo? = node
-        var depth = 0
+        if (runCatching { node.isClickable }.getOrDefault(false) == true) {
+            if (runCatching { node.performAction(AccessibilityNodeInfo.ACTION_CLICK) }.getOrDefault(false) == true) {
+                return true
+            }
+        }
+        // Nếu node khớp là khung bao ngoài không clickable (như assistant_robin_floaty_single_line_mic_button),
+        // tìm nút con clickable bên trong trước khi đi ngược lên parent để tránh bấm nhầm vào thanh input_border (bật bàn phím).
+        findClickableChild(node, maxDepth = 4)?.let { child ->
+            if (runCatching { child.performAction(AccessibilityNodeInfo.ACTION_CLICK) }.getOrDefault(false) == true) {
+                return true
+            }
+        }
+
+        val nodeRect = Rect()
+        runCatching { node.getBoundsInScreen(nodeRect) }
+
+        var current: AccessibilityNodeInfo? = runCatching { node.parent }.getOrNull()
+        var depth = 1
         while (current != null && depth < MAX_PARENT_DEPTH) {
+            val parentId = runCatching { current?.viewIdResourceName }.getOrNull().orEmpty()
+            if (parentId.contains("input_border") || parentId.contains("input_box") || parentId.contains("input_container")) {
+                break
+            }
+            val parentRect = Rect()
+            runCatching { current?.getBoundsInScreen(parentRect) }
+            if (!nodeRect.isEmpty && !parentRect.isEmpty && parentRect.width() > nodeRect.width() * 2) {
+                break
+            }
             val clickable = runCatching { current?.isClickable }.getOrDefault(false) == true
             if (clickable) {
                 val clicked = runCatching {
@@ -99,6 +127,17 @@ object MicTapper {
             depth++
         }
         return false
+    }
+
+    private fun findClickableChild(node: AccessibilityNodeInfo, maxDepth: Int): AccessibilityNodeInfo? {
+        if (maxDepth <= 0) return null
+        val count = runCatching { node.childCount }.getOrDefault(0)
+        for (i in 0 until count) {
+            val child = runCatching { node.getChild(i) }.getOrNull() ?: continue
+            if (runCatching { child.isClickable }.getOrDefault(false) == true) return child
+            findClickableChild(child, maxDepth - 1)?.let { return it }
+        }
+        return null
     }
 
     private fun tapAt(service: AccessibilityService, x: Int, y: Int): Boolean {
