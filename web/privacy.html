@@ -52,19 +52,19 @@
         <li>Lịch sử lượt chạy: tối đa 500 lượt gần nhất, dùng cho biểu đồ 7 ngày.</li>
         <li>Profile ROM: file JSON đi kèm app.</li>
       </ul>
-      <p>Bạn có thể xoá toàn bộ bằng <strong>Nhật ký → Xoá</strong>, hoặc xoá dữ liệu app trong hệ thống.</p>
+      <p>Bạn có thể xoá toàn bộ bằng <strong>Hệ thống → Xoá nhật ký</strong>, hoặc xoá dữ liệu app trong hệ thống.</p>
 
       <h2>Xuất log chẩn đoán</h2>
-      <p>File zip chỉ được tạo khi bạn bấm <strong>Xuất log chẩn đoán</strong> và nằm trong bộ nhớ máy cho tới khi bạn tự chia sẻ. Nội dung gồm:</p>
+      <p>File zip chỉ được tạo khi bạn bấm <strong>Hệ thống → Xuất chẩn đoán</strong> và nằm trong bộ nhớ máy cho tới khi bạn tự chia sẻ. Nội dung gồm:</p>
       <ul>
         <li>Nhật ký của app: tên gói, tên lớp cửa sổ, kết quả lệnh và thời lượng — không có văn bản màn hình.</li>
         <li>Lý do các lần app bị tắt (vuốt khỏi đa nhiệm, ROM dọn RAM, crash…), do Android ghi lại.</li>
-        <li>Nếu có Shizuku: logcat toàn máy và trạng thái hệ thống (trợ lý mặc định, quyền của app, trạng thái script). Phần này <strong>không được che</strong> và có thể chứa tên app khác, tên Wi-Fi hay tài khoản.</li>
+        <li>Nếu có Engine nội bộ hoặc Shizuku: logcat toàn máy và trạng thái hệ thống (trợ lý mặc định, quyền của app, trạng thái script). Phần này <strong>không được che</strong> và có thể chứa tên app khác, tên Wi-Fi hay tài khoản.</li>
       </ul>
       <p>Vì vậy chỉ gửi file zip riêng cho người phát triển, không đăng công khai.</p>
 
-      <h2>Shizuku và ADB</h2>
-      <p>Shizuku là app bên thứ ba, chạy lệnh shell với quyền của chính nó. AI Key Bridge chỉ gửi đúng các lệnh hiển thị trong app: lệnh cấu hình ở màn hình Kích hoạt, script nền ở màn hình Script nền, và các lệnh đọc trạng thái khi bạn xuất log. Không gửi gì ra mạng. Nếu bạn không cài Shizuku, app in lệnh ADB để bạn tự dán.</p>
+      <h2>Engine nội bộ, Shizuku và ADB</h2>
+      <p>AI Key Bridge tích hợp sẵn Engine nội bộ (ghép nối Gỡ lỗi không dây) và hỗ trợ Shizuku làm dự phòng để chạy đúng các lệnh hiển thị trong app: 9 lệnh cấu hình, script nền, và các lệnh đọc trạng thái khi bạn xuất log. Không gửi gì ra mạng. Nếu bạn không dùng Gỡ lỗi không dây hay Shizuku, app in lệnh ADB để bạn tự dán.</p>
 
       <h2>Quyền hệ thống được dùng</h2>
       <ul>

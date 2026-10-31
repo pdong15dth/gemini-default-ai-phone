@@ -337,12 +337,12 @@ fun OutlineCta(
             .clip(shape)
             .border(1.dp, Hairline, shape)
             .clickable(enabled = enabled, onClick = onClick, role = Role.Button)
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            .padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) LucideIcon(icon, if (enabled) iconTint else TextGhost, 14.dp)
-        BodyText(text, 13.5.sp, if (enabled) textColor else TextGhost, maxLines = 1)
+        BodyText(text, 13.sp, if (enabled) textColor else TextGhost, maxLines = 1)
     }
 }
 
@@ -592,10 +592,9 @@ fun ScreenTitle(text: String, size: TextUnit = 30.sp, modifier: Modifier = Modif
 data class NavTab(val label: String, @DrawableRes val icon: Int)
 
 val BridgeTabs = listOf(
-    NavTab("Tổng quan", R.drawable.lc_layout_dashboard),
-    NavTab("Chế độ", R.drawable.lc_sliders_horizontal),
-    NavTab("Nhật ký", R.drawable.lc_list_tree),
-    NavTab("Cài đặt", R.drawable.lc_settings),
+    NavTab("Trang chủ", R.drawable.lc_layout_dashboard),
+    NavTab("Tùy chỉnh AI", R.drawable.lc_sliders_horizontal),
+    NavTab("Hệ thống", R.drawable.lc_settings),
 )
 
 @Composable
@@ -609,7 +608,8 @@ fun BottomNav(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modif
                 drawLine(hairline, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1.dp.toPx())
             }
             .navigationBarsPadding()
-            .padding(horizontal = 22.dp, vertical = 6.dp),
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         BridgeTabs.forEachIndexed { index, tab ->
             val active = index == selected
@@ -617,14 +617,21 @@ fun BottomNav(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modif
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (active) Accent.copy(alpha = 0.10f) else Color.Transparent)
                     .clickable(role = Role.Tab) { onSelect(index) }
-                    .padding(vertical = 6.dp),
+                    .padding(vertical = 7.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                LucideIcon(tab.icon, color, 19.dp)
-                BodyText(tab.label, 9.sp, color, maxLines = 1)
+                LucideIcon(tab.icon, color, 18.dp)
+                BodyText(
+                    tab.label,
+                    10.5.sp,
+                    color,
+                    weight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                )
             }
         }
     }

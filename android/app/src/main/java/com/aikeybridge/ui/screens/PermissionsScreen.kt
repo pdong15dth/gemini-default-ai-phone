@@ -94,21 +94,21 @@ import com.aikeybridge.ui.theme.TextMain
 import com.aikeybridge.ui.theme.Warn
 
 /** Tọa độ vùng cần chiếu sáng (spotlight) trên khung ảnh gốc 1260 x 2800. */
-private data class SpotlightRect(
+internal data class SpotlightRect(
     val x1: Int,
     val y1: Int,
     val x2: Int,
     val y2: Int,
 )
 
-private data class GuideImage(
+internal data class GuideImage(
     @DrawableRes val resId: Int,
     val label: String,
     val spotlights: List<SpotlightRect> = emptyList(),
     val warmGlow: Boolean = false,
 )
 
-private data class PermissionGuideItem(
+internal data class PermissionGuideItem(
     val id: String,
     val section: String,
     val title: String,
@@ -123,26 +123,18 @@ private data class PermissionGuideItem(
 )
 
 @Composable
-fun PermissionsScreen(
+internal fun rememberPermissionGuideItems(
     config: ActiveConfig,
     permissions: PermissionSnapshot,
     settings: AppSettings,
-    onboarding: Boolean,
-    onBack: () -> Unit,
-    onContinue: () -> Unit,
-    onSkip: () -> Unit,
-    onToggleAutostart: (Boolean) -> Unit,
     onRequestShizuku: () -> Unit,
     onConnectShizuku: () -> Unit = onRequestShizuku,
     onStartWirelessPairing: () -> Unit = {},
     onLockDevMode: () -> Unit = {},
-    modifier: Modifier = Modifier,
-) {
+): List<PermissionGuideItem> {
     val context = LocalContext.current
     val wakePhrase = config.profile.wakePhrase ?: "Hi Jovi"
-    var activeGuideIndex by rememberSaveable { mutableIntStateOf(-1) }
-
-    val items = remember(config, permissions, settings) {
+    return remember(config, permissions, settings) {
         val gDetail = permissions.googleVivoDetail
         val bDetail = permissions.geminiVivoDetail
         listOf(
@@ -513,6 +505,34 @@ fun PermissionsScreen(
             ),
         )
     }
+}
+
+@Composable
+fun PermissionsScreen(
+    config: ActiveConfig,
+    permissions: PermissionSnapshot,
+    settings: AppSettings,
+    onboarding: Boolean,
+    onBack: () -> Unit,
+    onContinue: () -> Unit,
+    onSkip: () -> Unit,
+    onToggleAutostart: (Boolean) -> Unit,
+    onRequestShizuku: () -> Unit,
+    onConnectShizuku: () -> Unit = onRequestShizuku,
+    onStartWirelessPairing: () -> Unit = {},
+    onLockDevMode: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    var activeGuideIndex by rememberSaveable { mutableIntStateOf(-1) }
+    val items = rememberPermissionGuideItems(
+        config = config,
+        permissions = permissions,
+        settings = settings,
+        onRequestShizuku = onRequestShizuku,
+        onConnectShizuku = onConnectShizuku,
+        onStartWirelessPairing = onStartWirelessPairing,
+        onLockDevMode = onLockDevMode,
+    )
 
     val missingRequired = items.filter { it.required && !it.granted }
     val requiredTotal = items.count { it.required }
@@ -673,7 +693,7 @@ fun PermissionsScreen(
 }
 
 @Composable
-private fun CleanPermRow(
+internal fun CleanPermRow(
     item: PermissionGuideItem,
     divider: Boolean,
     onOpenSettings: () -> Unit,
@@ -772,7 +792,7 @@ private fun CleanPermRow(
 }
 
 @Composable
-private fun PermissionGuideDialog(
+internal fun PermissionGuideDialog(
     item: PermissionGuideItem,
     stepIndex: Int,
     totalSteps: Int,

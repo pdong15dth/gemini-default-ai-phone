@@ -180,14 +180,13 @@ Các file cần có trước khi deploy:
 
 ## Chuyển từ script ADB sang app
 
-App dùng cùng cơ chế với `scripts/gemini.sh` nhưng chạy trong AccessibilityService. Nếu đang dùng script cũ:
+App dùng cùng cơ chế với `scripts/gemini.sh` nhưng tự động quản lý qua **Engine nội bộ** (Gỡ lỗi không dây) hoặc **Shizuku**. Nếu đang dùng script thủ công cũ:
 
-1. Dừng script để tránh hai lớp cùng bấm Back và mở Gemini:
+1. Dừng script cũ để tránh hai tiến trình cùng chạy:
    ```bash
    adb shell "pkill -9 -f gemini.sh; pkill -9 -f logcat"
    ```
-2. Cài APK, bật Trợ năng.
-3. Nếu đã chạy đủ 7 lệnh cấu hình từ trước, không cần chạy lại; chỉ cần ứng dụng thấy `assistant` và Gemini đã cài.
-4. Nếu chưa cấu hình, mở tab **Kích hoạt** và chạy qua Shizuku, hoặc dán lệnh ADB.
+2. Cài APK và mở thẳng **Trang chủ**.
+3. Làm theo 3 bước trên **Trang chủ**: kiểm tra 4 nhóm quyền ở **Bước 1**, bật Script nền ở **Bước 2** (qua Engine nội bộ hoặc Shizuku), rồi bấm **Khóa Gỡ lỗi ngay (Bank-Safe)** ở **Bước 3**.
 
-App không tự xoá `/data/local/tmp/gemini.sh`, không sửa phân vùng hệ thống và không cần root.
+App không sửa phân vùng hệ thống và không cần root.

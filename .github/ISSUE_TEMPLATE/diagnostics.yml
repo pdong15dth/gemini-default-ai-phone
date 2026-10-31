@@ -9,7 +9,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Log lấy từ **Cài đặt → Nhật ký → Xuất log zip**. File chỉ gồm tên gói, tên lớp cửa sổ, kết quả lệnh và thông tin thiết bị.
+        Log lấy từ tab **Hệ thống → Xuất chẩn đoán**. File chỉ gồm tên gói, tên lớp cửa sổ, kết quả lệnh và thông tin thiết bị.
         Không dán ảnh màn hình chứa nội dung cá nhân.
 
   - type: input

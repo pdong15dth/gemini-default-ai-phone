@@ -1,5 +1,8 @@
 package com.aikeybridge.ui.screens
 
+import android.content.Intent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,49 +17,57 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aikeybridge.LaunchActivity
 import com.aikeybridge.R
 import com.aikeybridge.data.ActionMode
 import com.aikeybridge.data.ActiveConfig
 import com.aikeybridge.data.AppSettings
 import com.aikeybridge.data.ConfigResolver
 import com.aikeybridge.data.HardwareMode
-import com.aikeybridge.data.UsageMode
-import com.aikeybridge.ui.ScriptStatus
 import com.aikeybridge.data.PermissionSnapshot
+import com.aikeybridge.data.UsageMode
 import com.aikeybridge.model.AssistantTarget
 import com.aikeybridge.ui.Format
+import com.aikeybridge.ui.Intents
+import com.aikeybridge.ui.ScriptStatus
 import com.aikeybridge.ui.components.BodyText
-import com.aikeybridge.ui.components.Chip
-import com.aikeybridge.ui.components.CircleButton
 import com.aikeybridge.ui.components.Gap
 import com.aikeybridge.ui.components.IconTile
 import com.aikeybridge.ui.components.LucideIcon
 import com.aikeybridge.ui.components.MonoText
 import com.aikeybridge.ui.components.NavRow
+import com.aikeybridge.ui.components.OutlineCta
 import com.aikeybridge.ui.components.Panel
 import com.aikeybridge.ui.components.SectionLabel
-import com.aikeybridge.ui.components.Stepper
 import com.aikeybridge.ui.components.StatusDot
+import com.aikeybridge.ui.components.Stepper
 import com.aikeybridge.ui.components.TabHeader
 import com.aikeybridge.ui.components.TinyTag
 import com.aikeybridge.ui.components.ToggleRow
 import com.aikeybridge.ui.components.hairlineBottom
 import com.aikeybridge.ui.theme.Accent
+import com.aikeybridge.ui.theme.Danger
 import com.aikeybridge.ui.theme.Hairline
+import com.aikeybridge.ui.theme.Muted
+import com.aikeybridge.ui.theme.Surface
+import com.aikeybridge.ui.theme.Surface2
 import com.aikeybridge.ui.theme.TextBody
 import com.aikeybridge.ui.theme.TextDim
 import com.aikeybridge.ui.theme.TextFaint
@@ -84,6 +95,8 @@ fun ModesScreen(
     onSetUsageMode: (UsageMode) -> Unit,
     onOpenShortcuts: () -> Unit,
     onOpenScript: () -> Unit,
+    onOpenProfiles: () -> Unit = {},
+    onOpenTriggers: () -> Unit = {},
     scriptStatus: ScriptStatus,
     scriptStartedThisBoot: Boolean,
     onCheckScript: () -> Unit,
@@ -92,72 +105,86 @@ fun ModesScreen(
     onSetShortcutAction: (ActionMode) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val target = config.target
+    val vivo = config.profile.oem == "vivo"
     var confirmUsage by rememberSaveable { mutableStateOf(false) }
     var editingActionSlot by rememberSaveable { mutableStateOf<String?>(null) }
+    var showAdvanced by rememberSaveable { mutableStateOf(false) }
+    var aliasOn by remember { mutableStateOf(Intents.isLaunchAliasEnabled(context)) }
+
     if (settings.usageMode == UsageMode.SCRIPT) {
-        androidx.compose.runtime.LaunchedEffect(Unit) { onCheckScript() }
+        LaunchedEffect(Unit) { onCheckScript() }
     }
+
+    val wakeLabel = config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName
+
     Column(modifier.fillMaxSize()) {
-        TabHeader("Cấu hình", "Chế độ") {
-            CircleButton(R.drawable.lc_history, "Nhật ký", onOpenLogs)
-        }
+        TabHeader("Hành vi & Phím tắt", "Tùy chỉnh AI")
+
         Column(
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp),
+                .padding(start = 24.dp, end = 24.dp, top = 10.dp, bottom = 28.dp),
         ) {
-            SectionLabel("Cách dùng")
-            // Đổi chế độ phải qua hộp xác nhận: thanh chọn nằm trong vùng cuộn dễ bị chạm nhầm khi cuộn.
+            // 1. KHI GỌI AI SẼ MỞ GÌ?
+            SectionLabel("Khi gọi AI sẽ mở gì?")
+            BodyText(
+                "Chọn hành động riêng cho từng thao tác. Chạm vào từng dòng để đổi kiểu gọi.",
+                12.5.sp,
+                Muted,
+                Modifier.padding(bottom = 10.dp),
+                lineHeight = 18.sp,
+            )
             Panel {
-                NavRow(
-                    title = when (settings.usageMode) {
-                        UsageMode.ONE_TIME -> "Cấu hình một lần"
-                        UsageMode.SCRIPT -> "Script nền"
-                        UsageMode.FULL -> "Đầy đủ"
-                    },
-                    subtitle = when (settings.usageMode) {
-                        UsageMode.ONE_TIME -> "không Trợ năng · lối tắt Gọi AI"
-                        UsageMode.SCRIPT -> "script ${scriptState(scriptStatus, scriptStartedThisBoot).label} · không Trợ năng"
-                        UsageMode.FULL -> "Trợ năng · thay ${config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName}"
-                    },
-                    subColor = if (settings.usageMode == UsageMode.SCRIPT) {
-                        scriptState(scriptStatus, scriptStartedThisBoot).color
-                    } else {
-                        TextFaint
-                    },
-                    trailing = "đổi",
-                    onClick = { confirmUsage = true },
+                ActionSlotRow(
+                    icon = R.drawable.lc_mic,
+                    title = "Khẩu lệnh ($wakeLabel)",
+                    subtitle = actionModeSummary(settings.voiceAction, config.voiceAction, target.displayName),
+                    highlighted = settings.voiceAction != ActionMode.DEFAULT,
+                    onClick = { editingActionSlot = SLOT_VOICE },
+                )
+                ActionSlotRow(
+                    icon = R.drawable.lc_sparkles,
+                    title = "Nút cứng / Phím cạnh AI",
+                    subtitle = actionModeSummary(settings.buttonAction, config.buttonAction, target.displayName),
+                    highlighted = settings.buttonAction != ActionMode.DEFAULT,
+                    onClick = { editingActionSlot = SLOT_BUTTON },
+                )
+                ActionSlotRow(
+                    icon = R.drawable.lc_rocket,
+                    title = "Lối tắt “Gọi AI” & Cử chỉ",
+                    subtitle = actionModeSummary(settings.shortcutAction, config.shortcutAction, target.displayName),
+                    highlighted = settings.shortcutAction != ActionMode.DEFAULT,
+                    onClick = { editingActionSlot = SLOT_SHORTCUT },
                     divider = false,
                 )
             }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(
-                        role = Role.Button,
-                        onClick = if (settings.usageMode == UsageMode.SCRIPT) onOpenScript else onOpenShortcuts,
-                    )
-                    .padding(top = 8.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BodyText(
-                    when (settings.usageMode) {
-                        UsageMode.ONE_TIME -> "Không cần Trợ năng. Gán phím / chạm mặt lưng vào lối tắt “Gọi AI”."
-                        UsageMode.SCRIPT -> "Script shell nền thay ${config.profile.assistantName}. Bật / tắt / kiểm tra script."
-                        UsageMode.FULL -> "Trợ năng thay ${config.profile.assistantName}. Gán thêm phím vào “Gọi AI” nếu muốn."
-                    },
-                    11.sp,
-                    TextFaint,
-                    Modifier.weight(1f),
-                    lineHeight = 16.sp,
+            Gap(8.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlineCta(
+                    text = "Cài đặt Giọng nói",
+                    icon = R.drawable.lc_mic,
+                    iconTint = TextBody,
+                    onClick = { Intents.openVoiceWakeSettings(context) },
+                    modifier = Modifier.weight(1f),
+                    height = 40.dp,
+                    radius = 12.dp,
                 )
-                LucideIcon(R.drawable.lc_chevron_right, TextGhost, 13.dp)
+                OutlineCta(
+                    text = "Cài đặt Nút AI",
+                    icon = R.drawable.lc_sparkles,
+                    iconTint = TextBody,
+                    onClick = { Intents.openSmartKey(context) },
+                    modifier = Modifier.weight(1f),
+                    height = 40.dp,
+                    radius = 12.dp,
+                )
             }
 
-            SectionLabel("Đích đến", Modifier.padding(top = 6.dp))
+            // 2. ỨNG DỤNG AI MẶC ĐỊNH & TƯƠNG TÁC
+            SectionLabel("Ứng dụng AI mặc định", Modifier.padding(top = 14.dp))
             Panel {
                 targets.forEach { item ->
                     TargetRow(
@@ -177,7 +204,7 @@ fun ModesScreen(
                 TargetRow(
                     icon = R.drawable.lc_app_window,
                     name = if (customSelected) target.displayName else "Ứng dụng khác",
-                    subtitle = if (customSelected) "${target.launchLabel} · đổi" else "chọn app bất kỳ · không tự bật Micro",
+                    subtitle = if (customSelected) "${target.launchLabel} · chạm để đổi" else "chọn app bất kỳ trên máy",
                     selected = customSelected,
                     beta = false,
                     divider = false,
@@ -188,140 +215,211 @@ fun ModesScreen(
                 MonoText(
                     "Chưa cài ${target.displayName} trên máy này.",
                     9.5.sp,
-                    com.aikeybridge.ui.theme.Danger,
+                    Danger,
                     Modifier.padding(start = 2.dp, top = 8.dp),
                 )
             }
 
-            SectionLabel("Tùy chọn theo thao tác", Modifier.padding(top = 6.dp))
-            Panel {
-                val wakeLabel = config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName
-                NavRow(
-                    title = "Khẩu lệnh ($wakeLabel)",
-                    subtitle = actionModeSummary(settings.voiceAction, config.voiceAction, target.displayName),
-                    subColor = if (settings.voiceAction == ActionMode.DEFAULT) TextFaint else Accent,
-                    trailing = "đổi",
-                    onClick = { editingActionSlot = SLOT_VOICE },
-                )
-                NavRow(
-                    title = "Nút cứng / Nút AI",
-                    subtitle = actionModeSummary(settings.buttonAction, config.buttonAction, target.displayName),
-                    subColor = if (settings.buttonAction == ActionMode.DEFAULT) TextFaint else Accent,
-                    trailing = "đổi",
-                    onClick = { editingActionSlot = SLOT_BUTTON },
-                )
-                NavRow(
-                    title = "Lối tắt “Gọi AI”",
-                    subtitle = actionModeSummary(settings.shortcutAction, config.shortcutAction, target.displayName),
-                    subColor = if (settings.shortcutAction == ActionMode.DEFAULT) TextFaint else Accent,
-                    trailing = "đổi",
-                    onClick = { editingActionSlot = SLOT_SHORTCUT },
-                    divider = false,
-                )
-            }
-
-            SectionLabel("Tự động", Modifier.padding(top = 6.dp))
+            Gap(10.dp)
             Panel {
                 ToggleRow(
-                    title = "Chuyển hướng",
-                    subtitle = "${config.triggers.size} trigger · ${config.profile.assistantName}",
-                    checked = settings.redirectEnabled,
-                    onCheckedChange = onToggleRedirect,
-                )
-                ToggleRow(
-                    title = "Tự bật Micro",
-                    subtitle = if (target.voiceUi != null) "chạm Mic sau khi ${target.displayName} mở" else "${target.displayName} không hỗ trợ",
+                    title = "Tự động bật Micro",
+                    subtitle = if (target.voiceUi != null) {
+                        "Tự bật nghe ngay khi ${target.displayName} mở lên"
+                    } else {
+                        "${target.displayName} không hỗ trợ tự bật Micro"
+                    },
                     checked = settings.autoMic && target.voiceUi != null,
                     onCheckedChange = onToggleAutoMic,
                     enabled = target.voiceUi != null,
+                    icon = R.drawable.lc_mic,
                 )
                 ToggleRow(
-                    title = "Màn hình khóa",
-                    subtitle = "TriggerActivity · cần 3 quyền",
+                    title = "Cho phép trên màn hình khóa",
+                    subtitle = "Gọi trợ lý ngay cả khi chưa mở khóa máy",
                     checked = settings.lockScreen,
                     onCheckedChange = onToggleLockScreen,
+                    icon = R.drawable.lc_lock_keyhole,
                     divider = false,
                 )
             }
 
-            Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                val modeB = settings.hardwareMode == HardwareMode.LOGCAT
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    BodyText("Nút cứng → AI", 14.sp, TextMain, Modifier.weight(1f), weight = FontWeight.Medium)
-                    Chip(
-                        if (modeB) "chế độ B" else "chế độ A",
-                        Modifier
-                            .clip(CircleShape)
-                            .clickable(role = Role.Button, onClick = onOpenHardware),
-                    )
-                }
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(role = Role.Button, onClick = onOpenHardware)
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    BodyText(
-                        if (modeB) {
-                            "Đặt nút thành “không hành động”. App đọc event log" +
-                                if (permissions.readLogs) "." else " — cần cấp READ_LOGS."
-                        } else {
-                            "Đặt nút AI/nhấn giữ nút nguồn thành “mở ${config.profile.assistantName}”. App bắt cửa sổ đó y như khẩu lệnh."
-                        },
-                        11.sp,
-                        if (modeB && !permissions.readLogs) com.aikeybridge.ui.theme.Warn else TextFaint,
-                        Modifier.weight(1f),
-                        lineHeight = 16.sp,
-                    )
-                    LucideIcon(R.drawable.lc_chevron_right, TextGhost, 13.dp)
-                }
-            }
-
-            SectionLabel(
-                "Tinh chỉnh",
-                Modifier.padding(top = 6.dp),
-                action = if (settings.dismissDelayMs != null || settings.micTimeoutMs != null) "mặc định" else null,
-                onAction = onResetTuning,
-            )
-            Panel {
-                TuneRow(
-                    title = "Độ trễ sau Back",
-                    subtitle = "chờ nhả audio focus",
-                    value = "${config.dismissDelayMs} ms",
-                    onMinus = { onNudgeDismiss(-DISMISS_STEP) },
-                    onPlus = { onNudgeDismiss(DISMISS_STEP) },
-                    minusEnabled = config.dismissDelayMs > ConfigResolver.MIN_DISMISS_DELAY,
-                    plusEnabled = config.dismissDelayMs < ConfigResolver.MAX_DISMISS_DELAY,
-                )
-                TuneRow(
-                    title = "Timeout ${if (target.voiceUi != null) "Micro" else "mở app"}",
-                    subtitle = "bỏ cuộc nếu ${target.displayName} chậm",
-                    value = "${config.micTimeoutMs} ms",
-                    onMinus = { onNudgeMicTimeout(-MIC_STEP) },
-                    onPlus = { onNudgeMicTimeout(MIC_STEP) },
-                    minusEnabled = config.micTimeoutMs > ConfigResolver.MIN_MIC_TIMEOUT,
-                    plusEnabled = config.micTimeoutMs < ConfigResolver.MAX_MIC_TIMEOUT,
-                    divider = false,
-                )
-            }
-
-            SectionLabel("Nâng cao", Modifier.padding(top = 6.dp))
+            // 3. PHÍM TẮT NHANH & CHẠM MẶT LƯNG (Hợp nhất từ ShortcutsScreen)
+            SectionLabel("Chạm mặt lưng & Lối tắt nhanh", Modifier.padding(top = 14.dp))
             Panel {
                 ToggleRow(
-                    title = "Chống trùng",
-                    subtitle = "bỏ qua sự kiện trùng trong ${Format.seconds(config.cooldownMs)}",
-                    checked = settings.dedupe,
-                    onCheckedChange = onToggleDedupe,
-                    titleColor = TextBody,
-                    titleSize = 13.5.sp,
-                    titleWeight = FontWeight.Normal,
-                    subColor = TextGhost,
+                    title = "Hiện “Gọi AI” trong danh sách app",
+                    subtitle = "Dùng cho Chạm mặt lưng & Khởi chạy nhanh",
+                    checked = aliasOn,
+                    onCheckedChange = {
+                        Intents.setLaunchAlias(context, it)
+                        aliasOn = Intents.isLaunchAliasEnabled(context)
+                    },
+                )
+                if (vivo) {
+                    NavRow(
+                        title = "Gán vào Chạm mặt lưng",
+                        subtitle = "Cài đặt → Chạm mặt lưng → Mở ứng dụng → Gọi AI",
+                        trailing = "mở ↗",
+                        trailingColor = Accent,
+                        onClick = { Intents.openBackTap(context) },
+                    )
+                    NavRow(
+                        title = "Khởi chạy nhanh khi tắt màn hình",
+                        subtitle = "Giữ nút Giảm âm lượng → Mở ứng dụng → Gọi AI",
+                        trailing = "mở ↗",
+                        trailingColor = Accent,
+                        onClick = { Intents.openQuickLaunch(context) },
+                        divider = false,
+                    )
+                } else {
+                    NavRow(
+                        title = "Cài đặt phím tắt & cử chỉ của máy",
+                        subtitle = "Gán phím cạnh hoặc chạm mặt lưng → Mở ứng dụng “Gọi AI”",
+                        trailing = "mở ↗",
+                        trailingColor = Accent,
+                        onClick = { Intents.openSmartKey(context) },
+                        divider = false,
+                    )
+                }
+            }
+            Gap(8.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlineCta(
+                    text = "Thử Gọi AI",
+                    icon = R.drawable.lc_rocket,
+                    iconTint = Accent,
+                    onClick = {
+                        context.startActivity(
+                            Intent(context, LaunchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    height = 42.dp,
+                    radius = 12.dp,
+                )
+                OutlineCta(
+                    text = "Thử Khoanh tròn",
+                    icon = R.drawable.lc_scan_search,
+                    iconTint = Accent,
+                    onClick = {
+                        context.startActivity(
+                            Intent(context, LaunchActivity::class.java)
+                                .setAction(LaunchActivity.ACTION_CTS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    height = 42.dp,
+                    radius = 12.dp,
+                )
+            }
+
+            // 4. NHẬN DIỆN MÁY & DÒ CỬA SỔ
+            SectionLabel("Nhận diện máy & Cửa sổ trợ lý", Modifier.padding(top = 14.dp))
+            Panel {
+                NavRow(
+                    title = "Hãng điện thoại (Profile ROM)",
+                    subtitle = "${config.profile.displayName} · ${config.profile.os} · " +
+                        if (config.manualProfile) "đã chọn tay" else "tự nhận diện",
+                    trailing = "đổi hãng",
+                    onClick = onOpenProfiles,
+                )
+                NavRow(
+                    title = "Dò cửa sổ trợ lý gốc (${config.profile.assistantName})",
+                    subtitle = if (settings.customTriggers.isNotEmpty()) {
+                        "Đang dùng ${config.triggers.size} mẫu cửa sổ (${settings.customTriggers.size} tự dò)"
+                    } else {
+                        "Tự bắt cửa sổ khi bấm nút AI hoặc khẩu lệnh"
+                    },
+                    trailing = "dò 8s",
+                    trailingColor = Accent,
+                    onClick = onOpenTriggers,
                     divider = false,
                 )
             }
-            Gap(8.dp)
+
+            // 5. TINH CHỈNH KỸ THUẬT NÂNG CAO (Thu gọn mặc định)
+            Gap(14.dp)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Surface)
+                    .border(1.dp, Hairline, RoundedCornerShape(14.dp))
+                    .clickable(role = Role.Button) { showAdvanced = !showAdvanced }
+                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LucideIcon(R.drawable.lc_sliders_horizontal, TextDim, 15.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    BodyText("Tinh chỉnh kỹ thuật nâng cao", 13.5.sp, TextMain, weight = FontWeight.Medium)
+                    MonoText("Độ trễ đóng trợ lý, chờ Micro & chế độ nút cứng", 9.sp, TextFaint)
+                }
+                LucideIcon(
+                    if (showAdvanced) R.drawable.lc_chevron_down else R.drawable.lc_chevron_right,
+                    TextDim,
+                    15.dp,
+                )
+            }
+
+            AnimatedVisibility(visible = showAdvanced) {
+                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val modeB = settings.hardwareMode == HardwareMode.LOGCAT
+                    Panel {
+                        TuneRow(
+                            title = "Độ trễ sau khi đóng trợ lý gốc",
+                            subtitle = "Chờ nhả micro trước khi mở AI mới",
+                            value = "${config.dismissDelayMs} ms",
+                            onMinus = { onNudgeDismiss(-DISMISS_STEP) },
+                            onPlus = { onNudgeDismiss(DISMISS_STEP) },
+                            minusEnabled = config.dismissDelayMs > ConfigResolver.MIN_DISMISS_DELAY,
+                            plusEnabled = config.dismissDelayMs < ConfigResolver.MAX_DISMISS_DELAY,
+                        )
+                        TuneRow(
+                            title = "Thời gian chờ mở ${if (target.voiceUi != null) "Micro" else "ứng dụng"}",
+                            subtitle = "Tự bỏ qua nếu ${target.displayName} mở chậm",
+                            value = "${config.micTimeoutMs} ms",
+                            onMinus = { onNudgeMicTimeout(-MIC_STEP) },
+                            onPlus = { onNudgeMicTimeout(MIC_STEP) },
+                            minusEnabled = config.micTimeoutMs > ConfigResolver.MIN_MIC_TIMEOUT,
+                            plusEnabled = config.micTimeoutMs < ConfigResolver.MAX_MIC_TIMEOUT,
+                        )
+                        if (settings.dismissDelayMs != null || settings.micTimeoutMs != null) {
+                            NavRow(
+                                title = "Khôi phục độ trễ mặc định",
+                                subtitle = "Trả về thông số chuẩn của ${config.profile.displayName}",
+                                trailing = "đặt lại",
+                                trailingColor = Accent,
+                                onClick = onResetTuning,
+                            )
+                        }
+                        ToggleRow(
+                            title = "Chống trùng lặp sự kiện",
+                            subtitle = "Bỏ qua lệnh gọi trùng trong ${Format.seconds(config.cooldownMs)}",
+                            checked = settings.dedupe,
+                            onCheckedChange = onToggleDedupe,
+                        )
+                        NavRow(
+                            title = "Phương thức bắt nút cứng",
+                            subtitle = if (modeB) "Chế độ B · Đọc event log" else "Chế độ A · Bắt cửa sổ (Khuyên dùng)",
+                            trailing = "cấu hình",
+                            onClick = onOpenHardware,
+                        )
+                        NavRow(
+                            title = "Chế độ vận hành",
+                            subtitle = when (settings.usageMode) {
+                                UsageMode.ONE_TIME -> "Chỉ dùng lối tắt (Không chạy Script nền)"
+                                else -> "Script nền Bank-Safe (Khuyên dùng)"
+                            },
+                            trailing = "đổi",
+                            onClick = { confirmUsage = true },
+                            divider = false,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -338,10 +436,9 @@ fun ModesScreen(
     }
 
     editingActionSlot?.let { slot ->
-        val wakeLabel = config.profile.wakePhrase?.let { "“$it”" } ?: config.profile.assistantName
         val (dialogTitle, currentMode, onSave) = when (slot) {
             SLOT_VOICE -> Triple("Khẩu lệnh ($wakeLabel)", settings.voiceAction, onSetVoiceAction)
-            SLOT_BUTTON -> Triple("Nút cứng / Nút AI", settings.buttonAction, onSetButtonAction)
+            SLOT_BUTTON -> Triple("Nút cứng / Phím cạnh AI", settings.buttonAction, onSetButtonAction)
             else -> Triple("Lối tắt “Gọi AI”", settings.shortcutAction, onSetShortcutAction)
         }
         ActionModeDialog(
@@ -356,17 +453,59 @@ fun ModesScreen(
     }
 }
 
-private const val SLOT_VOICE = "voice"
-private const val SLOT_BUTTON = "button"
-private const val SLOT_SHORTCUT = "shortcut"
+internal const val SLOT_VOICE = "voice"
+internal const val SLOT_BUTTON = "button"
+internal const val SLOT_SHORTCUT = "shortcut"
 
-private fun actionModeSummary(raw: ActionMode, effective: ActionMode, targetName: String): String =
+internal fun actionModeSummary(raw: ActionMode, effective: ActionMode, targetName: String): String =
     if (raw == ActionMode.DEFAULT) {
         val label = if (effective == ActionMode.DEFAULT) targetName else effective.shortLabel
-        "Theo đích đến chung ($label)"
+        "Mặc định ($label)"
     } else {
         raw.title
     }
+
+@Composable
+private fun ActionSlotRow(
+    icon: Int,
+    title: String,
+    subtitle: String,
+    highlighted: Boolean,
+    onClick: () -> Unit,
+    divider: Boolean = true,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .hairlineBottom(divider)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconTile(icon, if (highlighted) Accent else TextDim)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            BodyText(title, 13.5.sp, TextMain, weight = FontWeight.Medium, maxLines = 1)
+            MonoText(
+                subtitle,
+                9.5.sp,
+                if (highlighted) Accent else TextFaint,
+                maxLines = 1,
+            )
+        }
+        MonoText(
+            "Đổi",
+            9.5.sp,
+            Accent,
+            Modifier
+                .clip(CircleShape)
+                .background(Accent.copy(alpha = 0.12f))
+                .border(1.dp, Accent.copy(alpha = 0.35f), CircleShape)
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = 9.dp, vertical = 5.dp),
+        )
+    }
+}
 
 @Composable
 private fun TargetRow(
@@ -447,13 +586,21 @@ private fun UsageModeDialog(
     var choice by rememberSaveable { mutableStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = com.aikeybridge.ui.theme.Surface,
-        title = { BodyText("Cách dùng", 18.sp, TextMain, weight = FontWeight.SemiBold) },
+        containerColor = Surface,
+        title = { BodyText("Chế độ vận hành", 18.sp, TextMain, weight = FontWeight.SemiBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 listOfNotNull(
-                    Triple(UsageMode.SCRIPT, "Script nền (Bank-Safe)", "Khuyên dùng · Shizuku · tương thích mọi app ngân hàng").takeIf { scriptAvailable },
-                    Triple(UsageMode.ONE_TIME, "Cấu hình một lần", "Không chạy nền · gán phím vào lối tắt Gọi AI"),
+                    Triple(
+                        UsageMode.SCRIPT,
+                        "Script nền (Bank-Safe)",
+                        "Khuyên dùng · Thay thế trợ lý gốc · Tương thích mọi app ngân hàng",
+                    ).takeIf { scriptAvailable },
+                    Triple(
+                        UsageMode.ONE_TIME,
+                        "Chỉ dùng lối tắt",
+                        "Không chạy nền · Chỉ mở AI khi bấm lối tắt Gọi AI",
+                    ),
                 ).forEach { (mode, title, sub) ->
                     Row(
                         Modifier
@@ -487,13 +634,13 @@ private fun UsageModeDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { BodyText("Huỷ", 14.sp, com.aikeybridge.ui.theme.Muted) }
+            TextButton(onClick = onDismiss) { BodyText("Huỷ", 14.sp, Muted) }
         },
     )
 }
 
 @Composable
-private fun ActionModeDialog(
+internal fun ActionModeDialog(
     title: String,
     current: ActionMode,
     onConfirm: (ActionMode) -> Unit,
@@ -502,7 +649,7 @@ private fun ActionModeDialog(
     var choice by rememberSaveable { mutableStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = com.aikeybridge.ui.theme.Surface,
+        containerColor = Surface,
         title = { BodyText(title, 18.sp, TextMain, weight = FontWeight.SemiBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -539,7 +686,7 @@ private fun ActionModeDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { BodyText("Huỷ", 14.sp, com.aikeybridge.ui.theme.Muted) }
+            TextButton(onClick = onDismiss) { BodyText("Huỷ", 14.sp, Muted) }
         },
     )
 }

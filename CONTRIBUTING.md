@@ -4,7 +4,7 @@ Dự án ưu tiên hai thứ: app không đọc nội dung màn hình, và profi
 
 ## Gửi lỗi
 
-1. Mở app → **Nhật ký** → **Xuất log zip**.
+1. Mở app → tab **Hệ thống** → **Xuất chẩn đoán**.
 2. Dùng mẫu [Gửi log chẩn đoán](https://github.com/pdong15dth/gemini-default-ai-phone/issues/new?template=diagnostics.yml).
 3. Ghi rõ máy, ROM, phiên bản Gemini và hiện tượng. Không dán ảnh có nội dung cá nhân.
 
