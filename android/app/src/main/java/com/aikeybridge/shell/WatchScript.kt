@@ -51,8 +51,10 @@ object WatchScript {
             appendLine("# vẫn nằm trong 0::/system/uid_0/pid_<adbd>. Dừng mọi app_process akb_engine cũ để VivoCommonService")
             appendLine("# giữ HasShellAppProc=false, rồi neo giữ adb_wifi_enabled=1 để khi tắt Gỡ lỗi USB (adb_enabled=0)")
             appendLine("# hoặc tắt Tùy chọn nhà phát triển, AdbService không dừng adbd và init không giết script.")
-            appendLine("ps -A -o PID,ARGS 2>/dev/null | grep '[a]kb_engine' | while read p r; do kill -9 \$p 2>/dev/null; done")
+            appendLine("ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[c]om\\.aikeybridge:shell|[c]om\\.android\\.commands\\.content\\.Content' | while read p r; do kill -9 \$p 2>/dev/null; done")
+            appendLine("pm grant com.aikeybridge android.permission.WRITE_SECURE_SETTINGS 2>/dev/null")
             appendLine("settings put global adb_wifi_enabled 1 2>/dev/null")
+            appendLine("cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1")
             appendLine("LOG='$eventLog'")
             appendLine("DIR=\"\${LOG%/*}\"")
             appendLine("echo 1 > \"\$DIR/$ENABLED_FILE\" 2>/dev/null")
@@ -69,7 +71,7 @@ object WatchScript {
                 "{ echo \"start \$(date '+%F %T') pid=\$\$ ppid=\$PPID uid=\$(id -u) ctx=\$(cat /proc/self/attr/current 2>/dev/null)\"; " +
                     "cat /proc/\$\$/cgroup; } > \"\$DIR/$STATE_FILE\" 2>/dev/null",
             )
-            appendLine("( while true; do [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && settings put global adb_wifi_enabled 1 2>/dev/null; date '+%F %T' > \"\$DIR/$ALIVE_FILE\" 2>/dev/null; sleep $ALIVE_INTERVAL_S; done ) &")
+            appendLine("( while true; do if [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ]; then settings put global adb_wifi_enabled 1 2>/dev/null; [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1; fi; date '+%F %T' > \"\$DIR/$ALIVE_FILE\" 2>/dev/null; sleep $ALIVE_INTERVAL_S; done ) </dev/null >/dev/null 2>&1 &")
             if (activeMic != null) {
                 appendLine("# Toạ độ nút Micro của lớp phủ: ưu tiên tính theo dp (wm density + navigation_mode) từ mép phải/dưới")
                 appendLine("# vì thanh nhập FloatyActivity neo 2 nút phải cố định theo dp (Mic cách mép phải ~113dp),")

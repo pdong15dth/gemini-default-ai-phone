@@ -55,10 +55,13 @@ object EngineDaemonMain {
         appendLine("trap \"\" HUP INT TERM")
         appendLine("for cg in ${WatchScript.ESCAPE_CGROUPS}; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
         appendLine("MY_PID=\$\$")
-        appendLine("ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[i]notifyd - .*com\\.aikeybridge' | while read p r; do")
+        appendLine("ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[c]om\\.aikeybridge:shell|[i]notifyd - .*com\\.aikeybridge|[c]om\\.android\\.commands\\.content\\.Content' | while read p r; do")
         appendLine("  [ \"\$p\" != \"\$MY_PID\" ] && kill -9 \"\$p\" 2>/dev/null")
         appendLine("done")
+        appendLine("pm grant com.aikeybridge android.permission.WRITE_SECURE_SETTINGS 2>/dev/null")
+        appendLine("pm grant com.aikeybridge android.permission.READ_LOGS 2>/dev/null")
         appendLine("settings put global adb_wifi_enabled 1 2>/dev/null")
+        appendLine("cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1")
         appendLine("DIR='$extDir'")
         appendLine("IPC_DIR=\"\$DIR/${EngineBinderProvider.IPC_DIR}\"")
         appendLine("PID_FILE=\"\$DIR/${EngineBinderProvider.PID_FILE}\"")
@@ -69,7 +72,7 @@ object EngineDaemonMain {
         appendLine("if [ -f \"\$PID_FILE\" ]; then")
         appendLine("  OLD_PID=\$(cat \"\$PID_FILE\" 2>/dev/null)")
         appendLine("  if [ -n \"\$OLD_PID\" ] && [ \"\$OLD_PID\" != \"\$MY_PID\" ]; then")
-        appendLine("    ( sleep 1; kill -9 \"\$OLD_PID\" 2>/dev/null ) &")
+        appendLine("    ( sleep 1; kill -9 \"\$OLD_PID\" 2>/dev/null ) </dev/null >/dev/null 2>&1 &")
         appendLine("  fi")
         appendLine("fi")
         appendLine("echo \"\$MY_PID\" > \"\$PID_FILE\" 2>/dev/null")
@@ -105,6 +108,10 @@ object EngineDaemonMain {
         appendLine("    read -r cur_pid < \"\$PID_FILE\" 2>/dev/null")
         appendLine("    [ \"\$cur_pid\" = \"\$MY_PID\" ] || break")
         appendLine("    date +%s > \"\$ALIVE_FILE\" 2>/dev/null")
+        appendLine("    if [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ]; then")
+        appendLine("      [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && settings put global adb_wifi_enabled 1 2>/dev/null")
+        appendLine("      [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1")
+        appendLine("    fi")
         appendLine("    if [ -f \"\$ENABLED_FILE\" ] && [ -f ${WatchScript.PATH} ]; then")
         appendLine("      if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-gemini.sh'; then")
         appendLine("        setsid sh ${WatchScript.PATH} </dev/null >/dev/null 2>&1 &")
@@ -127,8 +134,11 @@ object EngineDaemonMain {
             engineScriptContent(extDir).toByteArray(Charsets.UTF_8),
         )
         return buildString {
-            append("ps -A -o PID,ARGS 2>/dev/null | grep '[a]kb_engine' | while read p r; do kill -9 \$p 2>/dev/null; done; ")
+            append("pm grant $pkg android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; ")
+            append("pm grant $pkg android.permission.READ_LOGS 2>/dev/null; ")
+            append("ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[c]om\\.aikeybridge:shell|[c]om\\.android\\.commands\\.content\\.Content' | while read p r; do kill -9 \$p 2>/dev/null; done; ")
             append("settings put global adb_wifi_enabled 1 2>/dev/null; ")
+            append("cmd activity broadcast -n $pkg/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1; ")
             append("mkdir -p '$extDir/${EngineBinderProvider.IPC_DIR}' 2>/dev/null; ")
             append("date +%s > '$extDir/${EngineBinderProvider.ALIVE_FILE}' 2>/dev/null; ")
             append("echo $encoded | base64 -d > $PATH.tmp; ")
@@ -142,10 +152,13 @@ object EngineDaemonMain {
     /**
      * Lệnh tự động tắt Gỡ lỗi USB (`adb_enabled=0`) và ẩn Tùy chọn nhà phát triển (`development_settings_enabled=0`)
      * cho app ngân hàng / VNeID, đồng thời giữ `adb_wifi_enabled=1` để `AdbService` không dừng `adbd`
-     * (ngăn `init` giết nhóm cgroup `0::/system/uid_0/pid_<adbd>` trên Android 16 như vivo X200 Ultra).
+     * (ngăn `init` giết nhóm cgroup `0::/system/uid_0/pid_<adbd>` trên Android 16 như vivo X200 Ultra / iQOO Z10 Turbo+).
      */
     const val LOCK_DEV_MODE_CMD: String =
-        "settings put global adb_wifi_enabled 1; " +
+        "pm grant com.aikeybridge android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; " +
+            "ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[c]om\\.aikeybridge:shell|[c]om\\.android\\.commands\\.content\\.Content' | while read p r; do kill -9 \$p 2>/dev/null; done; " +
+            "cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.LOCK_DEV_MODE --receiver-include-background >/dev/null 2>&1; " +
+            "settings put global adb_wifi_enabled 1; " +
             "settings put global adb_enabled 0; " +
             "settings put global development_settings_enabled 0"
 }

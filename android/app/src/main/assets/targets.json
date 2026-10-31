@@ -53,7 +53,7 @@
           "title": "Cho Gemini xem màn hình",
           "detail": "Bật \"Dùng dữ liệu của màn hình và ứng dụng\" của trợ lý mặc định — tắt thì lớp phủ Gemini không khoanh tròn để hỏi được. Chưa từng đặt (null) nghĩa là đang bật theo mặc định.",
           "command": "settings put secure assist_structure_enabled 1; settings put secure assist_screenshot_enabled 1",
-          "verify": "case \"$(settings get secure assist_structure_enabled) $(settings get secure assist_screenshot_enabled)\" in *0*) echo off ;; *) echo on ;; esac",
+          "verify": "s1=$(settings get secure assist_structure_enabled) && s2=$(settings get secure assist_screenshot_enabled) && case \"$s1 $s2\" in *0*|\" \") echo off ;; *) echo on ;; esac",
           "expect": "on",
           "hint": "Muốn tắt lại: Cài đặt → Ứng dụng mặc định → Trợ lý số → Dùng dữ liệu của màn hình và ứng dụng."
         },
@@ -144,7 +144,7 @@
           "title": "Cho Google xem & chụp màn hình",
           "detail": "Bật \"Dùng dữ liệu của màn hình và ứng dụng\" của trợ lý mặc định để khoanh tròn tìm kiếm và dịch trực tiếp.",
           "command": "settings put secure assist_structure_enabled 1; settings put secure assist_screenshot_enabled 1; settings put secure visual_query_accessibility_detection_enabled 1",
-          "verify": "case \"$(settings get secure assist_structure_enabled) $(settings get secure assist_screenshot_enabled)\" in *0*) echo off ;; *) echo on ;; esac",
+          "verify": "s1=$(settings get secure assist_structure_enabled) && s2=$(settings get secure assist_screenshot_enabled) && case \"$s1 $s2\" in *0*|\" \") echo off ;; *) echo on ;; esac",
           "expect": "on",
           "hint": "Cài đặt → Ứng dụng mặc định → Trợ lý số → Dùng dữ liệu của màn hình và ứng dụng."
         },

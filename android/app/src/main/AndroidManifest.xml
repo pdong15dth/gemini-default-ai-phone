@@ -126,7 +126,13 @@
 
         <receiver
             android:name=".shell.WirelessAdbPairingReceiver"
-            android:exported="false" />
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL">
+            <intent-filter>
+                <action android:name="com.aikeybridge.action.ANCHOR_ADB_WIFI" />
+                <action android:name="com.aikeybridge.action.LOCK_DEV_MODE" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".shell.WirelessAdbPairingService"

@@ -144,8 +144,14 @@ class ShizukuShell(private val context: Context) : ShellRunner {
                 tryShizuku()?.let { return@withContext it }
             }
             ShellBackend.AUTO -> {
-                // Nếu Shizuku đang bật sẵn thì ưu tiên chạy trực tiếp qua Shizuku (ổn định tức thì)
-                // và dựng sẵn Engine nội bộ làm backup; nếu không có Shizuku thì chạy qua Engine nội bộ.
+                // Nếu Engine nội bộ (akb-engine.sh thuần /system/bin/sh) đang sống thì ưu tiên chạy qua nó
+                // để không phải sinh tiến trình app_process (HasShellAppProc=true trên Vivo OriginOS).
+                if (EngineBinderProvider.isAlive(context)) {
+                    execViaEngineDaemon(command)?.let { res ->
+                        if (res.exitCode >= 0) return@withContext res
+                        lastError = res
+                    }
+                }
                 if (isShizukuReady()) {
                     tryShizuku()?.let { return@withContext it }
                     tryEngine()?.let { return@withContext it }
@@ -163,6 +169,9 @@ class ShizukuShell(private val context: Context) : ShellRunner {
         EngineBinderProvider.execCommand(context, command, COMMAND_TIMEOUT_MS)
 
     private suspend fun execViaShizukuInternal(command: String): ShellResult? {
+        // Ưu tiên Shizuku.newProcess("sh", "-c", command) trước để KHÔNG sinh thêm tiến trình
+        // app_process (com.aikeybridge:shell) dưới UID 2000 làm bật cờ HasShellAppProc=true trên Vivo OriginOS.
+        execViaNewProcess(command)?.let { return it }
         if (!userServiceBlocked) {
             try {
                 if (ensureBound()) {
@@ -179,7 +188,7 @@ class ShizukuShell(private val context: Context) : ShellRunner {
                 userServiceBlocked = true
             }
         }
-        return execViaNewProcess(command)
+        return null
     }
 
     private fun isShizukuReady(): Boolean = runCatching {

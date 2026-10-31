@@ -236,6 +236,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         if (_script.value.busy) return
+        scriptManuallyStopped = false
+        vivoQueryJob?.cancel()
         scriptEventLog?.parentFile?.mkdirs()
         viewModelScope.launch {
             _script.update { it.copy(busy = true) }
@@ -258,6 +260,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             // Đảm bảo EngineDaemonMain (UID 2000) đã chạy trong RAM và cập nhật lên bản mới nhất
             shell.exec(EngineDaemonMain.bootstrapCommand(app))
             val active = config.value
+            ensureAppPrivilegesAndAnchorAdbWifi(active.target.id)
             if (active.provisioning.isNotEmpty()) {
                 _setup.value = SetupUiState.from(active.provisioning, active.restore).copy(running = true)
                 Diagnostics.info("setup", "Tự chạy ${active.provisioning.size} lệnh kích hoạt trước khi bật script · ${active.flowLabel}.")
@@ -282,22 +285,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             shell.exec(WatchScript.stopCommand())
             shell.exec(WatchScript.startCommand())
+            PermissionsReader.anchorAdbWifiFromApp(app)
             delay(700)
             val status = shell.exec(WatchScript.statusCommand())
             val running = status.stdout.isNotBlank()
-            if (running) settingsRepository.setScriptStartedAt(System.currentTimeMillis())
+            if (running) {
+                scriptUpdatedThisProcess = true
+                settingsRepository.setScriptStartedAt(System.currentTimeMillis())
+            }
             val pid = status.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty()
             val detached = if (running && pid.isNotEmpty()) logScriptCgroup(pid) else null
 
-            // Đọc lại bảng quyền Vivo vào bộ nhớ đệm trước khi khóa Gỡ lỗi
-            val vivoRes = shell.exec(PermissionsReader.VIVO_QUERY_CMD)
-            if (vivoRes.ok) {
-                PermissionsReader.updateFromVivoShell(app, vivoRes.stdout)
+            if (running && autoLockDevMode) {
+                PermissionsReader.lockDeveloperModeFromApp(app)
+                shell.exec(EngineDaemonMain.LOCK_DEV_MODE_CMD)
+                PermissionsReader.anchorAdbWifiFromApp(app)
+                Diagnostics.success("script", "Đã tự động tắt Tùy chọn nhà phát triển & Gỡ lỗi để dùng app ngân hàng / VNeID.")
             }
 
-            if (running && autoLockDevMode) {
-                shell.exec(EngineDaemonMain.LOCK_DEV_MODE_CMD)
-                Diagnostics.success("script", "Đã tự động tắt Tùy chọn nhà phát triển & Gỡ lỗi để dùng app ngân hàng / VNeID.")
+            if (PermissionsReader.shouldQueryVivoShell()) {
+                val vivoRes = shell.exec(PermissionsReader.VIVO_QUERY_CMD)
+                if (vivoRes.ok) {
+                    PermissionsReader.updateFromVivoShell(app, vivoRes.stdout)
+                }
             }
 
             _script.value = ScriptStatus(
@@ -323,6 +333,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private suspend fun ensureAppPrivilegesAndAnchorAdbWifi(targetId: String = config.value.target.id) {
+        if (!PermissionsReader.hasWriteSecureSettings(app)) {
+            shell.exec("pm grant ${app.packageName} android.permission.WRITE_SECURE_SETTINGS")
+        }
+        if (!_permissions.value.readLogs) {
+            shell.exec("pm grant ${app.packageName} android.permission.READ_LOGS")
+        }
+        PermissionsReader.anchorAdbWifiFromApp(app)
+        PermissionsReader.applyAssistantSecureSettingsFromApp(app, targetId)
+    }
+
     /**
      * Đảm bảo `akb-gemini.sh` đã được cài và chạy ngầm khi đang ở chế độ [UsageMode.SCRIPT].
      * Giúp người dùng dù bấm "Tắt Tùy chọn nhà phát triển" ngay ở bước 3 hay vừa chạy xong 9 lệnh ở bước 4
@@ -332,17 +353,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (settingsRepository.state.value.usageMode != UsageMode.SCRIPT) return
         val content = scriptContent() ?: return
         scriptEventLog?.parentFile?.mkdirs()
-        if (!_permissions.value.readLogs) {
-            shell.exec("pm grant ${app.packageName} android.permission.READ_LOGS")
-        }
+        ensureAppPrivilegesAndAnchorAdbWifi()
         val install = shell.exec(WatchScript.installCommand(content))
         if (!install.ok) return
         shell.exec(WatchScript.stopCommand())
         shell.exec(WatchScript.startCommand())
+        PermissionsReader.anchorAdbWifiFromApp(app)
         delay(350)
         val status = shell.exec(WatchScript.statusCommand())
         val running = status.stdout.isNotBlank()
         if (running) {
+            scriptUpdatedThisProcess = true
             settingsRepository.setScriptStartedAt(System.currentTimeMillis())
             val pid = status.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty()
             val detached = if (pid.isNotEmpty()) logScriptCgroup(pid) else null
@@ -356,15 +377,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
      * Cả [WatchScript] và [EngineDaemonMain] đều đã tách khỏi cgroup của `adbd` nên vẫn tiếp tục chạy ngầm.
      */
     fun lockDeveloperMode() {
+        scriptManuallyStopped = false
+        vivoQueryJob?.cancel()
         viewModelScope.launch {
             shell.exec(EngineDaemonMain.bootstrapCommand(app))
+            ensureAppPrivilegesAndAnchorAdbWifi()
             if (_script.value.running != true) {
                 ensureWatchScriptStartedQuietly()
             }
+            val lockedFromApp = PermissionsReader.lockDeveloperModeFromApp(app)
             val res = shell.exec(EngineDaemonMain.LOCK_DEV_MODE_CMD)
+            PermissionsReader.anchorAdbWifiFromApp(app)
             delay(200)
             refreshPermissions()
-            if (res.ok || (!_permissions.value.devOptionsEnabled && !_permissions.value.adbEnabled)) {
+            if (lockedFromApp || res.ok || (!_permissions.value.devOptionsEnabled && !_permissions.value.adbEnabled)) {
                 Diagnostics.success("security", "Đã tắt Tùy chọn nhà phát triển & Gỡ lỗi — an toàn 100% cho app ngân hàng & VNeID.")
                 _message.value = "Đã bật Script nền & tắt sạch Tùy chọn nhà phát triển / Gỡ lỗi! Dùng app ngân hàng & VNeID bình thường."
             } else {
@@ -476,6 +502,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun stopScript() {
+        scriptManuallyStopped = true
         refreshPermissions()
         if (!_permissions.value.shizukuGranted) {
             _message.value = "Cần Shizuku để tắt script. Hoặc khởi động lại máy."
@@ -496,7 +523,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     private var logSnifferJob: Job? = null
+    private var vivoQueryJob: Job? = null
     private val vivoQueryRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val autoStartingScript = java.util.concurrent.atomic.AtomicBoolean(false)
+    @Volatile
+    private var scriptUpdatedThisProcess = false
+    @Volatile
+    private var scriptManuallyStopped = false
     private var exporting = false
 
     private val binderReceived = Shizuku.OnBinderReceivedListener { refreshPermissions() }
@@ -536,19 +569,57 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshPermissions() {
         importScriptEvents()
         val active = config.value
+        val currentSettings = settingsRepository.state.value
         val snap = PermissionsReader.read(
             context = app,
-            settings = settingsRepository.state.value,
+            settings = currentSettings,
             targetPackages = active.target.packages,
             assistantRequired = false,
             nativeAssistantPackages = active.profile.assistantPackages,
         )
         _permissions.value = snap
-        if (snap.shizukuGranted && !_setup.value.running && !_script.value.busy && !exporting &&
-            vivoQueryRunning.compareAndSet(false, true)
+        if (snap.shizukuGranted &&
+            !scriptManuallyStopped &&
+            currentSettings.usageMode == UsageMode.SCRIPT &&
+            currentSettings.redirectEnabled &&
+            !_setup.value.running &&
+            !_script.value.busy &&
+            !exporting &&
+            (!scriptUpdatedThisProcess || _script.value.running != true) &&
+            autoStartingScript.compareAndSet(false, true)
         ) {
             viewModelScope.launch {
                 try {
+                    if (!EngineBinderProvider.isAlive(app)) {
+                        shell.exec(EngineDaemonMain.bootstrapCommand(app))
+                    }
+                    if (!scriptUpdatedThisProcess) {
+                        ensureWatchScriptStartedQuietly()
+                    } else {
+                        val status = shell.exec(WatchScript.statusCommand())
+                        val running = status.stdout.isNotBlank()
+                        if (running) {
+                            val pid = status.stdout.trim().lineSequence().firstOrNull()?.trim()?.substringBefore(' ').orEmpty()
+                            _script.update { it.copy(running = true, pid = pid) }
+                        } else {
+                            ensureWatchScriptStartedQuietly()
+                        }
+                    }
+                } finally {
+                    autoStartingScript.set(false)
+                }
+            }
+        }
+        if (snap.shizukuGranted && !_setup.value.running && !_script.value.busy && !exporting &&
+            PermissionsReader.shouldQueryVivoShell() &&
+            vivoQueryRunning.compareAndSet(false, true)
+        ) {
+            vivoQueryJob = viewModelScope.launch {
+                try {
+                    delay(650)
+                    if (_setup.value.running || _script.value.busy || exporting || !_permissions.value.shizukuGranted) {
+                        return@launch
+                    }
                     val res = shell.exec(PermissionsReader.VIVO_QUERY_CMD)
                     if (res.ok && PermissionsReader.updateFromVivoShell(app, res.stdout)) {
                         val latestActive = config.value
@@ -589,7 +660,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setLockScreen(value: Boolean) = settingsRepository.setLockScreen(value)
 
-    fun setRedirectEnabled(value: Boolean) = settingsRepository.setRedirectEnabled(value)
+    fun setRedirectEnabled(value: Boolean) {
+        if (value) scriptManuallyStopped = false
+        settingsRepository.setRedirectEnabled(value)
+        if (value) refreshPermissions()
+    }
 
     fun setDedupe(value: Boolean) = settingsRepository.setDedupe(value)
 
@@ -759,6 +834,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setUsageMode(mode: UsageMode, announce: Boolean = true) {
+        if (mode == UsageMode.SCRIPT) scriptManuallyStopped = false
         settingsRepository.setUsageMode(mode)
         refreshPermissions()
         if (announce) {
@@ -904,6 +980,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun runProvisioning() {
         if (_setup.value.running) return
+        scriptManuallyStopped = false
+        vivoQueryJob?.cancel()
         val active = config.value
         if (active.provisioning.isEmpty()) {
             settingsRepository.setProvisionedFingerprint(device.fingerprint)
@@ -929,6 +1007,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             shell.exec(EngineDaemonMain.bootstrapCommand(app))
+            ensureAppPrivilegesAndAnchorAdbWifi(active.target.id)
             Diagnostics.info("setup", "Bắt đầu chạy ${active.provisioning.size} lệnh · ${active.flowLabel}.")
 
             val report = Provisioner(shell, active.provisioning, active.restore).runProvisioning { step, phase, detail ->
@@ -962,6 +1041,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun restoreDefaults() {
         if (_setup.value.restoring) return
+        scriptManuallyStopped = true
+        vivoQueryJob?.cancel()
         if (!_permissions.value.shizukuGranted) {
             _message.value = "Cần cấp quyền Shizuku trước khi khôi phục."
             return
