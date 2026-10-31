@@ -30,10 +30,45 @@ class EngineBinderProvider : ContentProvider() {
 
     override fun onCreate(): Boolean {
         context?.let {
-            appContext = it.applicationContext
-            requestDaemonReconnect(it)
+            val appCtx = it.applicationContext
+            appContext = appCtx
+            requestDaemonReconnect(appCtx)
+            registerAdbAnchorObserver(appCtx)
         }
         return true
+    }
+
+    private fun registerAdbAnchorObserver(appCtx: Context) {
+        runCatching {
+            val resolver = appCtx.contentResolver
+            val observer = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
+                private var lastAnchorAt = 0L
+
+                override fun onChange(selfChange: Boolean) {
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - lastAnchorAt < 1_500L) return
+                    val extDir = runCatching { appCtx.getExternalFilesDir(null) }.getOrNull() ?: return
+                    if (!File(extDir, WatchScript.ENABLED_FILE).exists()) return
+                    val wifiOn = runCatching {
+                        android.provider.Settings.Global.getInt(resolver, "adb_wifi_enabled", 0) == 1
+                    }.getOrDefault(false)
+                    if (!wifiOn) {
+                        lastAnchorAt = now
+                        com.aikeybridge.data.PermissionsReader.anchorAdbWifiFromApp(appCtx)
+                    }
+                }
+            }
+            resolver.registerContentObserver(
+                android.provider.Settings.Global.getUriFor("adb_wifi_enabled"),
+                false,
+                observer,
+            )
+            resolver.registerContentObserver(
+                android.provider.Settings.Global.getUriFor(android.provider.Settings.Global.ADB_ENABLED),
+                false,
+                observer,
+            )
+        }
     }
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {

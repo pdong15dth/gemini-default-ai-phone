@@ -87,6 +87,8 @@ object BuiltInWirelessAdb {
     internal const val NOTIF_ID = 20001
     const val ACTION_REPLY_PAIRING_CODE = "com.aikeybridge.action.REPLY_PAIRING_CODE"
     const val ACTION_STOP_PAIRING = "com.aikeybridge.action.STOP_PAIRING"
+    const val ACTION_ANCHOR_ADB_WIFI = "com.aikeybridge.action.ANCHOR_ADB_WIFI"
+    const val ACTION_LOCK_DEV_MODE = "com.aikeybridge.action.LOCK_DEV_MODE"
     const val KEY_PAIRING_CODE_TEXT = "pairing_code"
 
     private const val SERVICE_TYPE_TLS_PAIRING = "_adb-tls-pairing._tcp"
@@ -976,6 +978,12 @@ class WirelessAdbPairingReceiver : BroadcastReceiver() {
         when (intent?.action) {
             BuiltInWirelessAdb.ACTION_STOP_PAIRING -> {
                 BuiltInWirelessAdb.stopPairingFlow(context)
+            }
+            BuiltInWirelessAdb.ACTION_ANCHOR_ADB_WIFI -> {
+                com.aikeybridge.data.PermissionsReader.anchorAdbWifiFromApp(context)
+            }
+            BuiltInWirelessAdb.ACTION_LOCK_DEV_MODE -> {
+                com.aikeybridge.data.PermissionsReader.lockDeveloperModeFromApp(context)
             }
             BuiltInWirelessAdb.ACTION_REPLY_PAIRING_CODE -> {
                 val results = RemoteInput.getResultsFromIntent(intent)

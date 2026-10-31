@@ -46,15 +46,20 @@ class WatchScriptTest {
 
     @Test
     fun micTapOnlyWhenOverlayHasFocus() {
-        val mic = com.aikeybridge.model.OverlayMic("FloatyActivity", 0.642f, 0.939f)
+        val mic = com.aikeybridge.model.OverlayMic("FloatyActivity", 0.686f, 0.940f)
         val script = WatchScript.content(watch, 219, log, mic = mic)
 
         assertTrue(script.contains("set -- \$(wm size | tail -1 | sed 's/.*: //; s/x/ /')"))
-        assertTrue(script.contains("MX=\$((\$1 * 642 / 1000)); MY=\$((\$2 * 939 / 1000))"))
+        assertTrue(script.contains("MX=\$((\$1 * 686 / 1000)); MY=\$((\$2 * 940 / 1000))"))
+        assertTrue(script.contains("MX=\$((\$1 - 113 * D / 160))"))
+        assertTrue(script.contains("MY=\$((\$2 - 80 * D / 160))"))
+        assertTrue(script.contains("MY=\$((\$2 - 48 * D / 160))"))
         // Chạm khi lớp phủ chưa hiện là chạm vào app bên dưới (có thể là app ngân hàng); chạm lúc nó còn trượt lên
         // là trúng ô nhập chữ. Mọi lệnh có timeout để script không kẹt rồi bỏ lỡ lần gọi sau.
         val focused = "timeout 2 dumpsys window displays 2>/dev/null | grep -q 'mCurrentFocus=.*FloatyActivity'"
-        assertTrue(script.contains("    if $focused; then\n      sleep 0.6\n      $focused && timeout 2 input tap \$MX \$MY"))
+        assertTrue(script.contains("    if $focused; then\n      sleep 0.6\n"))
+        assertTrue(script.contains("      $focused && timeout 2 input tap \$MX \$MY"))
+        assertTrue(script.contains("dumpsys input_method 2>/dev/null | grep -q 'mInputShown=true'"))
         // Dọn đa nhiệm giết dịch vụ trợ lý của Google: chưa thấy lớp phủ thì gửi lại phím một lần.
         assertTrue(script.contains("[ \$i -eq 7 ] && timeout 2 input keyevent 219"))
         // Không khai báo gói trợ lý thì không dừng app nào.
@@ -129,7 +134,7 @@ class WatchScriptTest {
         assertTrue(script.contains("settings put global adb_wifi_enabled 1 2>/dev/null"))
         assertTrue(script.contains("echo 1 > \"\$DIR/script-enabled\" 2>/dev/null"))
         assertTrue(script.contains("cat /proc/\$\$/cgroup; } > \"\$DIR/script-state.log\""))
-        assertTrue(script.contains("date '+%F %T' > \"\$DIR/script-alive\" 2>/dev/null; sleep 30; done ) &"))
+        assertTrue(script.contains("date '+%F %T' > \"\$DIR/script-alive\" 2>/dev/null; sleep 30; done ) </dev/null >/dev/null 2>&1 &"))
     }
 
     @Test
@@ -220,9 +225,17 @@ class WatchScriptTest {
         assertTrue(daemon.contains("timeout 12 /system/bin/sh \"\$work\" </dev/null 3>&-"))
         assertTrue(daemon.contains(") 2>&1 1>&3 | cat > \"\$IPC_DIR/err-\$id\""))
         assertTrue(daemon.contains(") 3>&1 | cat > \"\$IPC_DIR/out-\$id\""))
+        // Neo giữ adb_wifi_enabled=1 định kỳ (kèm broadcast sang app UID có WRITE_SECURE_SETTINGS)
+        // để tắt Gỡ lỗi USB trên Android 16 (kể cả khi shizuku_server đang chạy làm HasShellAppProc=true) không làm adbd dừng.
+        assertTrue(daemon.contains("[ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && settings put global adb_wifi_enabled 1 2>/dev/null"))
+        assertTrue(daemon.contains("com.aikeybridge.action.ANCHOR_ADB_WIFI"))
+        assertTrue(daemon.contains("pm grant com.aikeybridge android.permission.WRITE_SECURE_SETTINGS"))
+        assertTrue(EngineDaemonMain.LOCK_DEV_MODE_CMD.contains("[c]om\\.android\\.commands\\.content\\.Content"))
+        assertTrue(EngineDaemonMain.LOCK_DEV_MODE_CMD.contains("com.aikeybridge.action.LOCK_DEV_MODE"))
 
         val watchScript = WatchScript.content(watch, 219, log)
         assertTrue(watchScript.contains("if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-engine.sh'; then"))
         assertTrue(watchScript.contains("mv -f ${EngineDaemonMain.PATH}.tmp ${EngineDaemonMain.PATH}"))
+        assertTrue(watchScript.contains("com.aikeybridge.action.ANCHOR_ADB_WIFI"))
     }
 }

@@ -215,7 +215,7 @@
 
       <div class="nav__right">
         <span class="version" id="nav-version"><span class="dot" aria-hidden="true"></span><span
-            id="nav-version-text">v1.0.13</span></span>
+            id="nav-version-text">v1.0.14</span></span>
         <a class="btn btn--light btn--sm"
           href="https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk">
           Tải APK <svg class="i" aria-hidden="true">
@@ -282,10 +282,10 @@
           <figure class="phone phone--hero">
             <div class="phone__frame">
               <img class="phone__shot" src="assets/shots/overview.webp" width="540" height="1200"
-                alt="Màn hình Tổng quan của AI Key Bridge trên vivo: trạng thái Sẵn sàng, 100% thành công, thời gian trung bình 0,9 giây, script nền đang chạy."
+                alt="Màn hình Trang chủ của AI Key Bridge trên vivo X300 Pro: lộ trình 3 bước tự thu gọn, nút Khóa Gỡ lỗi Bank-Safe, 100% tỉ lệ chuyển hướng đạt."
                 fetchpriority="high" decoding="async">
             </div>
-            <figcaption class="visually-hidden">Ảnh màn hình ứng dụng AI Key Bridge</figcaption>
+            <figcaption class="visually-hidden">Ảnh màn hình Trang chủ ứng dụng AI Key Bridge</figcaption>
           </figure>
           <div class="chip chip--flow" aria-hidden="true">
             <span class="chip__icon"><svg class="i" aria-hidden="true">
@@ -311,8 +311,8 @@
           <p class="eyebrow eyebrow--dark">Trước &amp; sau</p>
           <h2 class="h2 h2--dark" id="compare-title">Một cái nút. Không còn chuỗi lệnh.</h2>
           <p class="lede">
-            Cách cũ cần PC, cáp và lòng kiên nhẫn. AI Key Bridge gói toàn bộ quy trình đó vào vài màn hình onboarding —
-            rồi biến mất khỏi đường đi của bạn.
+            Cách cũ cần PC, cáp và lòng kiên nhẫn. AI Key Bridge gói toàn bộ quy trình đó vào lộ trình 3 bước ngay trên
+            Trang chủ — không còn rào cản onboarding nhiều màn hình.
           </p>
         </header>
 
@@ -339,13 +339,13 @@
               <span class="compare__time compare__time--accent">≈ 3 phút</span>
             </div>
             <ul class="list-check">
-              <li>Chọn cách dùng: Script nền (Bank-Safe) tích hợp sẵn Engine nội bộ</li>
-              <li>Ghép nối 6 số Gỡ lỗi không dây ngay trên thanh thông báo — không cần cài Shizuku, không cần PC</li>
-              <li>Hô “Hi Jovi” → lớp phủ Gemini, Micro bật, khoanh tròn được</li>
+              <li>Mở thẳng Trang chủ với 3 bước trực quan: Cấp quyền → Bật Script nền → Khóa Gỡ lỗi (Bank-Safe)</li>
+              <li>Ghép nối 6 số Gỡ lỗi không dây ngay trên thanh thông báo (Engine nội bộ) — không cần cài Shizuku, không cần PC</li>
+              <li>Hô “Hi Jovi” hoặc bấm nút AI → lớp phủ Gemini đang nghe hoặc Google Circle to Search</li>
               <li>Bấm 1 chạm tự tắt Tuỳ chọn nhà phát triển &amp; Gỡ lỗi USB để dùng app ngân hàng / VNeID — script vẫn
                 chạy</li>
               <li>Reboot: bật lại Gỡ lỗi không dây là Engine tự kết nối lại không cần nhập mã lần 2</li>
-              <li>Đổi đích đến: Gemini, ChatGPT Voice, Claude hoặc app khác</li>
+              <li>Tùy biến riêng từng thao tác (Khẩu lệnh, Nút cứng, Lối tắt): Gemini, Circle to Search, ChatGPT, Claude</li>
             </ul>
             <p class="compare__note">Không root · Không Xposed · Không gửi dữ liệu ra ngoài</p>
           </div>
@@ -436,9 +436,10 @@
     <section class="section dark section--flush" id="screens" aria-labelledby="screens-title">
       <div class="wrap">
         <header class="head head--center" data-reveal>
-          <p class="eyebrow">Onboarding · chụp trên vivo X300 Pro</p>
-          <h2 class="h2" id="screens-title">Vài màn hình, rồi không cần mở app nữa.</h2>
-          <p class="lede lede--center">Cài đặt xong là xong. Chỉ cần mở lại app để bật script sau mỗi lần khởi động máy.
+          <p class="eyebrow">Giao diện 3 tab · chụp trên vivo X300 Pro</p>
+          <h2 class="h2" id="screens-title">Mở thẳng Trang chủ. Không còn rào cản onboarding.</h2>
+          <p class="lede lede--center">Toàn bộ lộ trình thiết lập 3 bước, tùy chỉnh hành động AI và nhật ký hệ thống nằm
+            gọn trong 3 tab trực quan.
           </p>
         </header>
 
@@ -446,31 +447,32 @@
           <figure class="screen-card" data-reveal>
             <div class="phone phone--strip">
               <div class="phone__frame">
-                <img class="phone__shot" src="assets/shots/guides/guide_vivo_perm_gemini.webp" width="540" height="1200"
+                <img class="phone__shot" src="assets/shots/04-permissions.webp" width="540" height="1200"
                   loading="lazy" decoding="async"
-                  alt="Màn hình Quyền của Gemini trên Vivo OriginOS với 5 quyền cần bật được khoanh khung xanh.">
+                  alt="Màn hình Quyền & Cài đặt của AI Key Bridge trên Vivo X300 Pro: đã bật đủ 4/4 nhóm quyền bắt buộc kèm nút xem Ảnh hướng dẫn và Mở cài đặt.">
               </div>
             </div>
             <figcaption>
               <span class="screen-card__num">01</span>
-              <h3>Mở thẳng trang quyền</h3>
-              <p>Chạm 1 lần để nhảy thẳng vào trang Tự khởi động, Cửa sổ nổi &amp; Màn hình khóa của Google và Gemini —
-                kèm ảnh khoanh vùng rõ ràng.</p>
+              <h3>Bước 1 · Cấp quyền cơ bản</h3>
+              <p>Tự động kiểm tra 4 nhóm quyền cốt lõi. Chạm <b>Mở ↗</b> để nhảy thẳng vào trang cài đặt Vivo, hoặc chạm
+                <b>Ảnh</b> để xem hình chụp khoanh vùng sáng ngay trên màn hình.</p>
             </figcaption>
           </figure>
 
           <figure class="screen-card" data-reveal data-delay="1">
             <div class="phone phone--strip">
               <div class="phone__frame">
-                <img class="phone__shot" src="assets/shots/guides/guide_battery_bg.webp" width="540" height="1200"
+                <img class="phone__shot" src="assets/shots/setup.webp" width="540" height="1200"
                   loading="lazy" decoding="async"
-                  alt="Màn hình Kiểm soát pin dưới nền trên Vivo: chọn chữ G để bật Cho phép sử dụng pin ngầm cho Gemini và Google.">
+                  alt="Màn hình Kích hoạt & vá lỗi của AI Key Bridge: tự động chạy 9 lệnh hệ thống qua Engine nội bộ hoặc Shizuku.">
               </div>
             </div>
             <figcaption>
               <span class="screen-card__num">02</span>
-              <h3>Pin ngầm &amp; Trợ lý mặc định</h3>
-              <p>Mở thẳng danh sách Kiểm soát pin dưới nền và trang Trợ lý kỹ thuật số bị Vivo giấu khỏi Cài đặt thường.
+              <h3>Bước 2 · Bật Script nền &amp; 9 lệnh</h3>
+              <p>Ghép nối 6 số Gỡ lỗi không dây bằng <b>Engine nội bộ</b> (hoặc Shizuku) để tự chạy 9 lệnh hệ thống và
+                khởi chạy Script nền độc lập trong RAM.
               </p>
             </figcaption>
           </figure>
@@ -478,16 +480,16 @@
           <figure class="screen-card" data-reveal data-delay="2">
             <div class="phone phone--strip">
               <div class="phone__frame">
-                <img class="phone__shot" src="assets/shots/guides/guide_gemini_lockscreen.webp" width="540"
+                <img class="phone__shot" src="assets/shots/overview.webp" width="540"
                   height="1200" loading="lazy" decoding="async"
-                  alt="Màn hình Gemini trên màn hình khoá: bật công tắc Dùng Gemini mà không cần mở khoá.">
+                  alt="Màn hình Trang chủ AI Key Bridge: Bước 1 và Bước 2 đã hoàn tất tự thu gọn, Bước 3 nhắc Khóa Gỡ lỗi ngay (Bank-Safe).">
               </div>
             </div>
             <figcaption>
               <span class="screen-card__num">03</span>
-              <h3>Hướng dẫn từng bước bằng ảnh</h3>
-              <p>9 bước hướng dẫn bằng ảnh chụp màn hình thật ngay trong app (cả Gemini trên màn khóa, khẩu lệnh “Hi
-                Jovi” và tắt Gỡ lỗi).</p>
+              <h3>Bước 3 · Khóa Gỡ lỗi (Bank-Safe)</h3>
+              <p>Chạm 1 lần để tắt sạch <i>Tùy chọn nhà phát triển</i> và <i>Gỡ lỗi USB</i> — an toàn 100% cho ứng dụng
+                Ngân hàng &amp; VNeID trong khi Script nền vẫn chạy.</p>
             </figcaption>
           </figure>
         </div>
@@ -737,31 +739,31 @@
         <div class="faq" data-reveal>
           <div class="faq__item">
             <button class="faq__q" type="button" aria-expanded="true" aria-controls="faq-a1" id="faq-q1">
-              App có cần root không?
+              App có cần root hay Shizuku không?
               <svg class="i" aria-hidden="true">
                 <use href="#i-chevron-down" />
               </svg>
             </button>
             <div class="faq__a" id="faq-a1" role="region" aria-labelledby="faq-q1">
               <div>
-                <p>Không. App không dùng root, không Xposed, không cài system app. Shizuku (không root) cho app quyền
-                  shell để chạy script nền và lệnh cấu hình. Không muốn dùng Shizuku thì dán lệnh ADB từ máy tính một
-                  lần.</p>
+                <p>Không cần root và cũng không bắt buộc cài Shizuku. App tích hợp sẵn <b>Engine nội bộ</b> tự ghép nối
+                  mã 6 số Gỡ lỗi không dây ngay trên thanh thông báo để chạy lệnh cấu hình và khởi chạy Script nền
+                  (ngoài ra vẫn hỗ trợ Shizuku hoặc dán lệnh ADB từ máy tính).</p>
               </div>
             </div>
           </div>
           <div class="faq__item">
             <button class="faq__q" type="button" aria-expanded="false" aria-controls="faq-a2" id="faq-q2">
-              Dùng được app ngân hàng không?
+              Dùng được app ngân hàng &amp; VNeID không?
               <svg class="i" aria-hidden="true">
                 <use href="#i-chevron-down" />
               </svg>
             </button>
             <div class="faq__a" id="faq-a2" role="region" aria-labelledby="faq-q2">
               <div>
-                <p>Được. Từ bản 1.0.10 app không còn dùng Trợ năng. Kích hoạt xong, bạn tắt công tắc tổng Tuỳ chọn nhà
-                  phát triển và Gỡ lỗi USB — hai cài đặt mà app ngân hàng chặn. Script nền chạy bằng quyền shell, tách
-                  khỏi app và Shizuku, nên vẫn chuyển “Hi Jovi” sang Gemini.</p>
+                <p>Được 100%. App không dùng Trợ năng. Sau khi bật Script ở Bước 2, bạn bấm nút <b>Khóa Gỡ lỗi ngay
+                    (Bank-Safe)</b> ở Bước 3 trên <b>Trang chủ</b> để tự động tắt công tắc tổng Tuỳ chọn nhà phát triển
+                  và Gỡ lỗi USB. Script nền chạy độc lập trong RAM nên vẫn chuyển “Hi Jovi” sang Gemini bình thường.</p>
               </div>
             </div>
           </div>
@@ -774,9 +776,9 @@
             </button>
             <div class="faq__a" id="faq-a3" role="region" aria-labelledby="faq-q3">
               <div>
-                <p>Không phụ thuộc PC: rút cáp vẫn chạy. Script nền chạy tách khỏi app nên vuốt app khỏi đa nhiệm, dọn
-                  đa nhiệm, dừng Shizuku hay tắt Gỡ lỗi USB vẫn dùng được; chỉ mất khi khởi động lại máy — bật lại
-                  Shizuku, mở app, bấm Kích hoạt.</p>
+                <p>Không phụ thuộc PC: rút cáp, vuốt app khỏi đa nhiệm, dọn RAM hay tắt Gỡ lỗi USB thì Script nền vẫn
+                  hoạt động. Chỉ khi khởi động lại máy (reboot) bạn mới cần bật lại Gỡ lỗi không dây, mở app để Engine
+                  tự kết nối lại (không cần nhập mã 6 số lần 2) rồi bấm <b>Bật Script nền</b>.</p>
               </div>
             </div>
           </div>
@@ -789,7 +791,7 @@
             </button>
             <div class="faq__a" id="faq-a4" role="region" aria-labelledby="faq-q4">
               <div>
-                <p>Không. App can thiệp vào trợ lý hệ thống qua quyền shell (Shizuku) nên không phù hợp chính sách Play.
+                <p>Không. App can thiệp vào trợ lý hệ thống qua quyền shell nên không phù hợp chính sách Play.
                   APK phát hành trực tiếp trên GitHub Releases, ký bằng một khoá cố định, kèm file SHA-256.</p>
               </div>
             </div>
@@ -803,9 +805,9 @@
             </button>
             <div class="faq__a" id="faq-a5" role="region" aria-labelledby="faq-q5">
               <div>
-                <p>Profile là file JSON đi kèm APK. Khi tên cửa sổ hoặc tên gói đổi, dùng “Dò trợ lý” để lưu cửa sổ mới
-                  ngay trên máy, rồi chờ bản APK cập nhật profile. App không có quyền Internet nên không tự tải profile
-                  từ xa.</p>
+                <p>Profile là file JSON đi kèm APK. Khi tên cửa sổ hoặc tên gói đổi, vào tab <b>Tùy chỉnh AI → Dò cửa
+                    sổ trợ lý gốc (Tiểu V)</b> để lưu cửa sổ mới trong 8 giây ngay trên máy. App không có quyền Internet
+                  nên không tự tải profile từ xa.</p>
               </div>
             </div>
           </div>

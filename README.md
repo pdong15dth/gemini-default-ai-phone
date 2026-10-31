@@ -9,14 +9,14 @@
 
 **Hô "Hi Jovi". Gemini trả lời.**
 
-App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi trên Vivo OriginOS và các hãng khác) bằng **Google Gemini** — cả câu lệnh giọng nói lẫn nút cứng, tự bật Micro. Không root, không bắt buộc Trợ năng, không cần máy tính sau khi cài.
+App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi trên Vivo OriginOS và các hãng khác) bằng **Google Gemini** hoặc **Google Circle to Search** — cả khẩu lệnh giọng nói, nút cứng lẫn cử chỉ, tự bật Micro. Tích hợp sẵn **Engine nội bộ** (ghép nối 6 số Gỡ lỗi không dây, không cần cài Shizuku, không cần máy tính) và khóa Gỡ lỗi 1 chạm (**Bank-Safe**) để dùng bình thường với mọi ứng dụng Ngân hàng & VNeID.
 
 <p align="center">
-  <img src="docs/images/01-welcome.webp" width="240" alt="Màn chào">
+  <img src="docs/images/10-overview.webp" width="240" alt="Tab 1: Trang chủ">
   &nbsp;
-  <img src="docs/images/10-overview.webp" width="240" alt="Tổng quan">
+  <img src="docs/images/11-modes.webp" width="240" alt="Tab 2: Tùy chỉnh AI">
   &nbsp;
-  <img src="docs/images/11-modes.webp" width="240" alt="Chế độ">
+  <img src="docs/images/14-logs.webp" width="240" alt="Tab 3: Hệ thống">
 </p>
 
 <p align="center">
@@ -27,16 +27,16 @@ App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi tr�
   <a href="HUONG-DAN-SCRIPT-ADB.md"><b>Dùng bằng script ADB (không cài app)</b></a>
 </p>
 
-> Android 11+ · không root · không quảng cáo · không thu thập dữ liệu. Đã kiểm chứng trên vivo X300 Pro (OriginOS 7, Android 17).
+> Android 11+ · không root · không Trợ năng · không quảng cáo · không thu thập dữ liệu. Đã kiểm chứng trực tiếp trên **vivo X300 Pro (`V2502DA`, OriginOS)**.
 
 ## Mục lục
 
 - [Chức năng](#chuc-nang)
 - [Cơ chế hoạt động](#co-che-hoat-dong)
 - [Hãng được hỗ trợ](#hang-duoc-ho-tro)
-- [Cài đặt và thiết lập](#cai-dat-va-thiet-lap)
-- [Các màn hình trong app](#cac-man-hinh-trong-app)
-- [Lưu ý trên OriginOS](#luu-y-tren-originos)
+- [Cài đặt và thiết lập (3 bước trên Trang chủ)](#cai-dat-va-thiet-lap)
+- [Giao diện 3 tab của ứng dụng](#cac-man-hinh-trong-app)
+- [Lưu ý trên OriginOS & Ngân hàng (Bank-Safe)](#luu-y-tren-originos)
 - [Báo lỗi](#bao-loi)
 - [Cách khác: script ADB](#cach-khac-script-adb)
 - [Tự build và deploy](#tu-build-va-deploy)
@@ -48,39 +48,35 @@ App Android mã nguồn mở thay trợ lý gốc của ROM (Tiểu V / Jovi tr�
 
 | | Chức năng | Mô tả |
 | --- | --- | --- |
-| 🎙️ | **Thay "Hi Jovi"** | Bắt trợ lý gốc vừa hiện, đóng nó và mở Gemini thay thế — bằng script nền (không cần Trợ năng) hoặc Trợ năng. |
-| 🔘 | **Nút cứng → AI** | Nút lối tắt / nút AI bên hông mở Gemini. Chế độ A bắt cửa sổ Tiểu V; chế độ B đọc event log nên Tiểu V không nháy lên. |
-| 🎤 | **Tự bật Micro** | Tự chạm nút Micro sau khi Gemini mở, bạn nói luôn không cần chạm tay. |
-| 🔒 | **Màn hình khóa** | Hô "Hi Jovi" khi máy đang khóa vẫn lên Gemini. |
-| 🎯 | **Chọn đích** | Gemini, ChatGPT Voice, Claude hoặc bất kỳ app nào khác. |
-| ⌨️ | **Lối tắt "Gọi AI"** | Gán vào chạm mặt lưng, khởi chạy nhanh, nút thông minh hoặc màn hình chính. |
-| 🛠️ | **Kích hoạt & vá lỗi** | Chạy các lệnh cấu hình một lần qua Shizuku (hoặc copy lệnh ADB): đặt Google làm trợ lý mặc định, cho Tiểu V chạy nền, vá crash locale tiếng Việt. Mỗi lệnh đều đọc lại giá trị để xác minh. |
-| 📜 | **Script nền** | Chạy đúng script trong [hướng dẫn ADB](HUONG-DAN-SCRIPT-ADB.md) bằng Shizuku — không cần Trợ năng. |
-| 🔍 | **Dò trợ lý** | ROM chưa có profile? Bấm Dò rồi gọi trợ lý gốc, app lưu cửa sổ đó làm trigger. |
-| 📊 | **Nhật ký** | Tỉ lệ thành công, thời gian chuyển hướng trung bình, biểu đồ 7 ngày. |
-| 📦 | **Xuất log chẩn đoán** | Một file `.zip` gồm log app, lý do các lần app bị tắt, logcat và trạng thái hệ thống — gửi cho người phát triển khi gặp lỗi. |
-| ↩️ | **Khôi phục mặc định** | Trả trợ lý về Tiểu V và bỏ mọi bản vá bằng một nút. |
+| 🎙️ | **Thay "Hi Jovi"** | Bắt trợ lý gốc vừa hiện, đóng ngay và mở lớp phủ Gemini đang nghe — bằng Script nền chạy độc lập trong RAM (không dùng Trợ năng). |
+| 🔘 | **Tùy biến từng thao tác** | Chọn hành động riêng cho **Khẩu lệnh ("Hi Jovi")**, **Nút cứng / Phím cạnh AI**, và **Lối tắt "Gọi AI"**: mở Gemini Voice, khoanh tròn tìm kiếm (**Google · Circle to Search**), ChatGPT Voice, Claude hoặc bất kỳ app nào. |
+| ⚡ | **Engine nội bộ (Không cần Shizuku / PC)** | Tự ghép nối 6 số Gỡ lỗi không dây ngay trên thanh thông báo để chạy lệnh hệ thống và khởi chạy Script nền — không cần cài thêm Shizuku hay cắm máy tính (vẫn hỗ trợ Shizuku làm dự phòng). |
+| 🛡️ | **Khóa Gỡ lỗi 1 chạm (Bank-Safe)** | Sau khi Script nền đã chạy, bấm 1 chạm trên **Trang chủ** để tắt sạch *Tùy chọn nhà phát triển* & *Gỡ lỗi USB* — mọi app Ngân hàng và VNeID hoạt động 100% bình thường trong khi Script vẫn chạy ngầm. |
+| 🎤 | **Tự bật Micro** | Tự chạm nút Micro ngay khi lớp phủ Gemini mở lên, bạn nói luôn không cần chạm tay. |
+| 🔒 | **Màn hình khóa** | Hô "Hi Jovi" khi màn hình đang tắt/khóa vẫn đánh thức máy và mở lớp phủ Gemini. |
+| ⌨️ | **Chạm mặt lưng & Khởi chạy nhanh** | Tích hợp lối tắt **Gọi AI** để gán vào *Chạm mặt lưng* hoặc *Nhấn giữ nút Giảm âm lượng khi tắt màn hình* trên Vivo OriginOS. |
+| 🛠️ | **Kích hoạt & vá lỗi tự động** | Tự chạy và xác minh 9 lệnh hệ thống: đặt Google làm trợ lý mặc định, bật khoanh tròn màn hình, cho Tiểu V chạy nền, vá crash locale tiếng Việt (`en-US`). |
+| 🔍 | **Dò cửa sổ trợ lý (8 giây)** | ROM chưa có profile? Bấm Dò rồi gọi trợ lý gốc, app tự bắt tên gói và tên cửa sổ làm trigger. |
+| 📊 | **Biểu đồ 7 ngày & Xuất chẩn đoán `.zip`** | Theo dõi tỉ lệ chuyển hướng thành công, lịch sử từng lượt gọi AI, log kỹ thuật và xuất gói `.zip` để gửi báo lỗi. |
+| ↩️ | **Khôi phục mặc định ban đầu** | Trả trợ lý về Tiểu V và gỡ mọi bản vá chỉ bằng một nút trong tab **Hệ thống**. |
 
 <a name="co-che-hoat-dong"></a>
 
 ## Cơ chế hoạt động
 
 ```
-"Hi Jovi" / nút AI ──► cửa sổ Tiểu V hiện ──► app biết (≈50 ms)
+"Hi Jovi" / nút AI ──► cửa sổ Tiểu V hiện ──► Script nền bắt sự kiện (≈50 ms)
                                                    │
                                                    ▼
                                      Back: đóng panel, nhả audio (500 ms)
                                                    │
                                                    ▼
-                                     Mở Gemini, Micro bật sẵn
+                                     Mở lớp phủ Gemini / Circle to Search
 ```
 
-App biết trợ lý gốc vừa mở bằng một trong hai cách, tuỳ chế độ:
-
-- **Script nền** (khuyên dùng, không cần Trợ năng): script shell chạy bằng quyền shell của Shizuku, đọc kênh `events` của logcat và lọc đúng sự kiện `CopilotPanelWindow` / nút lối tắt. Gặp sự kiện thì bấm Back, đánh thức màn hình rồi gửi `keyevent 219` — lớp phủ Gemini hiện lên như khi giữ nút nguồn, khoanh tròn để hỏi được. Giống hệt cách trong [hướng dẫn script ADB](HUONG-DAN-SCRIPT-ADB.md), nhưng không cần máy tính. Script chạy riêng bằng quyền shell nên tắt Tuỳ chọn nhà phát triển, Gỡ lỗi USB, dừng Shizuku hay vuốt tắt app đều không làm script dừng; chỉ mất khi khởi động lại máy.
-- **Đầy đủ**: **AccessibilityService** đọc *tên gói* và *tên lớp cửa sổ* vừa hiện. Khi Gemini mở, service đọc thêm tên và mô tả của các nút để tìm nút Micro rồi chạm.
-
-Cả hai đều không đọc văn bản trên màn hình, không chụp màn hình, không ghi âm. App không có quyền Internet.
+- **Script nền độc lập (Bank-Safe, không dùng Trợ năng)**: Script shell (`/data/local/tmp/akb-gemini.sh`) được đẩy và khởi chạy bằng **Engine nội bộ** (Gỡ lỗi không dây) hoặc **Shizuku**, đọc kênh `events` của logcat và lọc đúng sự kiện `CopilotPanelWindow` / nút lối tắt. Khi bắt được sự kiện, script gửi Back để đóng Tiểu V, đánh thức màn hình và gọi lớp phủ Gemini (`keyevent 219`) hoặc Google Circle to Search.
+- **Tách hoàn toàn khỏi `adbd` và ứng dụng**: Script chạy trong phiên độc lập (`setsid` + `trap "" HUP INT TERM`), nên sau khi bật xong bạn **tắt Tùy chọn nhà phát triển, tắt Gỡ lỗi USB, dừng Shizuku hay vuốt tắt app khỏi đa nhiệm** thì script vẫn tiếp tục chạy trong RAM cho tới khi khởi động lại máy.
+- **Tuyệt đối riêng tư**: Không dùng `AccessibilityService`, không đọc văn bản trên màn hình, không chụp màn hình, không có quyền `RECORD_AUDIO` và không có quyền `INTERNET`.
 
 <a name="hang-duoc-ho-tro"></a>
 
@@ -88,64 +84,41 @@ Cả hai đều không đọc văn bản trên màn hình, không chụp màn h�
 
 | Hãng | Trợ lý gốc | ROM | Trạng thái |
 | --- | --- | --- | --- |
-| Vivo / iQOO | Tiểu V (Jovi) | OriginOS | ✅ Đã kiểm chứng |
+| Vivo / iQOO | Tiểu V (Jovi) | OriginOS | ✅ Đã kiểm chứng (vivo X300 Pro) |
 | Honor / Huawei | YOYO / Celia | MagicOS | Beta |
 | Nubia / RedMagic | Mora | MyOS | Beta |
 | OPPO / OnePlus / Realme | Breeno | ColorOS | Beta |
 | Xiaomi / Redmi / POCO | XiaoAI | HyperOS | Beta |
-| Hãng khác | — | — | Dùng **Dò trợ lý** |
+| Hãng khác | — | — | Dùng **Dò cửa sổ trợ lý** |
 
-Profile beta lấy tên gói và tên cửa sổ từ thông tin công khai, chưa thử trên máy thật. Profile nằm ở [`android/app/src/main/assets/profiles/`](android/app/src/main/assets/profiles/) — rất mong bạn đóng góp profile cho máy của mình (xem [CONTRIBUTING.md](CONTRIBUTING.md)).
+Profile nằm ở [`android/app/src/main/assets/profiles/`](android/app/src/main/assets/profiles/) — rất mong bạn đóng góp profile cho máy của mình (xem [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 <a name="cai-dat-va-thiet-lap"></a>
 
-## Cài đặt và thiết lập
+## Cài đặt và thiết lập (3 bước trên Trang chủ)
+
+Ứng dụng mở thẳng vào **Trang chủ** (không còn các màn hình onboarding rườm rà). Toàn bộ lộ trình thiết lập được gói gọn trong **3 thẻ bước tự động thu gọn** khi hoàn tất:
 
 ### 1. Tải và cài APK
 
-Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk) và cài (cho phép cài từ nguồn không xác định). Cài sẵn **Google** và **Gemini** từ Play Store.
+Tải [`ai-key-bridge.apk`](https://github.com/pdong15dth/gemini-default-ai-phone/releases/latest/download/ai-key-bridge.apk) và cài đặt. Cài sẵn **Google** và **Google Gemini** từ Play Store.
 
-### 2. Chọn máy và cách dùng
-
-<table>
-  <tr>
-    <td width="33%"><img src="docs/images/01-welcome.webp" alt="Màn chào"></td>
-    <td width="33%"><img src="docs/images/02-device.webp" alt="Bước 1: Máy của bạn"></td>
-    <td width="33%"><img src="docs/images/03-usage.webp" alt="Bước 2: Cách dùng"></td>
-  </tr>
-  <tr>
-    <td>Mở app, bấm <b>Bắt đầu</b>.</td>
-    <td><b>Bước 1 — Máy của bạn.</b> App tự nhận diện hãng và ROM. Sai thì chọn lại.</td>
-    <td><b>Bước 2 — Cách dùng.</b> Chọn một trong ba chế độ bên dưới.</td>
-  </tr>
-</table>
-
-| Chế độ | Thay "Hi Jovi" | Nút / phím tắt | Tự bật Micro | Cần |
-| --- | --- | --- | --- | --- |
-| **Script nền** (khuyên dùng) | ✅ | ✅ | ✅ | Shizuku (bật lại sau mỗi lần khởi động máy) |
-| **Đầy đủ** | ✅ | ✅ | ✅ | Trợ năng, app chạy nền nhẹ |
-| **Cấu hình một lần** | ❌ (vẫn là Tiểu V) | ✅ | ❌ | Shizuku hoặc ADB một lần, không chạy nền |
-
-Đổi chế độ bất cứ lúc nào trong tab **Chế độ**.
-
-### 3. Cấp quyền và kích hoạt
+### 2. Làm theo 3 bước ngay trên Trang chủ
 
 <table>
   <tr>
-    <td width="33%"><img src="docs/images/04-permissions.webp" alt="Bước 3: Cấp quyền"></td>
-    <td width="33%"><img src="docs/images/25-setup.webp" alt="Kích hoạt và vá lỗi"></td>
-    <td width="33%"><img src="docs/images/10-overview.webp" alt="Tổng quan: Sẵn sàng"></td>
+    <td width="33%"><img src="docs/images/04-permissions.webp" alt="Bước 1: Cấp quyền cơ bản"></td>
+    <td width="33%"><img src="docs/images/20-script.webp" alt="Bước 2: Bật Script nền"></td>
+    <td width="33%"><img src="docs/images/10-overview.webp" alt="Bước 3: Khóa Gỡ lỗi (Bank-Safe)"></td>
   </tr>
   <tr>
-    <td><b>Bước 3 — Quyền & Hướng dẫn bằng ảnh.</b> Chạm vào từng mục để mở thẳng màn hình cài đặt đó, hoặc bấm <b>Ảnh HD</b> để xem ảnh chụp màn hình khoanh vùng từng bước.</td>
-    <td><b>Bước 4 — Kích hoạt & vá lỗi.</b> Có Shizuku thì bấm <b>Kích hoạt & Bật script nền</b>; không có thì bấm nút copy và dán lệnh ADB vào máy tính một lần.</td>
-    <td>Trạng thái chuyển sang <b>Sẵn sàng</b>. Hô <b>"Hi Jovi"</b> để thử.</td>
+    <td><b>Bước 1 — Cấp quyền cơ bản (4/4 đạt).</b> Bấm <b>Mở ↗</b> ở từng mục để nhảy thẳng tới trang quyền của Google, Gemini, Pin dưới nền và Trợ lý mặc định; hoặc bấm <b>Ảnh</b> để xem hình chụp khoanh vùng từng công tắc.</td>
+    <td><b>Bước 2 — Bật Script nền.</b> Ghép nối 6 số Gỡ lỗi không dây ngay trên thanh thông báo bằng <b>Engine nội bộ</b> (hoặc dùng Shizuku) rồi bấm <b>Bật Script nền</b>. Script tự tách khỏi <code>adbd</code> và chạy ngầm trong RAM.</td>
+    <td><b>Bước 3 — Khóa Gỡ lỗi (Bank-Safe).</b> Bấm 1 chạm <b>Khóa Gỡ lỗi ngay (Bank-Safe)</b> để tắt sạch <i>Tùy chọn nhà phát triển</i> &amp; <i>Gỡ lỗi USB</i> — an toàn 100% cho app Ngân hàng &amp; VNeID.</td>
   </tr>
 </table>
 
-#### Hướng dẫn trực quan các quyền cần bật (đã tích hợp sẵn trong app)
-
-Ngay trong app (**Tổng quan → Quyền & Hướng dẫn bằng ảnh**), bạn có thể bấm để nhảy thẳng tới từng màn hình bên dưới mà không cần tự tìm trong Cài đặt:
+#### Bộ ảnh hướng dẫn khoanh vùng (tích hợp sẵn trong nút `Ảnh` trên Trang chủ)
 
 <table>
   <tr>
@@ -163,107 +136,81 @@ Ngay trong app (**Tổng quan → Quyền & Hướng dẫn bằng ảnh**), bạ
   <tr>
     <td><img src="docs/images/guides/guide_gemini_lockscreen.webp" alt="Gemini trên màn hình khoá"></td>
     <td><img src="docs/images/guides/guide_voice_wakeup.webp" alt="Đánh thức bằng giọng nói Hi Jovi"></td>
-    <td><img src="docs/images/guides/guide_shizuku.webp" alt="Shizuku Gỡ lỗi không dây"></td>
+    <td><img src="docs/images/guides/guide_shizuku.webp" alt="Gỡ lỗi không dây"></td>
     <td><img src="docs/images/guides/guide_dev_options.webp" alt="Tắt Tùy chọn nhà phát triển"></td>
   </tr>
   <tr>
     <td><b>5. Gemini trên màn khóa:</b> <i>Avatar Gemini → Cài đặt → Điều khiển thiết bị → Gemini trên màn hình khoá</i> → bật.</td>
     <td><b>6. Khẩu lệnh "Hi Jovi":</b> bật <i>Đánh thức bằng giọng nói</i> trong cài đặt Tiểu V / BlueLM.</td>
-    <td><b>7. Shizuku:</b> <i>Ghép nối</i> & <i>Bắt đầu</i> qua Gỡ lỗi không dây để bật Script nền.</td>
-    <td><b>8. Dùng app ngân hàng:</b> sau khi bật Script nền, tắt công tắc <i>Tùy chọn nhà phát triển</i>.</td>
-  </tr>
-</table>
-
-> **Nút Trợ năng bị mờ?** Android 13+ chặn app cài ngoài: mở **Thông tin ứng dụng → ⋮ → Cho phép cài đặt bị hạn chế**, rồi quay lại bật.
->
-> **Lần đầu chuyển hướng**, OriginOS hỏi "AI Key Bridge muốn mở Gemini" — chọn **Luôn mở**, nếu không lần nào cũng bị chặn.
-
-### 4. Gán phím (tuỳ chọn)
-
-<table>
-  <tr>
-    <td width="33%"><img src="docs/images/21-shortcuts.webp" alt="Gán phím và lối tắt"></td>
-    <td width="33%"><img src="docs/images/24-hardware.webp" alt="Nút cứng sang AI"></td>
-    <td width="33%"><img src="docs/images/20-script.webp" alt="Script nền"></td>
-  </tr>
-  <tr>
-    <td><b>Gán phím & lối tắt.</b> Gán lối tắt "Gọi AI" vào chạm mặt lưng, khởi chạy nhanh hoặc nút thông minh.</td>
-    <td><b>Nút cứng → AI.</b> Chế độ B: đặt nút thành "không hành động", app đọc event log (cần quyền <code>READ_LOGS</code>).</td>
-    <td><b>Script nền.</b> Bật/tắt script shell chạy bằng Shizuku, không cần Trợ năng.</td>
+    <td><b>7. Gỡ lỗi không dây:</b> ghép nối mã 6 số để Engine nội bộ (hoặc Shizuku) chạy 9 lệnh hệ thống &amp; bật Script nền.</td>
+    <td><b>8. Khóa Gỡ lỗi (Bank-Safe):</b> tắt công tắc <i>Tùy chọn nhà phát triển</i> sau khi Script đã chạy.</td>
   </tr>
 </table>
 
 <a name="cac-man-hinh-trong-app"></a>
 
-## Các màn hình trong app
+## Giao diện 3 tab của ứng dụng
+
+Toàn bộ tính năng được tổ chức gọn trong **3 tab chính** (`Trang chủ`, `Tùy chỉnh AI`, `Hệ thống`), các thông số kỹ thuật nâng cao được ẩn trong ngăn thu gọn:
 
 <table>
   <tr>
-    <td width="25%"><img src="docs/images/10-overview.webp" alt="Tổng quan"></td>
-    <td width="25%"><img src="docs/images/11-modes.webp" alt="Chế độ"></td>
-    <td width="25%"><img src="docs/images/12-modes-2.webp" alt="Chế độ: tự động và tinh chỉnh"></td>
-    <td width="25%"><img src="docs/images/14-logs.webp" alt="Nhật ký"></td>
+    <td width="25%"><img src="docs/images/10-overview.webp" alt="Tab 1: Trang chủ"></td>
+    <td width="25%"><img src="docs/images/11-modes.webp" alt="Tab 2: Tùy chỉnh AI"></td>
+    <td width="25%"><img src="docs/images/12-modes-2.webp" alt="Tab 2: Chạm mặt lưng & Lối tắt"></td>
+    <td width="25%"><img src="docs/images/14-logs.webp" alt="Tab 3: Hệ thống (Hoạt động 7 ngày)"></td>
   </tr>
   <tr>
-    <td><b>Tổng quan</b> — trạng thái, số lần chuyển hướng, script nền.</td>
-    <td><b>Chế độ</b> — cách dùng và ứng dụng đích.</td>
-    <td>Bật/tắt chuyển hướng, tự bật Micro, màn hình khóa; tinh chỉnh độ trễ.</td>
-    <td><b>Nhật ký</b> — tỉ lệ thành công, biểu đồ 7 ngày, sự kiện gần nhất.</td>
+    <td><b>Tab 1: Trang chủ</b> — Thẻ trạng thái tổng thể, thống kê nhanh và lộ trình 3 bước tự thu gọn.</td>
+    <td><b>Tab 2: Tùy chỉnh AI</b> — Chọn hành động riêng cho Khẩu lệnh, Nút cứng, Lối tắt và chọn Ứng dụng AI mặc định.</td>
+    <td><b>Chạm mặt lưng &amp; Lối tắt</b> — Gán "Gọi AI", nút <b>Thử Gọi AI</b> / <b>Thử Khoanh tròn</b> ngay lập tức.</td>
+    <td><b>Tab 3: Hệ thống</b> — Biểu đồ hoạt động 7 ngày, chuyển đổi Lịch sử gọi AI / Log kỹ thuật, Xuất chẩn đoán.</td>
   </tr>
   <tr>
-    <td><img src="docs/images/15-settings.webp" alt="Cài đặt"></td>
-    <td><img src="docs/images/16-settings-2.webp" alt="Cài đặt: dữ liệu và khôi phục"></td>
+    <td><img src="docs/images/15-settings.webp" alt="Tab 3: Giao diện & Bảo trì"></td>
+    <td><img src="docs/images/25-setup.webp" alt="Kích hoạt & vá lỗi (9 lệnh)"></td>
     <td><img src="docs/images/23-profiles.webp" alt="Profile ROM"></td>
     <td><img src="docs/images/22-triggers.webp" alt="Dò trợ lý"></td>
   </tr>
   <tr>
-    <td><b>Cài đặt</b> — thiết bị, quyền, kiểm tra thay đổi ROM.</td>
-    <td>Xuất log chẩn đoán, xoá nhật ký, khôi phục mặc định.</td>
-    <td><b>Profile ROM</b> — tự nhận diện hoặc chọn hãng.</td>
-    <td><b>Dò trợ lý</b> — lưu cửa sổ trợ lý của máy bạn làm trigger.</td>
+    <td><b>Giao diện &amp; Bảo trì</b> — Chế độ Sáng/Tối, chọn công cụ Shell (Tự động / Shizuku / Engine nội bộ), Khôi phục mặc định.</td>
+    <td><b>Kích hoạt &amp; vá lỗi</b> — Xem chi tiết và xác minh từng lệnh trong 9 lệnh hệ thống hoặc copy mã ADB.</td>
+    <td><b>Profile ROM</b> — Tự nhận diện hãng điện thoại hoặc chọn profile thủ công.</td>
+    <td><b>Dò trợ lý</b> — Tự bắt cửa sổ trợ lý gốc trong 8 giây cho các dòng máy mới.</td>
   </tr>
 </table>
 
 <a name="luu-y-tren-originos"></a>
 
-## Lưu ý trên OriginOS
+## Lưu ý trên OriginOS & Ngân hàng (Bank-Safe)
 
-**Script nền** (khuyên dùng)
-
-- Script chạy dưới quyền `shell` của Shizuku, tách khỏi app. **Vuốt app khỏi đa nhiệm hay kill app đều không ảnh hưởng** — "Hi Jovi" vẫn gọi Gemini.
-- Script và Shizuku không root **mất khi khởi động lại máy**. Sau mỗi lần khởi động: bật lại Shizuku, mở app, bấm **Bật script**.
-- Không cần Trợ năng, không cần Tự khởi chạy.
-
-**Đầy đủ** (Trợ năng)
-
-- **Khóa AI Key Bridge trong đa nhiệm.** Vuốt app khỏi màn đa nhiệm trên OriginOS là *force-stop*, và Android tự **tắt Trợ năng** của app bị force-stop — "Hi Jovi" sẽ ngừng hoạt động cho tới khi bạn bật lại Trợ năng. Mở đa nhiệm, kéo thẻ AI Key Bridge xuống (hoặc chạm biểu tượng khóa) để OriginOS không dọn nó.
-- Bật **Tự khởi chạy**: *i Quản lý → Quản lý ứng dụng → Tự khởi chạy → bật AI Key Bridge*, để dịch vụ chạy lại sau khi khởi động máy.
-- Không cần Shizuku lúc chạy — chỉ cần một lần để chạy lệnh kích hoạt (hoặc dán lệnh ADB).
+- **Hoạt động độc lập hoàn toàn với ứng dụng**: Script nền chạy dưới quyền `shell` trong phiên độc lập (`setsid`). **Vuốt AI Key Bridge khỏi đa nhiệm, dọn RAM hay tắt Gỡ lỗi USB đều không ảnh hưởng** — hô "Hi Jovi" hoặc bấm nút AI vẫn lên Gemini.
+- **Tương thích 100% ứng dụng Ngân hàng & VNeID**: Sau khi Bước 2 báo `Đang chạy`, bạn chỉ cần chạm nút **Khóa Gỡ lỗi ngay (Bank-Safe)** ở Bước 3 trên **Trang chủ** để ứng dụng tự tắt *Tùy chọn nhà phát triển* và *Gỡ lỗi USB*.
+- **Sau khi khởi động lại máy (Reboot)**: Vì không root nên tiến trình trong `/data/local/tmp` sẽ mất khi tắt nguồn. Sau khi bật máy lại, bạn chỉ cần bật lại *Gỡ lỗi không dây*, mở app (Engine nội bộ tự kết nối lại mà **không cần nhập mã 6 số lần 2**) rồi bấm **Bật Script nền** và **Khóa Gỡ lỗi**.
 
 <a name="bao-loi"></a>
 
 ## Báo lỗi
 
-1. Vào **Cài đặt → Xuất log chẩn đoán** (hoặc **Nhật ký → Xuất log chẩn đoán · .zip**).
-2. Có Shizuku thì file `.zip` kèm cả log toàn máy; không có thì chỉ có log của app.
-3. Gửi file cho người phát triển, hoặc mở [issue](https://github.com/pdong15dth/gemini-default-ai-phone/issues/new/choose) mô tả lỗi.
+1. Vào tab **Hệ thống → Xuất chẩn đoán** để tạo file `.zip`.
+2. Gửi file cho người phát triển, hoặc mở [issue](https://github.com/pdong15dth/gemini-default-ai-phone/issues/new/choose) mô tả lỗi.
 
 | File trong `.zip` | Nội dung |
 | --- | --- |
-| `history.log`, `log.txt`, `attempts.txt` | Nhật ký của app (lưu xuống đĩa, không mất khi app bị tắt) |
-| `exit-reasons.txt` | Các lần app bị tắt và lý do: vuốt khỏi đa nhiệm, ROM dọn RAM, crash… |
-| `logcat-system.txt`, `system-state.txt` | Log toàn máy và trạng thái Trợ năng, trợ lý mặc định, quyền (qua Shizuku) |
+| `history.log`, `log.txt`, `attempts.txt` | Nhật ký chuyển hướng và log kỹ thuật của app |
+| `exit-reasons.txt` | Các lần app bị tắt và lý do do Android ghi nhận |
+| `logcat-system.txt`, `system-state.txt` | Log hệ thống và trạng thái trợ lý mặc định, quyền, tiến trình script |
 | `device.txt`, `settings.txt`, `profile.json` | Thông tin máy, cài đặt và profile đang dùng |
 
-> Log toàn máy có thể chứa tên app khác, tên Wi-Fi hay tài khoản. Chỉ gửi riêng cho người phát triển, đừng đăng công khai.
+> Log hệ thống có thể chứa tên gói ứng dụng hoặc tên Wi-Fi. Chỉ gửi riêng cho người phát triển, đừng đăng công khai.
 
 <a name="cach-khac-script-adb"></a>
 
 ## Cách khác: script ADB
 
-Không muốn cài app? [HUONG-DAN-SCRIPT-ADB.md](HUONG-DAN-SCRIPT-ADB.md) hướng dẫn làm điều tương tự chỉ bằng ADB và một script shell chạy nền: đổi trợ lý mặc định, vá crash locale, script bắt `CopilotPanelWindow`, dùng khi màn hình khóa, xử lý sự cố.
+Không muốn cài app? [HUONG-DAN-SCRIPT-ADB.md](HUONG-DAN-SCRIPT-ADB.md) hướng dẫn làm điều tương tự chỉ bằng ADB trên máy tính và một script shell chạy nền.
 
-Nếu từng chạy script rồi chuyển sang app, dừng script trước để không có hai lớp cùng bấm Back:
+Nếu từng chạy script thủ công rồi chuyển sang app, dừng script cũ trước để tránh hai tiến trình cùng chạy:
 
 ```bash
 adb shell "pkill -9 -f gemini.sh; pkill -9 -f logcat"
@@ -281,7 +228,7 @@ cd android
 ./gradlew assembleRelease   # bản R8 ~2 MB
 ```
 
-- **APK phát hành:** đẩy tag `v*`, workflow [`android.yml`](.github/workflows/android.yml) build và gắn `ai-key-bridge.apk` vào GitHub Release. Nên cấu hình keystore cố định trong GitHub Secrets trước khi phát hành.
+- **APK phát hành:** đẩy tag `v*`, workflow [`android.yml`](.github/workflows/android.yml) build và gắn `ai-key-bridge.apk` vào GitHub Release.
 - **Trang giới thiệu:** nằm trong `web/`, workflow [`pages.yml`](.github/workflows/pages.yml) deploy lên GitHub Pages khi có thay đổi trong `web/` trên `main`.
 
 <a name="cau-truc-repo"></a>
@@ -290,14 +237,13 @@ cd android
 
 ```
 .
-├── android/                  # app Kotlin + Jetpack Compose
+├── android/                  # app Kotlin + Jetpack Compose (3 tab: Trang chủ, Tùy chỉnh AI, Hệ thống)
 │   └── app/src/main/
 │       ├── assets/profiles/  # profile ROM (JSON)
-│       ├── java/com/aikeybridge/
-│       └── res/xml/          # cấu hình AccessibilityService
+│       └── java/com/aikeybridge/
 ├── web/                      # trang giới thiệu tĩnh, deploy GitHub Pages
 ├── docs/
-│   ├── images/               # ảnh chụp màn hình app
+│   ├── images/               # ảnh chụp màn hình thực tế từ vivo X300 Pro
 │   ├── build-va-deploy.md    # build APK, ký, phát hành, Pages
 │   ├── rut-cap-usb.md
 │   └── spec-app.md
