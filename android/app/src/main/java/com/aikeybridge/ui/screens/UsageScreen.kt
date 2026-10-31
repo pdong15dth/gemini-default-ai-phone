@@ -88,7 +88,7 @@ fun UsageScreen(
             )
             Gap(22.dp)
             ModeCard(
-                title = "Script nền (Bank-Safe)",
+                title = "Script nền",
                 tag = "khuyên dùng",
                 selected = selected == UsageMode.SCRIPT,
                 points = listOf(

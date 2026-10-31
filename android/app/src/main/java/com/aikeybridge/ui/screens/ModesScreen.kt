@@ -411,7 +411,7 @@ fun ModesScreen(
                             title = "Chế độ vận hành",
                             subtitle = when (settings.usageMode) {
                                 UsageMode.ONE_TIME -> "Chỉ dùng lối tắt (Không chạy Script nền)"
-                                else -> "Script nền Bank-Safe (Khuyên dùng)"
+                                else -> "Script nền (Khuyên dùng · Tương thích ngân hàng)"
                             },
                             trailing = "đổi",
                             onClick = { confirmUsage = true },
@@ -593,7 +593,7 @@ private fun UsageModeDialog(
                 listOfNotNull(
                     Triple(
                         UsageMode.SCRIPT,
-                        "Script nền (Bank-Safe)",
+                        "Script nền",
                         "Khuyên dùng · Thay thế trợ lý gốc · Tương thích mọi app ngân hàng",
                     ).takeIf { scriptAvailable },
                     Triple(

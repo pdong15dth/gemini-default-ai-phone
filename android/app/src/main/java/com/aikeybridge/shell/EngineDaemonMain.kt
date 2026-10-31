@@ -16,9 +16,9 @@ import kotlin.system.exitProcess
  *    từ UID 2000. Chạy thuần `/system/bin/sh` giúp `HasShellAppProc=false` 100% thời gian, mọi lệnh `settings put`
  *    đều hoạt động bình thường.
  * 2. **Sống sót khi tắt Gỡ lỗi USB (`adb_enabled=0`) và tắt Tùy chọn nhà phát triển (`development_settings_enabled=0`)**:
- *    Tự chuyển sang cgroup gốc ([WatchScript.ESCAPE_CGROUPS]) và neo giữ `adb_wifi_enabled=1` để trên Android 16
- *    (như vivo X200 Ultra, nơi `/sys/fs/cgroup` thuộc `system:system`), `AdbService.stopAdbd()` không dừng `adbd`
- *    và `init` không bao giờ giết tiến trình nền.
+ *    Tự chuyển sang cgroup gốc ([WatchScript.ESCAPE_CGROUPS]). Tuyệt đối KHÔNG tự ý bật `adb_wifi_enabled=1`
+ *    khi đang tắt để tránh kích hoạt hộp thoại hệ thống “Cho phép gỡ lỗi không dây trên mạng này?” lặp vô tận
+ *    khi người dùng đổi mạng Wi-Fi, tắt Wi-Fi hoặc bấm Từ chối.
  * 3. **Không mở cổng mạng TCP**: Giao tiếp với app qua thư mục IPC riêng (`getExternalFilesDir`),
  *    an toàn tuyệt đối trước mọi trình quét cổng của ứng dụng ngân hàng và VNeID.
  */
@@ -60,42 +60,54 @@ object EngineDaemonMain {
         appendLine("done")
         appendLine("pm grant com.aikeybridge android.permission.WRITE_SECURE_SETTINGS 2>/dev/null")
         appendLine("pm grant com.aikeybridge android.permission.READ_LOGS 2>/dev/null")
-        appendLine("settings put global adb_wifi_enabled 1 2>/dev/null")
-        appendLine("cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1")
         appendLine("DIR='$extDir'")
         appendLine("IPC_DIR=\"\$DIR/${EngineBinderProvider.IPC_DIR}\"")
         appendLine("PID_FILE=\"\$DIR/${EngineBinderProvider.PID_FILE}\"")
         appendLine("ALIVE_FILE=\"\$DIR/${EngineBinderProvider.ALIVE_FILE}\"")
         appendLine("REQ_FILE=\"\$DIR/${EngineBinderProvider.REQ_FILE}\"")
         appendLine("ENABLED_FILE=\"\$DIR/${WatchScript.ENABLED_FILE}\"")
-        appendLine("mkdir -p \"\$IPC_DIR\" 2>/dev/null")
+        appendLine("[ \"\$(stat -c %u \"\$IPC_DIR\" 2>/dev/null)\" = \"2000\" ] && rm -rf \"\$IPC_DIR\" 2>/dev/null")
+        appendLine("for sf in \"\$REQ_FILE\" \"\$ENABLED_FILE\" \"\$DIR/${WatchScript.ALIVE_FILE}\" \"\$DIR/script-events.log\" \"\$DIR/${WatchScript.STATE_FILE}\" \"\$DIR/${WatchScript.TRACE_FILE}\"; do")
+        appendLine("  [ \"\$(stat -c %u \"\$sf\" 2>/dev/null)\" = \"2000\" ] && rm -f \"\$sf\" 2>/dev/null")
+        appendLine("done")
         appendLine("if [ -f \"\$PID_FILE\" ]; then")
         appendLine("  OLD_PID=\$(cat \"\$PID_FILE\" 2>/dev/null)")
         appendLine("  if [ -n \"\$OLD_PID\" ] && [ \"\$OLD_PID\" != \"\$MY_PID\" ]; then")
         appendLine("    ( sleep 1; kill -9 \"\$OLD_PID\" 2>/dev/null ) </dev/null >/dev/null 2>&1 &")
         appendLine("  fi")
         appendLine("fi")
+        appendLine("( sleep 1; ps -A -o PID,ARGS 2>/dev/null | grep '[a]kb-engine\\.sh' | while read p r; do [ \"\$p\" != \"\$MY_PID\" ] && kill -9 \"\$p\" 2>/dev/null; done ) </dev/null >/dev/null 2>&1 &")
+        appendLine("if grep -q 'ANCHOR_ADB_WIFI' ${WatchScript.PATH} 2>/dev/null; then")
+        appendLine("  sed -i '/adb_wifi_enabled/d; /ANCHOR_ADB_WIFI/d' ${WatchScript.PATH} 2>/dev/null")
+        appendLine("  ps -A -o PID,ARGS 2>/dev/null | grep -E '${WatchScript.STOP_PATTERN}' | while read p r; do kill -9 \"\$p\" 2>/dev/null; done")
+        appendLine("  [ -s \"\$ENABLED_FILE\" ] && setsid sh ${WatchScript.PATH} </dev/null >/dev/null 2>&1 &")
+        appendLine("fi")
         appendLine("echo \"\$MY_PID\" > \"\$PID_FILE\" 2>/dev/null")
         appendLine("rm -f \"\$IPC_DIR\"/.tmp-* 2>/dev/null")
         appendLine("date +%s > \"\$ALIVE_FILE\" 2>/dev/null")
         appendLine("run_ipc() {")
         appendLine("  for req in \"\$IPC_DIR\"/req-*.sh; do")
-        appendLine("    [ -f \"\$req\" ] || continue")
+        appendLine("    [ -s \"\$req\" ] || continue")
         appendLine("    id=\"\${req##*/req-}\"")
         appendLine("    id=\"\${id%.sh}\"")
-        appendLine("    work=\"\$IPC_DIR/.run-\$id.sh\"")
-        appendLine("    mv \"\$req\" \"\$work\" 2>/dev/null || continue")
+        appendLine("    [ -f \"\$IPC_DIR/out-\$id\" ] && [ -f \"\$IPC_DIR/err-\$id\" ] && [ -f \"\$IPC_DIR/rc-\$id\" ] || continue")
+        appendLine("    work=\"/data/local/tmp/.akb-run-\$id.sh\"")
+        appendLine("    cp \"\$req\" \"\$work\" 2>/dev/null || continue")
+        appendLine("    : > \"\$req\" 2>/dev/null")
         appendLine("    (")
         appendLine("      (")
-        appendLine("        timeout 12 /system/bin/sh \"\$work\" </dev/null 3>&-")
-        appendLine("        echo \$? > \"\$IPC_DIR/.rc-\$id\"")
-        appendLine("      ) 2>&1 1>&3 | cat > \"\$IPC_DIR/err-\$id\"")
-        appendLine("    ) 3>&1 | cat > \"\$IPC_DIR/out-\$id\"")
-        appendLine("    rm -f \"\$work\" 2>/dev/null")
-        appendLine("    mv \"\$IPC_DIR/.rc-\$id\" \"\$IPC_DIR/rc-\$id\" 2>/dev/null")
+        appendLine("        (")
+        appendLine("          timeout 12 /system/bin/sh \"\$work\" </dev/null 3>&-")
+        appendLine("          echo \$? > \"/data/local/tmp/.akb-rc-\$id\"")
+        appendLine("        ) 2>&1 1>&3 | cat > \"\$IPC_DIR/err-\$id\"")
+        appendLine("      ) 3>&1 | cat > \"\$IPC_DIR/out-\$id\"")
+        appendLine("      cat \"/data/local/tmp/.akb-rc-\$id\" > \"\$IPC_DIR/rc-\$id\" 2>/dev/null")
+        appendLine("      rm -f \"\$work\" \"/data/local/tmp/.akb-rc-\$id\" 2>/dev/null")
+        appendLine("      ( sleep 5; rm -f \"\$req\" \"\$IPC_DIR/out-\$id\" \"\$IPC_DIR/err-\$id\" \"\$IPC_DIR/rc-\$id\" 2>/dev/null ) </dev/null >/dev/null 2>&1 &")
+        appendLine("    ) </dev/null >/dev/null 2>&1 &")
         appendLine("  done")
-        appendLine("  if [ -f \"\$REQ_FILE\" ]; then")
-        appendLine("    rm -f \"\$REQ_FILE\" 2>/dev/null")
+        appendLine("  if [ -s \"\$REQ_FILE\" ]; then")
+        appendLine("    : > \"\$REQ_FILE\" 2>/dev/null")
         appendLine("    date +%s > \"\$ALIVE_FILE\" 2>/dev/null")
         appendLine("  fi")
         appendLine("}")
@@ -108,11 +120,7 @@ object EngineDaemonMain {
         appendLine("    read -r cur_pid < \"\$PID_FILE\" 2>/dev/null")
         appendLine("    [ \"\$cur_pid\" = \"\$MY_PID\" ] || break")
         appendLine("    date +%s > \"\$ALIVE_FILE\" 2>/dev/null")
-        appendLine("    if [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ]; then")
-        appendLine("      [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && settings put global adb_wifi_enabled 1 2>/dev/null")
-        appendLine("      [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1")
-        appendLine("    fi")
-        appendLine("    if [ -f \"\$ENABLED_FILE\" ] && [ -f ${WatchScript.PATH} ]; then")
+        appendLine("    if [ -s \"\$ENABLED_FILE\" ] && [ -f ${WatchScript.PATH} ]; then")
         appendLine("      if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-gemini.sh'; then")
         appendLine("        setsid sh ${WatchScript.PATH} </dev/null >/dev/null 2>&1 &")
         appendLine("      fi")
@@ -124,7 +132,7 @@ object EngineDaemonMain {
 
     /**
      * Lệnh shell cài đặt và khởi chạy `/data/local/tmp/akb-engine.sh` tách khỏi cgroup của `adbd`
-     * (và neo giữ `adb_wifi_enabled=1` trên Android 16) mà không dùng `app_process`.
+     * mà không dùng `app_process`.
      */
     fun bootstrapCommand(context: Context): String {
         val pkg = context.packageName
@@ -136,10 +144,9 @@ object EngineDaemonMain {
         return buildString {
             append("pm grant $pkg android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; ")
             append("pm grant $pkg android.permission.READ_LOGS 2>/dev/null; ")
-            append("ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[c]om\\.aikeybridge:shell|[c]om\\.android\\.commands\\.content\\.Content' | while read p r; do kill -9 \$p 2>/dev/null; done; ")
-            append("settings put global adb_wifi_enabled 1 2>/dev/null; ")
-            append("cmd activity broadcast -n $pkg/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1; ")
-            append("mkdir -p '$extDir/${EngineBinderProvider.IPC_DIR}' 2>/dev/null; ")
+            append("ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[c]om\\.aikeybridge:shell' | while read p r; do kill -9 \$p 2>/dev/null; done; ")
+            append("[ \"\$(stat -c %u '$extDir/${EngineBinderProvider.IPC_DIR}' 2>/dev/null)\" = \"2000\" ] && rm -rf '$extDir/${EngineBinderProvider.IPC_DIR}' 2>/dev/null; ")
+            append("for sf in '$extDir/${EngineBinderProvider.REQ_FILE}' '$extDir/${WatchScript.ENABLED_FILE}' '$extDir/${WatchScript.ALIVE_FILE}' '$extDir/script-events.log' '$extDir/${WatchScript.STATE_FILE}' '$extDir/${WatchScript.TRACE_FILE}'; do [ \"\$(stat -c %u \"\$sf\" 2>/dev/null)\" = \"2000\" ] && rm -f \"\$sf\" 2>/dev/null; done; ")
             append("date +%s > '$extDir/${EngineBinderProvider.ALIVE_FILE}' 2>/dev/null; ")
             append("echo $encoded | base64 -d > $PATH.tmp; ")
             append("if ! cmp -s $PATH.tmp $PATH 2>/dev/null || ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-engine.sh'; then ")
@@ -151,14 +158,12 @@ object EngineDaemonMain {
 
     /**
      * Lệnh tự động tắt Gỡ lỗi USB (`adb_enabled=0`) và ẩn Tùy chọn nhà phát triển (`development_settings_enabled=0`)
-     * cho app ngân hàng / VNeID, đồng thời giữ `adb_wifi_enabled=1` để `AdbService` không dừng `adbd`
-     * (ngăn `init` giết nhóm cgroup `0::/system/uid_0/pid_<adbd>` trên Android 16 như vivo X200 Ultra / iQOO Z10 Turbo+).
+     * cho app ngân hàng / VNeID. Không tự ý bật `adb_wifi_enabled=1` để tránh bung popup Gỡ lỗi không dây.
      */
     const val LOCK_DEV_MODE_CMD: String =
         "pm grant com.aikeybridge android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; " +
             "ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[c]om\\.aikeybridge:shell|[c]om\\.android\\.commands\\.content\\.Content' | while read p r; do kill -9 \$p 2>/dev/null; done; " +
             "cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.LOCK_DEV_MODE --receiver-include-background >/dev/null 2>&1; " +
-            "settings put global adb_wifi_enabled 1; " +
             "settings put global adb_enabled 0; " +
             "settings put global development_settings_enabled 0"
 }

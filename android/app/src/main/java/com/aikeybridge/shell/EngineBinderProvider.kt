@@ -33,42 +33,8 @@ class EngineBinderProvider : ContentProvider() {
             val appCtx = it.applicationContext
             appContext = appCtx
             requestDaemonReconnect(appCtx)
-            registerAdbAnchorObserver(appCtx)
         }
         return true
-    }
-
-    private fun registerAdbAnchorObserver(appCtx: Context) {
-        runCatching {
-            val resolver = appCtx.contentResolver
-            val observer = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
-                private var lastAnchorAt = 0L
-
-                override fun onChange(selfChange: Boolean) {
-                    val now = SystemClock.elapsedRealtime()
-                    if (now - lastAnchorAt < 1_500L) return
-                    val extDir = runCatching { appCtx.getExternalFilesDir(null) }.getOrNull() ?: return
-                    if (!File(extDir, WatchScript.ENABLED_FILE).exists()) return
-                    val wifiOn = runCatching {
-                        android.provider.Settings.Global.getInt(resolver, "adb_wifi_enabled", 0) == 1
-                    }.getOrDefault(false)
-                    if (!wifiOn) {
-                        lastAnchorAt = now
-                        com.aikeybridge.data.PermissionsReader.anchorAdbWifiFromApp(appCtx)
-                    }
-                }
-            }
-            resolver.registerContentObserver(
-                android.provider.Settings.Global.getUriFor("adb_wifi_enabled"),
-                false,
-                observer,
-            )
-            resolver.registerContentObserver(
-                android.provider.Settings.Global.getUriFor(android.provider.Settings.Global.ADB_ENABLED),
-                false,
-                observer,
-            )
-        }
     }
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
@@ -192,6 +158,7 @@ class EngineBinderProvider : ContentProvider() {
                 }
             }
 
+            ensureSharedFilesOwnedByApp(context)
             if (!isAlive(context)) return@withContext null
             val dir = runCatching { context.getExternalFilesDir(null) }.getOrNull() ?: return@withContext null
             val ipcDir = File(dir, IPC_DIR).apply { mkdirs() }
@@ -203,6 +170,11 @@ class EngineBinderProvider : ContentProvider() {
             val rcFile = File(ipcDir, "rc-$id")
 
             try {
+                // Tạo trước các file kết quả dưới UID của app (u0_a502:ext_data_rw) để trên FUSE Android 11+,
+                // cả tiến trình shell (thuộc nhóm ext_data_rw) lẫn app đều có toàn quyền đọc/ghi/xóa.
+                outFile.writeText("", Charsets.UTF_8)
+                errFile.writeText("", Charsets.UTF_8)
+                rcFile.writeText("", Charsets.UTF_8)
                 tmpFile.writeText(command, Charsets.UTF_8)
                 if (!tmpFile.renameTo(reqFile)) {
                     reqFile.writeText(command, Charsets.UTF_8)
@@ -210,11 +182,13 @@ class EngineBinderProvider : ContentProvider() {
                 }
                 val deadline = System.currentTimeMillis() + timeoutMs
                 while (System.currentTimeMillis() < deadline) {
-                    if (rcFile.exists()) {
-                        val code = runCatching { rcFile.readText().trim().toIntOrNull() }.getOrNull() ?: -1
-                        val out = runCatching { if (outFile.exists()) outFile.readText() else "" }.getOrDefault("")
-                        val err = runCatching { if (errFile.exists()) errFile.readText() else "" }.getOrDefault("")
-                        return@withContext ShellResult(code, out, err)
+                    if (rcFile.length() > 0L) {
+                        val code = runCatching { rcFile.readText().trim().toIntOrNull() }.getOrNull()
+                        if (code != null) {
+                            val out = runCatching { outFile.readText() }.getOrDefault("")
+                            val err = runCatching { errFile.readText() }.getOrDefault("")
+                            return@withContext ShellResult(code, out, err)
+                        }
                     }
                     delay(25)
                 }
@@ -259,17 +233,41 @@ class EngineBinderProvider : ContentProvider() {
             notifyListeners()
         }
 
+        fun ensureSharedFilesOwnedByApp(context: Context) {
+            runCatching {
+                val dir = context.getExternalFilesDir(null) ?: return@runCatching
+                dir.mkdirs()
+                File(dir, IPC_DIR).mkdirs()
+                val sharedFiles = listOf(
+                    ALIVE_FILE,
+                    REQ_FILE,
+                    WatchScript.ENABLED_FILE,
+                    WatchScript.ALIVE_FILE,
+                    "script-events.log",
+                    WatchScript.STATE_FILE,
+                    WatchScript.TRACE_FILE,
+                )
+                for (name in sharedFiles) {
+                    val f = File(dir, name)
+                    if (!f.exists()) {
+                        runCatching { f.createNewFile() }
+                    }
+                }
+            }
+        }
+
         /**
          * Đánh thức Engine nội bộ (`/data/local/tmp/akb-engine.sh`) cập nhật nhịp sống tức thì
          * ngay cả khi người dùng đã tắt hoàn toàn Tùy chọn nhà phát triển và Gỡ lỗi USB/Không dây.
          */
         fun requestDaemonReconnect(context: Context) {
             appContext = context.applicationContext
-            if (isAlive(context)) return
+            ensureSharedFilesOwnedByApp(context)
             runCatching {
-                val dir = context.getExternalFilesDir(null) ?: return
-                dir.mkdirs()
-                File(dir, REQ_FILE).writeText("${System.currentTimeMillis()}-${System.nanoTime()}")
+                val dir = context.getExternalFilesDir(null) ?: return@runCatching
+                if (!isAlive(context)) {
+                    File(dir, REQ_FILE).writeText("${System.currentTimeMillis()}-${System.nanoTime()}")
+                }
             }
         }
     }

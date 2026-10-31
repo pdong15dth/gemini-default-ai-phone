@@ -269,19 +269,9 @@ object PermissionsReader {
         val adb = runCatching {
             Settings.Global.getInt(resolver, Settings.Global.ADB_ENABLED, 0) == 1
         }.getOrDefault(false)
-        var adbWifi = runCatching {
+        val adbWifi = runCatching {
             Settings.Global.getInt(resolver, "adb_wifi_enabled", 0) == 1
         }.getOrDefault(false)
-        if (!adbWifi) {
-            val enabledFile = runCatching {
-                context.getExternalFilesDir(null)?.let { java.io.File(it, com.aikeybridge.shell.WatchScript.ENABLED_FILE) }
-            }.getOrNull()
-            if (enabledFile?.exists() == true && anchorAdbWifiFromApp(context)) {
-                adbWifi = runCatching {
-                    Settings.Global.getInt(resolver, "adb_wifi_enabled", 0) == 1
-                }.getOrDefault(false)
-            }
-        }
 
         val engineAlive = EngineBinderProvider.isAlive(context)
         if (!engineAlive) {
@@ -424,24 +414,13 @@ object PermissionsReader {
             PackageManager.PERMISSION_GRANTED
 
     /**
-     * Ghi `adb_wifi_enabled=1` trực tiếp từ UID của ứng dụng (qua quyền `WRITE_SECURE_SETTINGS`).
-     * Trên Vivo OriginOS, khi `shizuku_server` (`app_process` UID 2000) đang chạy trong RAM,
-     * `VivoCommonService` đặt `HasShellAppProc=true` khiến `SettingsProvider.shouldBlockShell()`
-     * chặn lệnh `settings put` từ UID 2000; nhưng lời gọi từ UID ứng dụng không bao giờ bị chặn.
-     */
-    fun anchorAdbWifiFromApp(context: Context): Boolean = runCatching {
-        if (!hasWriteSecureSettings(context)) return false
-        Settings.Global.putInt(context.contentResolver, "adb_wifi_enabled", 1)
-    }.getOrDefault(false)
-
-    /**
      * Tắt Gỡ lỗi USB (`adb_enabled=0`) và ẩn Tùy chọn nhà phát triển (`development_settings_enabled=0`)
-     * đồng thời neo giữ `adb_wifi_enabled=1` trực tiếp từ UID của ứng dụng (vượt qua `shouldBlockShell()`).
+     * trực tiếp từ UID của ứng dụng (vượt qua `shouldBlockShell()` trên Vivo OriginOS).
+     * Tuyệt đối không tự ý bật `adb_wifi_enabled=1` khi đang tắt để tránh kích hoạt popup Gỡ lỗi không dây.
      */
     fun lockDeveloperModeFromApp(context: Context): Boolean = runCatching {
         if (!hasWriteSecureSettings(context)) return false
         val resolver = context.contentResolver
-        Settings.Global.putInt(resolver, "adb_wifi_enabled", 1)
         Settings.Global.putInt(resolver, Settings.Global.ADB_ENABLED, 0)
         Settings.Global.putInt(resolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0)
     }.getOrDefault(false)

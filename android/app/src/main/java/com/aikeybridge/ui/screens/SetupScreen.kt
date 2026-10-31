@@ -180,7 +180,7 @@ fun SetupScreen(
                 permissions.shizukuPermissionGranted ->
                     "shizuku · kết nối" to Accent
                 permissions.engineDaemonRunning && !permissions.devOptionsEnabled && !permissions.adbEnabled ->
-                    "engine · chạy ngầm (bank-safe)" to Accent
+                    "engine · chạy ngầm (đã tắt gỡ lỗi)" to Accent
                 permissions.engineDaemonRunning -> "engine · kết nối" to Accent
                 permissions.shizukuGranted -> "shizuku · kết nối" to Accent
                 permissions.shizukuRunning -> "chờ cấp quyền" to Warn
@@ -245,7 +245,7 @@ fun SetupScreen(
                             weight = FontWeight.SemiBold,
                         )
                         MonoText(
-                            "${permissions.coreGrantedCount}/${permissions.coreTotalCount} nhóm đạt · kèm ảnh chụp màn hình & nút mở cài đặt",
+                            "Đã bật ${permissions.coreGrantedCount}/${permissions.coreTotalCount} mục · kèm ảnh chụp màn hình & nút mở cài đặt",
                             9.5.sp,
                             if (permissions.ready) Accent else Warn,
                         )

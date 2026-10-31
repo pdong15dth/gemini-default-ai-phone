@@ -325,7 +325,7 @@ fun SettingsScreen(
                 )
                 NavRow(
                     title = "Danh sách quyền & Ảnh hướng dẫn",
-                    subtitle = "Đạt ${permissions.coreGrantedCount}/${permissions.coreTotalCount} quyền cốt lõi · kèm ảnh chụp màn hình",
+                    subtitle = "Đã bật ${permissions.coreGrantedCount}/${permissions.coreTotalCount} quyền bắt buộc · kèm ảnh chụp màn hình",
                     trailing = "xem",
                     onClick = onOpenPermissions,
                 )

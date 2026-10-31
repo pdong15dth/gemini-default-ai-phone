@@ -444,6 +444,10 @@ object BuiltInWirelessAdb {
 
     private suspend fun ensureAdbConnected(context: Context, mgr: AbsAdbConnectionManager): Boolean {
         if (runCatching { mgr.isConnected }.getOrDefault(false)) return true
+        val wifiAdbOn = runCatching {
+            Settings.Global.getInt(context.contentResolver, "adb_wifi_enabled", 0) == 1
+        }.getOrDefault(false)
+        if (!wifiAdbOn && !_state.value.pairingActive) return false
 
         repeat(3) { attempt ->
             var port = _state.value.connectPort
@@ -980,7 +984,17 @@ class WirelessAdbPairingReceiver : BroadcastReceiver() {
                 BuiltInWirelessAdb.stopPairingFlow(context)
             }
             BuiltInWirelessAdb.ACTION_ANCHOR_ADB_WIFI -> {
-                com.aikeybridge.data.PermissionsReader.anchorAdbWifiFromApp(context)
+                // Nếu trên RAM còn bản akb-engine.sh / akb-gemini.sh cũ từ APK trước phát broadcast này,
+                // tự động nâng cấp ngay daemon trong RAM lên bản mới và tuyệt đối không bật lại adb_wifi_enabled.
+                val appCtx = context.applicationContext
+                val pendingResult = goAsync()
+                BuiltInWirelessAdb.scope.launch {
+                    try {
+                        EngineBinderProvider.execCommand(appCtx, EngineDaemonMain.bootstrapCommand(appCtx))
+                    } finally {
+                        runCatching { pendingResult.finish() }
+                    }
+                }
             }
             BuiltInWirelessAdb.ACTION_LOCK_DEV_MODE -> {
                 com.aikeybridge.data.PermissionsReader.lockDeveloperModeFromApp(context)

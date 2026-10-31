@@ -47,14 +47,10 @@ object WatchScript {
             appendLine("# Tắt Gỡ lỗi / Tuỳ chọn nhà phát triển thì init dừng adbd và giết cả nhóm tiến trình (cgroup) của nó.")
             appendLine("# Chuyển sang nhóm gốc như Shizuku, logcat/input sinh ra sau đó cũng nằm ngoài nhóm của adbd.")
             appendLine("for cg in $ESCAPE_CGROUPS; do echo \$\$ 2>/dev/null > \"\$cg/cgroup.procs\"; done")
-            appendLine("# Trên Android 16 (như vivo X200 Ultra), /sys/fs/cgroup thuộc system:system (0775) nên UID 2000")
-            appendLine("# vẫn nằm trong 0::/system/uid_0/pid_<adbd>. Dừng mọi app_process akb_engine cũ để VivoCommonService")
-            appendLine("# giữ HasShellAppProc=false, rồi neo giữ adb_wifi_enabled=1 để khi tắt Gỡ lỗi USB (adb_enabled=0)")
-            appendLine("# hoặc tắt Tùy chọn nhà phát triển, AdbService không dừng adbd và init không giết script.")
+            appendLine("# Trên Vivo OriginOS, dừng mọi app_process akb_engine cũ để VivoCommonService giữ HasShellAppProc=false.")
+            appendLine("# Tuyệt đối không tự ý bật adb_wifi_enabled=1 để tránh bung popup Gỡ lỗi không dây liên tục.")
             appendLine("ps -A -o PID,ARGS 2>/dev/null | grep -E '[a]kb_engine|[c]om\\.aikeybridge:shell|[c]om\\.android\\.commands\\.content\\.Content' | while read p r; do kill -9 \$p 2>/dev/null; done")
             appendLine("pm grant com.aikeybridge android.permission.WRITE_SECURE_SETTINGS 2>/dev/null")
-            appendLine("settings put global adb_wifi_enabled 1 2>/dev/null")
-            appendLine("cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1")
             appendLine("LOG='$eventLog'")
             appendLine("DIR=\"\${LOG%/*}\"")
             appendLine("echo 1 > \"\$DIR/$ENABLED_FILE\" 2>/dev/null")
@@ -62,16 +58,19 @@ object WatchScript {
             val engineB64 = Base64.getEncoder().encodeToString(
                 EngineDaemonMain.engineScriptContent(extDir).toByteArray(Charsets.UTF_8),
             )
-            appendLine("if ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-engine.sh'; then")
-            appendLine("  echo $engineB64 | base64 -d > ${EngineDaemonMain.PATH}.tmp 2>/dev/null && chmod 755 ${EngineDaemonMain.PATH}.tmp 2>/dev/null && mv -f ${EngineDaemonMain.PATH}.tmp ${EngineDaemonMain.PATH} 2>/dev/null")
+            appendLine("echo $engineB64 | base64 -d > ${EngineDaemonMain.PATH}.tmp 2>/dev/null")
+            appendLine("if ! cmp -s ${EngineDaemonMain.PATH}.tmp ${EngineDaemonMain.PATH} 2>/dev/null || ! ps -A -o ARGS 2>/dev/null | grep -q '[a]kb-engine.sh'; then")
+            appendLine("  chmod 755 ${EngineDaemonMain.PATH}.tmp 2>/dev/null && mv -f ${EngineDaemonMain.PATH}.tmp ${EngineDaemonMain.PATH} 2>/dev/null")
             appendLine("  [ -f ${EngineDaemonMain.PATH} ] && setsid sh ${EngineDaemonMain.PATH} </dev/null >/dev/null 2>&1 &")
+            appendLine("else")
+            appendLine("  rm -f ${EngineDaemonMain.PATH}.tmp 2>/dev/null")
             appendLine("fi")
             appendLine("# Chẩn đoán đọc được cả khi Shizuku đã chết: trạng thái lúc khởi động + nhịp còn sống mỗi ${ALIVE_INTERVAL_S}s.")
             appendLine(
                 "{ echo \"start \$(date '+%F %T') pid=\$\$ ppid=\$PPID uid=\$(id -u) ctx=\$(cat /proc/self/attr/current 2>/dev/null)\"; " +
                     "cat /proc/\$\$/cgroup; } > \"\$DIR/$STATE_FILE\" 2>/dev/null",
             )
-            appendLine("( while true; do if [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ]; then settings put global adb_wifi_enabled 1 2>/dev/null; [ \"\$(settings get global adb_wifi_enabled 2>/dev/null)\" != \"1\" ] && cmd activity broadcast -n com.aikeybridge/.shell.WirelessAdbPairingReceiver -a com.aikeybridge.action.ANCHOR_ADB_WIFI --receiver-include-background >/dev/null 2>&1; fi; date '+%F %T' > \"\$DIR/$ALIVE_FILE\" 2>/dev/null; sleep $ALIVE_INTERVAL_S; done ) </dev/null >/dev/null 2>&1 &")
+            appendLine("( while true; do date '+%F %T' > \"\$DIR/$ALIVE_FILE\" 2>/dev/null; sleep $ALIVE_INTERVAL_S; done ) </dev/null >/dev/null 2>&1 &")
             if (activeMic != null) {
                 appendLine("# Toạ độ nút Micro của lớp phủ: ưu tiên tính theo dp (wm density + navigation_mode) từ mép phải/dưới")
                 appendLine("# vì thanh nhập FloatyActivity neo 2 nút phải cố định theo dp (Mic cách mép phải ~113dp),")
@@ -217,7 +216,9 @@ object WatchScript {
      * Mẫu "[s]h", "[l]ogcat" để grep không khớp vào chính dòng lệnh này.
      */
     fun stopCommand(): String =
-        "ps -A -o PID,ARGS | grep -E '$STOP_PATTERN' | while read pid rest; do kill -9 \$pid; done"
+        ": > /sdcard/Android/data/com.aikeybridge/files/$ENABLED_FILE 2>/dev/null; " +
+            ": > /sdcard/Android/data/com.aikeybridge/files/$ALIVE_FILE 2>/dev/null; " +
+            "ps -A -o PID,ARGS | grep -E '$STOP_PATTERN' | while read pid rest; do kill -9 \$pid; done"
 
     /** In ra "pid args" nếu script đang chạy; rỗng nếu không. */
     fun statusCommand(): String = "ps -A -o PID,ARGS | grep '[a]kb-gemini.sh'"

@@ -137,6 +137,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun scriptAlive(): Boolean? {
         val alive = scriptEventLog?.parentFile?.let { File(it, WatchScript.ALIVE_FILE) } ?: return null
+        if (!alive.exists() || alive.length() == 0L) return if (scriptStartedThisBoot) false else null
         val now = System.currentTimeMillis()
         val bootAt = now - android.os.SystemClock.elapsedRealtime()
         val modified = alive.lastModified()
@@ -260,7 +261,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             // Đảm bảo EngineDaemonMain (UID 2000) đã chạy trong RAM và cập nhật lên bản mới nhất
             shell.exec(EngineDaemonMain.bootstrapCommand(app))
             val active = config.value
-            ensureAppPrivilegesAndAnchorAdbWifi(active.target.id)
+            ensureAppPrivileges(active.target.id)
             if (active.provisioning.isNotEmpty()) {
                 _setup.value = SetupUiState.from(active.provisioning, active.restore).copy(running = true)
                 Diagnostics.info("setup", "Tự chạy ${active.provisioning.size} lệnh kích hoạt trước khi bật script · ${active.flowLabel}.")
@@ -285,7 +286,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             shell.exec(WatchScript.stopCommand())
             shell.exec(WatchScript.startCommand())
-            PermissionsReader.anchorAdbWifiFromApp(app)
             delay(700)
             val status = shell.exec(WatchScript.statusCommand())
             val running = status.stdout.isNotBlank()
@@ -299,15 +299,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (running && autoLockDevMode) {
                 PermissionsReader.lockDeveloperModeFromApp(app)
                 shell.exec(EngineDaemonMain.LOCK_DEV_MODE_CMD)
-                PermissionsReader.anchorAdbWifiFromApp(app)
                 Diagnostics.success("script", "Đã tự động tắt Tùy chọn nhà phát triển & Gỡ lỗi để dùng app ngân hàng / VNeID.")
-            }
-
-            if (PermissionsReader.shouldQueryVivoShell()) {
-                val vivoRes = shell.exec(PermissionsReader.VIVO_QUERY_CMD)
-                if (vivoRes.ok) {
-                    PermissionsReader.updateFromVivoShell(app, vivoRes.stdout)
-                }
             }
 
             _script.value = ScriptStatus(
@@ -324,23 +316,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
             _message.value = when {
                 running && autoLockDevMode ->
-                    "Đã bật Script nền & tự tắt Gỡ lỗi / Tùy chọn nhà phát triển! Máy sạch 100% cho app ngân hàng & VNeID."
+                    "Đã bật Script nền và tắt Gỡ lỗi / Tùy chọn nhà phát triển! Dùng ứng dụng ngân hàng & VNeID bình thường."
                 running ->
-                    "Script nền đang chạy. Bấm “Tắt ngay Gỡ lỗi & Tùy chọn nhà phát triển” bên dưới để dùng app ngân hàng — script vẫn chạy."
+                    "Script nền đang chạy. Hãy bấm “Tắt Gỡ lỗi ngay” ở Bước 3 để dùng ứng dụng ngân hàng — script vẫn chạy."
                 else ->
                     "Script không chạy được — xem Nhật ký."
             }
         }
     }
 
-    private suspend fun ensureAppPrivilegesAndAnchorAdbWifi(targetId: String = config.value.target.id) {
+    private suspend fun ensureAppPrivileges(targetId: String = config.value.target.id) {
         if (!PermissionsReader.hasWriteSecureSettings(app)) {
             shell.exec("pm grant ${app.packageName} android.permission.WRITE_SECURE_SETTINGS")
         }
         if (!_permissions.value.readLogs) {
             shell.exec("pm grant ${app.packageName} android.permission.READ_LOGS")
         }
-        PermissionsReader.anchorAdbWifiFromApp(app)
         PermissionsReader.applyAssistantSecureSettingsFromApp(app, targetId)
     }
 
@@ -353,12 +344,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (settingsRepository.state.value.usageMode != UsageMode.SCRIPT) return
         val content = scriptContent() ?: return
         scriptEventLog?.parentFile?.mkdirs()
-        ensureAppPrivilegesAndAnchorAdbWifi()
+        ensureAppPrivileges()
         val install = shell.exec(WatchScript.installCommand(content))
         if (!install.ok) return
         shell.exec(WatchScript.stopCommand())
         shell.exec(WatchScript.startCommand())
-        PermissionsReader.anchorAdbWifiFromApp(app)
         delay(350)
         val status = shell.exec(WatchScript.statusCommand())
         val running = status.stdout.isNotBlank()
@@ -373,26 +363,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Tắt sạch Gỡ lỗi không dây, Gỡ lỗi USB và Tùy chọn nhà phát triển bằng 1 chạm qua Engine nội bộ.
-     * Cả [WatchScript] và [EngineDaemonMain] đều đã tách khỏi cgroup của `adbd` nên vẫn tiếp tục chạy ngầm.
+     * Tắt sạch Gỡ lỗi USB và Tùy chọn nhà phát triển bằng 1 chạm qua Engine nội bộ.
      */
     fun lockDeveloperMode() {
         scriptManuallyStopped = false
         vivoQueryJob?.cancel()
         viewModelScope.launch {
             shell.exec(EngineDaemonMain.bootstrapCommand(app))
-            ensureAppPrivilegesAndAnchorAdbWifi()
+            ensureAppPrivileges()
             if (_script.value.running != true) {
                 ensureWatchScriptStartedQuietly()
             }
             val lockedFromApp = PermissionsReader.lockDeveloperModeFromApp(app)
             val res = shell.exec(EngineDaemonMain.LOCK_DEV_MODE_CMD)
-            PermissionsReader.anchorAdbWifiFromApp(app)
             delay(200)
             refreshPermissions()
             if (lockedFromApp || res.ok || (!_permissions.value.devOptionsEnabled && !_permissions.value.adbEnabled)) {
-                Diagnostics.success("security", "Đã tắt Tùy chọn nhà phát triển & Gỡ lỗi — an toàn 100% cho app ngân hàng & VNeID.")
-                _message.value = "Đã bật Script nền & tắt sạch Tùy chọn nhà phát triển / Gỡ lỗi! Dùng app ngân hàng & VNeID bình thường."
+                Diagnostics.success("security", "Đã tắt Tùy chọn nhà phát triển & Gỡ lỗi — dùng ứng dụng ngân hàng & VNeID bình thường.")
+                _message.value = "Đã bật Script nền và tắt Tùy chọn nhà phát triển / Gỡ lỗi! Dùng ứng dụng ngân hàng & VNeID bình thường."
             } else {
                 Intents.openDeveloperSettings(app)
                 _message.value = "Hãy gạt tắt công tắc Tùy chọn nhà phát triển ở đầu trang."
@@ -495,7 +483,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             Diagnostics.info(
                 "script",
-                "Script trong nhóm ${groups.joinToString()} (Android 16) · đã neo giữ adbd (adb_wifi=1) để tắt Gỡ lỗi USB / Nhà phát triển không làm script dừng.",
+                "Script đang chạy trong nhóm ${groups.joinToString()}.",
             )
             false
         }
@@ -511,7 +499,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _script.update { it.copy(busy = true) }
             runCatching {
-                scriptEventLog?.parentFile?.let { File(it, WatchScript.ENABLED_FILE).delete() }
+                scriptEventLog?.parentFile?.let {
+                    File(it, WatchScript.ENABLED_FILE).writeText("")
+                    File(it, WatchScript.ALIVE_FILE).writeText("")
+                }
             }
             shell.exec(WatchScript.stopCommand())
             settingsRepository.setScriptStartedAt(0)
@@ -590,7 +581,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         ) {
             viewModelScope.launch {
                 try {
-                    if (!EngineBinderProvider.isAlive(app)) {
+                    if (!scriptUpdatedThisProcess || !EngineBinderProvider.isAlive(app)) {
                         shell.exec(EngineDaemonMain.bootstrapCommand(app))
                     }
                     if (!scriptUpdatedThisProcess) {
@@ -1007,7 +998,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             shell.exec(EngineDaemonMain.bootstrapCommand(app))
-            ensureAppPrivilegesAndAnchorAdbWifi(active.target.id)
+            ensureAppPrivileges(active.target.id)
             Diagnostics.info("setup", "Bắt đầu chạy ${active.provisioning.size} lệnh · ${active.flowLabel}.")
 
             val report = Provisioner(shell, active.provisioning, active.restore).runProvisioning { step, phase, detail ->
@@ -1034,7 +1025,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _message.value = if (report.ok) {
                 "Đã xác minh đủ ${report.total} bước. Gọi ${active.profile.assistantName} để thử."
             } else {
-                "Còn ${report.total - report.passed} bước chưa đạt — xem chi tiết."
+                "Còn ${report.total - report.passed} bước chưa hoàn tất — xem chi tiết."
             }
         }
     }

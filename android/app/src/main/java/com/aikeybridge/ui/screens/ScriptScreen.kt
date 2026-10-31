@@ -158,9 +158,9 @@ fun ScriptScreen(
                             MonoText(
                                 when {
                                     status.running == true && status.detachedFromAdbd == true ->
-                                        "pid ${status.pid} · đã tách khỏi adbd · tắt Gỡ lỗi không chết"
+                                        "pid ${status.pid} · đã tách khỏi adbd · tắt Gỡ lỗi vẫn chạy"
                                     status.running == true && status.detachedFromAdbd == false ->
-                                        "pid ${status.pid} · đã neo giữ adbd · tắt Gỡ lỗi USB không chết"
+                                        "pid ${status.pid} · đang chạy ngầm · tắt Gỡ lỗi vẫn chạy"
                                     status.running == true -> "pid ${status.pid} · ${WatchScript.PATH}"
                                     startedThisBoot -> "đã bật trong phiên khởi động này · gọi $wake để thử"
                                     status.running == null -> "bật Shizuku để kích hoạt & khởi chạy"
@@ -192,19 +192,19 @@ fun ScriptScreen(
                             title = if (bankSafe) {
                                 "Đã tắt Tùy chọn nhà phát triển & Gỡ lỗi ✓"
                             } else {
-                                "Tắt ngay Tùy chọn nhà phát triển & Gỡ lỗi"
+                                "Tắt Tùy chọn nhà phát triển & Gỡ lỗi"
                             },
                             subtitle = when {
                                 bankSafe ->
-                                    "an toàn 100% cho mọi app ngân hàng & VNeID · script vẫn chạy ngầm"
+                                    "dùng mọi app ngân hàng & VNeID bình thường · script vẫn chạy ngầm"
                                 permissions.shizukuGranted ->
-                                    "chạm để Engine tự tắt sạch trong 1 giây · script và Engine vẫn chạy ngầm"
+                                    "chạm để Engine tự tắt ngay · script và Engine vẫn chạy ngầm"
                                 else ->
                                     "bắt buộc để dùng app ngân hàng · script vẫn chạy, chỉ mất khi khởi động lại máy"
                             },
                             subColor = if (bankSafe) Accent else Warn,
                             trailing = when {
-                                bankSafe -> "an toàn"
+                                bankSafe -> "đã tắt"
                                 permissions.shizukuGranted -> "tắt ngay"
                                 else -> "mở"
                             },
@@ -249,7 +249,7 @@ fun ScriptScreen(
                         title = "Engine nội bộ (Gỡ lỗi không dây 6 số)",
                         subtitle = when {
                             permissions.engineDaemonRunning && !permissions.devOptionsEnabled && !permissions.adbEnabled ->
-                                "đang chạy ngầm · đã tắt Gỡ lỗi (Bank-Safe) ✓"
+                                "đang chạy ngầm · đã tắt Gỡ lỗi ✓"
                             permissions.engineDaemonRunning ->
                                 "đã kết nối trong RAM (UID 2000) ✓"
                             canAutoConnectWireless ->
@@ -306,7 +306,7 @@ fun ScriptScreen(
                         subtitle = if (permissions.ready) {
                             "đã đủ ${permissions.coreGrantedCount}/${permissions.coreTotalCount} mục · xem ảnh hoặc mở cài đặt"
                         } else {
-                            "đạt ${permissions.coreGrantedCount}/${permissions.coreTotalCount} · mở thẳng quyền Google, Gemini, Pin, Khóa màn"
+                            "đã bật ${permissions.coreGrantedCount}/${permissions.coreTotalCount} mục · mở thẳng quyền Google, Gemini, Pin, Màn hình khóa"
                         },
                         subColor = if (permissions.ready) Accent else Warn,
                         trailing = "ảnh HD",
@@ -396,7 +396,7 @@ fun ScriptScreen(
                     !permissions.shizukuGranted && permissions.shizukuRunning -> "Cấp quyền Engine / Shizuku"
                     !permissions.shizukuGranted && canAutoConnectWireless -> "Kết nối Engine (Gỡ lỗi không dây)"
                     !permissions.shizukuGranted -> "Ghép nối Gỡ lỗi không dây (6 số)"
-                    status.running == true && devStillOn -> "Bật lại Script & Tắt ngay Gỡ lỗi"
+                    status.running == true && devStillOn -> "Cập nhật Script & Tắt Gỡ lỗi"
                     status.running == true -> "Kích hoạt & Bật lại script"
                     devStillOn -> "Kích hoạt, Bật Script & Tắt Gỡ lỗi"
                     else -> "Kích hoạt & Bật script nền"
@@ -442,7 +442,7 @@ fun ScriptScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (devStillOn) {
                             OutlineCta(
-                                text = "Tắt ngay Gỡ lỗi",
+                                text = "Tắt Gỡ lỗi ngay",
                                 onClick = onLockDevMode,
                                 modifier = Modifier.weight(1f),
                             )
@@ -471,5 +471,5 @@ internal fun scriptState(status: ScriptStatus, startedThisBoot: Boolean): Script
     status.running == true -> ScriptStateUi("đang chạy", "pid ${status.pid} · không cần Trợ năng", Accent)
     status.running == false -> ScriptStateUi("đã dừng", "chạm để bật lại", Danger)
     startedThisBoot -> ScriptStateUi("có lẽ chạy", "cần Shizuku để kiểm tra", Warn)
-    else -> ScriptStateUi("chưa bật", "như README · không cần Trợ năng", TextDim)
+    else -> ScriptStateUi("chưa bật", "chạy ngầm · không dùng Trợ năng", TextDim)
 }

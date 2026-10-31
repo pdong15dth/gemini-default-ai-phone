@@ -145,7 +145,6 @@ fun OverviewScreen(
     val missingRequired = requiredGuideItems.filter { !it.granted }
 
     var activeGuideIndex by rememberSaveable { mutableIntStateOf(-1) }
-    var editingActionSlot by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Trạng thái đóng/mở từng bước: tự động mở bước đang cần người dùng thực hiện
     var step1Expanded by rememberSaveable(permissions.ready) { mutableStateOf(!permissions.ready) }
@@ -184,61 +183,26 @@ fun OverviewScreen(
                 romChanged = romChanged,
                 summary = summary,
                 now = now,
-                onPrimaryAction = when {
-                    !permissions.ready -> {
-                        {
-                            step1Expanded = true
-                            val next = missingRequired.firstOrNull()
-                            if (next != null) next.onOpenSettings()
-                        }
-                    }
-                    !oneTime && !scriptOn -> {
-                        {
-                            step2Expanded = true
-                            val canAutoConnect = permissions.adbWifiEnabled && permissions.wirelessAdbPaired
-                            val preferShizuku = settings.shellBackend == ShellBackend.SHIZUKU ||
-                                (settings.shellBackend == ShellBackend.AUTO && permissions.shizukuBinderAlive && !permissions.shizukuPermissionGranted)
-                            when {
-                                permissions.shizukuGranted && !bankSafe -> onStartAndLock()
-                                permissions.shizukuGranted -> onStartScript()
-                                preferShizuku -> onConnectShizuku()
-                                permissions.shizukuRunning || canAutoConnect -> onRequestShizuku()
-                                else -> onStartWirelessPairing()
-                            }
-                        }
-                    }
-                    !bankSafe -> {
-                        {
-                            if (permissions.shizukuGranted) {
-                                onLockDevMode()
-                            } else {
-                                Intents.openDeveloperSettings(context)
-                            }
-                        }
-                    }
-                    romChanged -> onOpenSetup
-                    else -> null
-                },
+                onOpenSetup = if (romChanged) onOpenSetup else null,
             )
 
             // 2. LỘ TRÌNH 3 BƯỚC TRỰC QUAN
             SectionLabel(
-                "Lộ trình thiết lập (3 bước)",
+                "Thiết lập (3 bước)",
                 Modifier.padding(top = 2.dp),
                 action = if (permissions.ready && scriptOn && bankSafe) "Hoàn tất 3/3 ✓" else null,
             )
 
-            // --- BƯỚC 1: CẤP QUYỀN HỆ THỐNG ---
+            // --- BƯỚC 1: CẤP QUYỀN CƠ BẢN ---
             StepCard(
                 stepNumber = 1,
                 title = "Cấp quyền cơ bản",
                 subtitle = if (missingRequired.isEmpty()) {
-                    "Đã bật đủ ${requiredGuideItems.size}/${requiredGuideItems.size} nhóm quyền bắt buộc"
+                    "Đã bật đủ ${requiredGuideItems.size}/${requiredGuideItems.size} quyền bắt buộc"
                 } else {
-                    "Còn ${missingRequired.size} mục cần bật · Có ảnh minh họa từng bước"
+                    "Thiếu ${missingRequired.size} quyền bắt buộc · Bấm để bật"
                 },
                 completed = missingRequired.isEmpty(),
-                badgeText = "${requiredGuideItems.size - missingRequired.size}/${requiredGuideItems.size} đạt",
                 expanded = step1Expanded,
                 onToggleExpand = { step1Expanded = !step1Expanded },
             ) {
@@ -271,7 +235,7 @@ fun OverviewScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     BodyText(
-                        "Xem thêm hướng dẫn Màn hình khóa Gemini, Giọng nói & Nút AI",
+                        "Hướng dẫn thêm: Màn hình khóa, Giọng nói & Nút AI",
                         12.sp,
                         Accent,
                         weight = FontWeight.Medium,
@@ -289,39 +253,23 @@ fun OverviewScreen(
                 stepNumber = 2,
                 title = "Bật Script nền",
                 subtitle = when {
-                    scriptStatus.busy -> "Đang chạy lệnh kích hoạt & bật Script…"
-                    scriptOn -> "Đang chạy ngầm · Thay ${config.profile.assistantName} bằng ${config.target.displayName}"
-                    permissions.shizukuGranted -> "Công cụ chạy lệnh đã kết nối · Bấm để bật Script"
-                    else -> "Kết nối Gỡ lỗi không dây (6 số) hoặc Shizuku để kích hoạt"
+                    scriptStatus.busy -> "Đang kích hoạt & bật Script…"
+                    scriptOn -> "Đang chạy ngầm trong RAM"
+                    permissions.shizukuGranted -> "Đã kết nối công cụ chạy lệnh · Sẵn sàng bật"
+                    else -> "Cần kết nối Gỡ lỗi không dây (6 số) hoặc Shizuku"
                 },
                 completed = scriptOn,
-                badgeText = when {
-                    scriptStatus.busy -> "Đang bật…"
-                    scriptOn -> "Đang chạy"
-                    permissions.shizukuGranted -> "Sẵn sàng"
-                    else -> "Chưa bật"
-                },
                 expanded = step2Expanded,
                 onToggleExpand = { step2Expanded = !step2Expanded },
             ) {
-                BodyText(
-                    when {
-                        config.shellWatch == null ->
-                            "${config.profile.displayName} chưa có mẫu cửa sổ mặc định. Hãy bấm Dò cửa sổ trợ lý để tự bắt cửa sổ."
-                        scriptOn ->
-                            "Script đang chạy độc lập trong RAM (không dùng Trợ năng). Kể cả khi bạn đóng ứng dụng hoặc tắt Gỡ lỗi, Script vẫn tiếp tục hoạt động cho đến khi khởi động lại máy."
-                        permissions.shizukuGranted ->
-                            "Bấm nút bên dưới: ứng dụng sẽ tự động chạy ${setup.steps.size} lệnh cấu hình hệ thống, bật Script ngầm và khóa Gỡ lỗi."
-                        else ->
-                            "Để bật Script lần đầu sau khi mở máy, hãy ghép nối 6 số Gỡ lỗi không dây (Engine nội bộ) hoặc dùng ứng dụng Shizuku."
-                    },
-                    12.5.sp,
-                    Muted,
-                    lineHeight = 18.sp,
-                )
-                Gap(12.dp)
-
                 if (config.shellWatch == null) {
+                    BodyText(
+                        "${config.profile.displayName} chưa có mẫu cửa sổ mặc định. Hãy bấm Dò cửa sổ trợ lý để tự bắt cửa sổ.",
+                        12.5.sp,
+                        Muted,
+                        lineHeight = 18.sp,
+                    )
+                    Gap(10.dp)
                     OutlineCta(
                         text = "Dò cửa sổ trợ lý gốc",
                         icon = R.drawable.lc_scan_search,
@@ -332,9 +280,9 @@ fun OverviewScreen(
                 } else if (permissions.shizukuGranted) {
                     val primaryText = when {
                         scriptStatus.busy -> "Đang kích hoạt & bật Script…"
-                        !bankSafe && scriptOn -> "Cập nhật Script & Khóa Gỡ lỗi"
-                        !bankSafe -> "Bật Script & Tự khóa Gỡ lỗi"
-                        scriptOn -> "Bật lại / Cập nhật Script nền"
+                        !bankSafe && scriptOn -> "Cập nhật Script & Tắt Gỡ lỗi"
+                        !bankSafe -> "Bật Script & Tự tắt Gỡ lỗi"
+                        scriptOn -> "Cập nhật lại Script nền"
                         else -> "Kích hoạt & Bật Script nền"
                     }
                     PrimaryCta(
@@ -366,6 +314,13 @@ fun OverviewScreen(
                         }
                     }
                 } else {
+                    BodyText(
+                        "Ghép nối 6 số Gỡ lỗi không dây (chỉ cần làm 1 lần) hoặc bật Shizuku để kích hoạt Script.",
+                        12.5.sp,
+                        Muted,
+                        lineHeight = 18.sp,
+                    )
+                    Gap(10.dp)
                     val connectText = when {
                         preferShizuku && permissions.shizukuBinderAlive -> "Cấp quyền Shizuku ngay"
                         preferShizuku && permissions.shizukuAppInstalled -> "Mở ứng dụng Shizuku"
@@ -453,7 +408,7 @@ fun OverviewScreen(
                                 scriptStatus.running == true && scriptStatus.detachedFromAdbd == true ->
                                     "Tiến trình: pid ${scriptStatus.pid} · đã tách khỏi adbd · ${WatchScript.PATH}"
                                 scriptStatus.running == true ->
-                                    "Tiến trình: pid ${scriptStatus.pid} · đã neo giữ adbd · ${WatchScript.PATH}"
+                                    "Tiến trình: pid ${scriptStatus.pid} · đang chạy · ${WatchScript.PATH}"
                                 scriptStartedThisBoot ->
                                     "Tiến trình: đã khởi chạy trong phiên bật máy này"
                                 else ->
@@ -509,35 +464,23 @@ fun OverviewScreen(
                 }
             }
 
-            // --- BƯỚC 3: KHÓA GỠ LỖI · BANK-SAFE ---
+            // --- BƯỚC 3: TẮT GỠ LỖI ---
             StepCard(
                 stepNumber = 3,
-                title = "Khóa Gỡ lỗi",
+                title = "Tắt Gỡ lỗi",
                 subtitle = if (bankSafe) {
-                    "Đã tắt Gỡ lỗi & Tùy chọn nhà phát triển · An toàn 100% cho Ngân hàng & VNeID"
+                    "Đã tắt · Dùng Ngân hàng & VNeID"
                 } else {
-                    "Đang bật Gỡ lỗi · Tắt để dùng Ngân hàng & VNeID"
+                    "Cần tắt để dùng Ngân hàng & VNeID"
                 },
                 completed = bankSafe,
-                badgeText = if (bankSafe) "An toàn 100%" else "Cần khóa",
                 expanded = step3Expanded,
                 onToggleExpand = { step3Expanded = !step3Expanded },
             ) {
-                BodyText(
-                    if (bankSafe) {
-                        "Tùy chọn nhà phát triển và Gỡ lỗi USB đều đang tắt. Mọi ứng dụng Ngân hàng và VNeID sẽ hoạt động bình thường trong khi Script nền vẫn chạy ngầm."
-                    } else {
-                        "Sau khi Script ở Bước 2 đã chạy, bạn hãy tắt Tùy chọn nhà phát triển để các ứng dụng Ngân hàng và VNeID không cảnh báo. Script nền vẫn tiếp tục hoạt động."
-                    },
-                    12.5.sp,
-                    Muted,
-                    lineHeight = 18.sp,
-                )
-                Gap(12.dp)
                 if (!bankSafe) {
                     if (permissions.shizukuGranted) {
                         PrimaryCta(
-                            text = "Tắt ngay Gỡ lỗi (Bank-Safe)",
+                            text = "Tắt Gỡ lỗi ngay",
                             onClick = onLockDevMode,
                             leadingIcon = R.drawable.lc_shield_check,
                             modifier = Modifier.fillMaxWidth(),
@@ -567,51 +510,13 @@ fun OverviewScreen(
                     }
                 } else {
                     OutlineCta(
-                        text = "Mở Cài đặt Tùy chọn nhà phát triển",
+                        text = "Mở Tùy chọn nhà phát triển",
                         onClick = { Intents.openDeveloperSettings(context) },
                         modifier = Modifier.fillMaxWidth(),
                         height = 40.dp,
                         radius = 12.dp,
                     )
                 }
-            }
-
-            // 3. TÓM TẮT HÀNH VI GỌI AI NGAY TRÊN TRANG CHỦ
-            SectionLabel(
-                "Hành động khi gọi AI",
-                Modifier.padding(top = 4.dp),
-                action = "Tùy chỉnh chi tiết ›",
-                onAction = onOpenModes,
-            )
-            Panel {
-                NavRow(
-                    title = "Khẩu lệnh ($wakePhrase)",
-                    subtitle = actionModeSummary(settings.voiceAction, config.voiceAction, config.target.displayName),
-                    subColor = if (settings.voiceAction == ActionMode.DEFAULT) TextFaint else Accent,
-                    trailing = "đổi",
-                    trailingColor = Accent,
-                    leading = { IconTile(R.drawable.lc_mic, Accent) },
-                    onClick = { editingActionSlot = SLOT_VOICE },
-                )
-                NavRow(
-                    title = "Nút cứng / Phím cạnh AI",
-                    subtitle = actionModeSummary(settings.buttonAction, config.buttonAction, config.target.displayName),
-                    subColor = if (settings.buttonAction == ActionMode.DEFAULT) TextFaint else Accent,
-                    trailing = "đổi",
-                    trailingColor = Accent,
-                    leading = { IconTile(R.drawable.lc_sparkles, Accent) },
-                    onClick = { editingActionSlot = SLOT_BUTTON },
-                )
-                NavRow(
-                    title = "Lối tắt “Gọi AI” & Chạm mặt lưng",
-                    subtitle = actionModeSummary(settings.shortcutAction, config.shortcutAction, config.target.displayName),
-                    subColor = if (settings.shortcutAction == ActionMode.DEFAULT) TextFaint else Accent,
-                    trailing = "đổi",
-                    trailingColor = Accent,
-                    leading = { IconTile(R.drawable.lc_rocket, Accent) },
-                    onClick = { editingActionSlot = SLOT_SHORTCUT },
-                    divider = false,
-                )
             }
         }
     }
@@ -635,23 +540,6 @@ fun OverviewScreen(
             },
         )
     }
-
-    editingActionSlot?.let { slot ->
-        val (dialogTitle, currentMode, onSave) = when (slot) {
-            SLOT_VOICE -> Triple("Khẩu lệnh ($wakePhrase)", settings.voiceAction, onSetVoiceAction)
-            SLOT_BUTTON -> Triple("Nút cứng / Phím cạnh AI", settings.buttonAction, onSetButtonAction)
-            else -> Triple("Lối tắt “Gọi AI”", settings.shortcutAction, onSetShortcutAction)
-        }
-        ActionModeDialog(
-            title = dialogTitle,
-            current = currentMode,
-            onConfirm = { chosen ->
-                editingActionSlot = null
-                if (chosen != currentMode) onSave(chosen)
-            },
-            onDismiss = { editingActionSlot = null },
-        )
-    }
 }
 
 @Composable
@@ -665,61 +553,15 @@ private fun HeroStatusCard(
     romChanged: Boolean,
     summary: AttemptSummary,
     now: Long,
-    onPrimaryAction: (() -> Unit)?,
+    onOpenSetup: (() -> Unit)?,
 ) {
     val allGood = permissions.ready && (scriptOn || oneTime) && bankSafe && !romChanged
-    val stateColor = when {
-        allGood -> Accent
-        !permissions.ready -> Warn
-        !scriptOn && !oneTime -> Warn
-        !bankSafe -> Warn
-        else -> Warn
-    }
-    val eyebrow = when {
-        scriptBusy -> "ĐANG XỬ LÝ…"
-        allGood -> "HOẠT ĐỘNG HOÀN HẢO · BANK-SAFE ✓"
-        !permissions.ready -> "CẦN THIẾT LẬP · BƯỚC 1 / 3"
-        !scriptOn && !oneTime -> "CẦN KÍCH HOẠT · BƯỚC 2 / 3"
-        !bankSafe -> "BƯỚC CUỐI · CẦN KHÓA GỠ LỖI (BƯỚC 3)"
-        romChanged -> "CẬP NHẬT HỆ THỐNG · CẦN KIỂM TRA LẠI"
-        else -> "SẴN SÀNG"
-    }
-    val headline = when {
-        scriptBusy -> "Đang kích hoạt & bật Script…"
-        allGood -> "${config.profile.assistantName} → ${config.target.displayName}"
-        !permissions.ready -> "Bật đủ quyền cơ bản để bắt đầu"
-        !scriptOn && !oneTime -> "Bật Script nền để thay ${config.profile.assistantName}"
-        !bankSafe -> "Script đã chạy · Hãy khóa Gỡ lỗi"
-        else -> "Kiểm tra lại cấu hình sau cập nhật ROM"
-    }
-    val description = when {
-        allGood ->
-            "Script đang chạy ngầm và Gỡ lỗi đã tắt sạch. Gọi khẩu lệnh hoặc nhấn nút AI sẽ mở ngay ${config.target.displayName}."
-        !permissions.ready ->
-            "Còn ${permissions.coreTotalCount - permissions.coreGrantedCount} mục quyền ở Bước 1 cần bật để lớp phủ AI hoạt động ổn định."
-        !scriptOn && !oneTime ->
-            "Đã cấp đủ quyền cơ bản! Thực hiện Bước 2 bên dưới để kích hoạt Script ngầm."
-        !bankSafe ->
-            "Tắt Tùy chọn nhà phát triển để dùng ứng dụng Ngân hàng & VNeID bình thường (Script vẫn chạy)."
-        else ->
-            "Bản cập nhật hệ thống có thể đã đặt lại trợ lý mặc định."
-    }
-    val ctaLabel = when {
-        scriptBusy -> null
-        !permissions.ready -> "Mở quyền còn thiếu ngay"
-        !scriptOn && !oneTime -> when {
-            permissions.shizukuGranted && !bankSafe -> "Bật Script & Tự khóa Gỡ lỗi"
-            permissions.shizukuGranted -> "Kích hoạt & Bật Script nền"
-            permissions.adbWifiEnabled && permissions.wirelessAdbPaired -> "Kết nối Engine & Bật Script"
-            else -> "Ghép nối 6 số & Bật Script"
-        }
-        !bankSafe -> if (permissions.shizukuGranted) {
-            "Khóa Gỡ lỗi ngay (Bank-Safe)"
-        } else {
-            "Tắt Tùy chọn nhà phát triển"
-        }
-        romChanged -> "Chạy lại kích hoạt"
-        else -> null
+    val stateColor = if (allGood) Accent else Warn
+    val statusText = when {
+        scriptBusy -> "ĐANG KÍCH HOẠT…"
+        allGood -> "ĐANG HOẠT ĐỘNG ✓"
+        scriptOn -> "ĐANG CHẠY NGẦM"
+        else -> "CHƯA KÍCH HOẠT"
     }
 
     val shape = RoundedCornerShape(20.dp)
@@ -733,8 +575,8 @@ private fun HeroStatusCard(
                 if (allGood) CommunityLine else stateColor.copy(alpha = 0.45f),
                 shape,
             )
-            .padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -742,39 +584,31 @@ private fun HeroStatusCard(
         ) {
             StatusDot(stateColor, 8.dp)
             MonoText(
-                eyebrow,
+                statusText,
                 9.5.sp,
                 stateColor,
-                letterSpacing = 0.8.sp,
+                letterSpacing = 0.6.sp,
                 weight = FontWeight.Medium,
             )
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            BodyText(
-                headline,
-                21.sp,
-                if (allGood) CommunityTitle else TextMain,
-                weight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp,
-                lineHeight = 26.sp,
-            )
-            BodyText(
-                description,
-                12.5.sp,
-                if (allGood) TextBody else Muted,
-                lineHeight = 18.sp,
-            )
-        }
+        BodyText(
+            "${config.profile.assistantName} → ${config.target.displayName}",
+            20.sp,
+            if (allGood) CommunityTitle else TextMain,
+            weight = FontWeight.Bold,
+            letterSpacing = (-0.4).sp,
+            lineHeight = 25.sp,
+        )
 
-        if (ctaLabel != null && onPrimaryAction != null) {
+        if (romChanged && onOpenSetup != null) {
             PrimaryCta(
-                text = ctaLabel,
-                onClick = onPrimaryAction,
+                text = "Chạy lại kích hoạt",
+                onClick = onOpenSetup,
                 trailingIcon = R.drawable.lc_arrow_right,
                 modifier = Modifier.fillMaxWidth(),
-                height = 46.dp,
-                radius = 13.dp,
+                height = 42.dp,
+                radius = 12.dp,
             )
         }
 
@@ -791,7 +625,7 @@ private fun HeroStatusCard(
         ) {
             MiniStat("Hôm nay", "${summary.today} lượt")
             StatDivider()
-            MiniStat("Tỉ lệ đạt", summary.rate?.let { "$it%" } ?: "—")
+            MiniStat("Thành công", summary.rate?.let { "$it%" } ?: "—")
             StatDivider()
             MiniStat(
                 "Gần nhất",
@@ -825,7 +659,6 @@ private fun StepCard(
     title: String,
     subtitle: String,
     completed: Boolean,
-    badgeText: String,
     expanded: Boolean,
     onToggleExpand: () -> Unit,
     content: @Composable () -> Unit,
@@ -870,22 +703,12 @@ private fun StepCard(
                 BodyText(title, 14.5.sp, TextMain, weight = FontWeight.SemiBold, maxLines = 1)
                 BodyText(
                     subtitle,
-                    11.5.sp,
+                    12.sp,
                     if (completed) TextDim else Warn,
-                    maxLines = 2,
+                    maxLines = 1,
                     lineHeight = 16.sp,
                 )
             }
-
-            MonoText(
-                badgeText,
-                9.sp,
-                statusColor,
-                Modifier
-                    .clip(CircleShape)
-                    .background(statusColor.copy(alpha = 0.12f))
-                    .padding(horizontal = 9.dp, vertical = 4.dp),
-            )
 
             LucideIcon(
                 if (expanded) R.drawable.lc_chevron_down else R.drawable.lc_chevron_right,

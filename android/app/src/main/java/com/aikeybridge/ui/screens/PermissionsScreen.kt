@@ -387,7 +387,7 @@ internal fun rememberPermissionGuideItems(
                 title = "Engine nội bộ (Gỡ lỗi không dây 6 số)",
                 subtitle = when {
                     permissions.engineDaemonRunning && !permissions.devOptionsEnabled && !permissions.adbEnabled ->
-                        "Engine đang chạy ngầm · đã tắt Gỡ lỗi (Bank-Safe) ✓"
+                        "Engine đang chạy ngầm · đã tắt Gỡ lỗi ✓"
                     permissions.engineDaemonRunning ->
                         "Engine nội bộ đã kết nối trong RAM (UID 2000) ✓"
                     permissions.adbWifiEnabled && permissions.wirelessAdbPaired ->
@@ -467,9 +467,9 @@ internal fun rememberPermissionGuideItems(
                 title = "Tắt Tùy chọn nhà phát triển",
                 subtitle = when {
                     !permissions.devOptionsEnabled && !permissions.adbEnabled ->
-                        "Đã tắt — an toàn 100% cho app ngân hàng & VNeID ✓"
+                        "Đã tắt — dùng app ngân hàng & VNeID bình thường ✓"
                     permissions.shizukuGranted ->
-                        "Đang bật — bấm để Engine tự tắt sạch trong 1 giây (Script vẫn chạy)"
+                        "Đang bật — bấm để Engine tự tắt ngay (Script vẫn chạy)"
                     else ->
                         "Đang bật — tắt sau khi đã bật Script nền để dùng ngân hàng"
                 },
@@ -477,7 +477,7 @@ internal fun rememberPermissionGuideItems(
                 required = false,
                 pathSummary = "Tự động tắt bằng Engine nội bộ hoặc Cài đặt → Tùy chọn nhà phát triển",
                 steps = listOf(
-                    "Nếu Engine nội bộ đang chạy, chỉ cần bấm nút bên dưới — app sẽ tự động tắt sạch Gỡ lỗi không dây, Gỡ lỗi USB và Tùy chọn nhà phát triển ngay lập tức.",
+                    "Nếu Engine nội bộ đang chạy, chỉ cần bấm nút bên dưới — app sẽ tự động tắt Gỡ lỗi USB và Tùy chọn nhà phát triển ngay lập tức.",
                     "Hoặc mở Tùy chọn nhà phát triển và gạt TẮT công tắc tổng ở đầu trang để dùng mọi app ngân hàng & VNeID.",
                 ),
                 images = listOf(
@@ -491,7 +491,7 @@ internal fun rememberPermissionGuideItems(
                     ),
                 ),
                 openButtonLabel = if (permissions.shizukuGranted && (permissions.devOptionsEnabled || permissions.adbEnabled)) {
-                    "Tắt ngay Tùy chọn nhà phát triển (1 chạm)"
+                    "Tắt Tùy chọn nhà phát triển ngay"
                 } else {
                     "Mở Tùy chọn nhà phát triển"
                 },
@@ -541,7 +541,7 @@ fun PermissionsScreen(
     Column(modifier.fillMaxSize()) {
         SubHeader(onBack = onBack) {
             MonoText(
-                "$requiredGranted / $requiredTotal ĐẠT",
+                "$requiredGranted / $requiredTotal ĐÃ BẬT",
                 10.sp,
                 if (missingRequired.isEmpty()) Accent else Warn,
                 letterSpacing = 1.sp,
